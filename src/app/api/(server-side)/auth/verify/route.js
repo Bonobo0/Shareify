@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUser } from "@/lib/auth/jwt";
 import { connectToDatabase } from "@/lib/db/mongodb";
-import User from "@/lib/db/models/user";
+import User from "@/models/User";
 
 export async function GET(req) {
   try {
