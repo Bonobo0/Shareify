@@ -1,6 +1,6 @@
 import { Inter } from "next/font/google";
-import Head from "next/head";
-import ThemeSelector from "./components/themeSelector";
+import { AuthProvider } from "@/context/AuthContext";
+import Header from "./components/header";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -13,13 +13,15 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ko">
-      <Head>
-        <title>{metadata.title}</title>
-        <meta name="description" content={metadata.description} />
-      </Head>
       <body className={inter.className}>
-        <ThemeSelector />
-        {children}
+        <AuthProvider>
+          <Header />
+          <main className="pt-16">
+            {" "}
+            {/* 헤더 높이만큼 상단 패딩 추가 */}
+            {children}
+          </main>
+        </AuthProvider>
       </body>
     </html>
   );
