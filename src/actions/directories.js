@@ -664,7 +664,7 @@ export async function getDirectoryShareLinks({ directoryId }) {
       permission: link.permission,
       expiresAt: link.expiresAt,
       createdAt: link.createdAt,
-      shareUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/share/directory/${link.hash}`,
+      shareUrl: `${process.env.NEXT_PUBLIC_APP_URL}/share/directory/${link.hash}`,
       expired: new Date() > link.expiresAt,
     }));
 
