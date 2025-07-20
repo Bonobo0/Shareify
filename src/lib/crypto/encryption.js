@@ -41,12 +41,26 @@ export function generateIV() {
 // 파일 암호화
 export async function encryptFile(file, password) {
   try {
+    // Web Crypto API 지원 확인
+    if (!window.crypto || !window.crypto.subtle) {
+      throw new Error("이 브라우저는 암호화 기능을 지원하지 않습니다.");
+    }
+
+    // 파일 크기 제한 (100MB)
+    const MAX_FILE_SIZE = 100 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error("암호화할 수 있는 파일 크기는 최대 100MB입니다.");
+    }
+
+    console.log("암호화 시작:", file.name, "크기:", file.size);
+
     const salt = generateSalt();
     const iv = generateIV();
     const key = await deriveKeyFromPassword(password, salt);
 
     // 파일을 ArrayBuffer로 읽기
     const fileBuffer = await file.arrayBuffer();
+    console.log("파일 읽기 완료, 암호화 진행 중...");
 
     // 암호화
     const encryptedData = await crypto.subtle.encrypt(
@@ -57,6 +71,8 @@ export async function encryptFile(file, password) {
       key,
       fileBuffer
     );
+
+    console.log("암호화 완료, 결과 파일 생성 중...");
 
     // salt + iv + encryptedData를 하나의 배열로 결합
     const resultBuffer = new Uint8Array(
@@ -72,6 +88,8 @@ export async function encryptFile(file, password) {
       type: "application/octet-stream",
     });
 
+    console.log("암호화된 파일 생성 완료:", encryptedFile.size, "bytes");
+
     return {
       success: true,
       encryptedFile,
@@ -85,10 +103,29 @@ export async function encryptFile(file, password) {
     };
   } catch (error) {
     console.error("파일 암호화 오류:", error);
-    return {
-      success: false,
-      error: "파일 암호화 중 오류가 발생했습니다.",
-    };
+
+    // 구체적인 에러 메시지 제공
+    if (error.name === "NotSupportedError") {
+      return {
+        success: false,
+        error: "이 브라우저는 필요한 암호화 알고리즘을 지원하지 않습니다.",
+      };
+    } else if (error.name === "QuotaExceededError") {
+      return {
+        success: false,
+        error: "메모리가 부족합니다. 더 작은 파일을 시도해주세요.",
+      };
+    } else if (error.message.includes("크기")) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    } else {
+      return {
+        success: false,
+        error: "파일 암호화 중 오류가 발생했습니다: " + error.message,
+      };
+    }
   }
 }
 

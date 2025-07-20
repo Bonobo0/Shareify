@@ -17,7 +17,27 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
 
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) {
-      setFiles(Array.from(e.target.files));
+      const selectedFiles = Array.from(e.target.files);
+
+      // E2EE 활성화 시 파일 크기 검증
+      if (enableE2EE) {
+        const MAX_ENCRYPT_SIZE = 100 * 1024 * 1024; // 100MB
+        const oversizedFiles = selectedFiles.filter(
+          (file) => file.size > MAX_ENCRYPT_SIZE
+        );
+
+        if (oversizedFiles.length > 0) {
+          setError(
+            `암호화 모드에서는 100MB 이하의 파일만 업로드할 수 있습니다. 큰 파일: ${oversizedFiles
+              .map((f) => f.name)
+              .join(", ")}`
+          );
+          return;
+        }
+      }
+
+      setFiles(selectedFiles);
+      setError(""); // 에러 메시지 클리어
     }
   };
 
@@ -38,7 +58,27 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
     setDragActive(false);
 
     if (e.dataTransfer.files.length > 0) {
-      setFiles(Array.from(e.dataTransfer.files));
+      const selectedFiles = Array.from(e.dataTransfer.files);
+
+      // E2EE 활성화 시 파일 크기 검증
+      if (enableE2EE) {
+        const MAX_ENCRYPT_SIZE = 100 * 1024 * 1024; // 100MB
+        const oversizedFiles = selectedFiles.filter(
+          (file) => file.size > MAX_ENCRYPT_SIZE
+        );
+
+        if (oversizedFiles.length > 0) {
+          setError(
+            `암호화 모드에서는 100MB 이하의 파일만 업로드할 수 있습니다. 큰 파일: ${oversizedFiles
+              .map((f) => f.name)
+              .join(", ")}`
+          );
+          return;
+        }
+      }
+
+      setFiles(selectedFiles);
+      setError(""); // 에러 메시지 클리어
     }
   };
 
@@ -46,9 +86,28 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
     setEnableE2EE(checked);
     if (checked) {
       setShowPasswordInput(true);
+
+      // 이미 선택된 파일이 있다면 크기 검증
+      if (files.length > 0) {
+        const MAX_ENCRYPT_SIZE = 100 * 1024 * 1024; // 100MB
+        const oversizedFiles = files.filter(
+          (file) => file.size > MAX_ENCRYPT_SIZE
+        );
+
+        if (oversizedFiles.length > 0) {
+          setError(
+            `암호화 모드에서는 100MB 이하의 파일만 업로드할 수 있습니다. 큰 파일: ${oversizedFiles
+              .map((f) => f.name)
+              .join(", ")}`
+          );
+          // 큰 파일들 제거
+          setFiles(files.filter((file) => file.size <= MAX_ENCRYPT_SIZE));
+        }
+      }
     } else {
       setShowPasswordInput(false);
       setEncryptionPassword("");
+      setError(""); // 에러 메시지 클리어
     }
   };
 
@@ -84,18 +143,35 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
             [file.name]: { percent: 5, status: "encrypting" },
           }));
 
-          const encryptResult = await encryptFile(file, encryptionPassword);
-          if (!encryptResult.success) {
-            throw new Error(encryptResult.error);
+          console.log("파일 암호화 시작:", file.name);
+
+          try {
+            const encryptResult = await encryptFile(file, encryptionPassword);
+            if (!encryptResult.success) {
+              throw new Error(encryptResult.error);
+            }
+
+            fileToUpload = encryptResult.encryptedFile;
+            originalMetadata = encryptResult.metadata;
+
+            console.log(
+              "파일 암호화 완료:",
+              fileToUpload.name,
+              fileToUpload.size
+            );
+
+            setProgress((prev) => ({
+              ...prev,
+              [file.name]: { percent: 15, status: "uploading" },
+            }));
+          } catch (encryptError) {
+            console.error("암호화 실패:", encryptError);
+            setProgress((prev) => ({
+              ...prev,
+              [file.name]: { percent: 0, status: "error" },
+            }));
+            throw new Error(`암호화 실패: ${encryptError.message}`);
           }
-
-          fileToUpload = encryptResult.encryptedFile;
-          originalMetadata = encryptResult.metadata;
-
-          setProgress((prev) => ({
-            ...prev,
-            [file.name]: { percent: 15, status: "uploading" },
-          }));
         }
 
         // 1. 업로드 URL 요청
@@ -243,15 +319,33 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
                   </div>
 
                   {progress[file.name] && (
-                    <progress
-                      className={`progress w-full ${
-                        progress[file.name].status === "success"
-                          ? "progress-success"
-                          : "progress-primary"
-                      }`}
-                      value={progress[file.name].percent}
-                      max="100"
-                    ></progress>
+                    <div className="mt-1">
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>
+                          {progress[file.name].status === "encrypting" &&
+                            "🔒 암호화 중..."}
+                          {progress[file.name].status === "uploading" &&
+                            "📤 업로드 중..."}
+                          {progress[file.name].status === "success" &&
+                            "✅ 완료"}
+                          {progress[file.name].status === "error" && "❌ 실패"}
+                        </span>
+                        <span>{progress[file.name].percent}%</span>
+                      </div>
+                      <progress
+                        className={`progress w-full ${
+                          progress[file.name].status === "success"
+                            ? "progress-success"
+                            : progress[file.name].status === "error"
+                            ? "progress-error"
+                            : progress[file.name].status === "encrypting"
+                            ? "progress-warning"
+                            : "progress-primary"
+                        }`}
+                        value={progress[file.name].percent}
+                        max="100"
+                      ></progress>
+                    </div>
                   )}
                 </li>
               ))}

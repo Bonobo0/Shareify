@@ -12,14 +12,34 @@ import { getStorageInfo } from "@/actions/user";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, loading: authLoading, isAuthenticated } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    isAuthenticated,
+    refreshUser,
+  } = useAuth();
   const [loading, setLoading] = useState(true);
   const [storageInfo, setStorageInfo] = useState({ used: 0, total: 0 });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [userRefreshed, setUserRefreshed] = useState(false);
 
   useEffect(() => {
     // 인증 상태가 로딩 중이면 기다림
     if (authLoading) return;
+
+    // 로그인되었지만 user 정보가 없거나 불완전한 경우 새로고침
+    if (
+      isAuthenticated &&
+      !userRefreshed &&
+      (!user || user.isVerified === undefined)
+    ) {
+      const refreshUserInfo = async () => {
+        await refreshUser();
+        setUserRefreshed(true);
+      };
+      refreshUserInfo();
+      return;
+    }
 
     // 로그인되지 않았다면 로그인 페이지로 이동
     if (!isAuthenticated) {
@@ -28,7 +48,15 @@ export default function Dashboard() {
     }
 
     fetchStorageInfo();
-  }, [isAuthenticated, authLoading, router, refreshTrigger]);
+  }, [
+    isAuthenticated,
+    authLoading,
+    router,
+    refreshTrigger,
+    user,
+    userRefreshed,
+    refreshUser,
+  ]);
 
   const fetchStorageInfo = async () => {
     try {

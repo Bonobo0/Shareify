@@ -54,7 +54,10 @@ function SigninContent() {
         }
 
         // 로그인 성공
-        router.push(callbackUrl);
+        // AuthContext 업데이트를 위해 약간의 딜레이 후 리다이렉션
+        setTimeout(() => {
+          router.push(callbackUrl);
+        }, 100);
       } else {
         // 일반 로그인 시도
         const result = await login(email, password);
@@ -71,7 +74,10 @@ function SigninContent() {
         }
 
         // 로그인 성공 시 callbackUrl로 리다이렉션
-        router.push(callbackUrl);
+        // AuthContext 업데이트를 위해 약간의 딜레이 후 리다이렉션
+        setTimeout(() => {
+          router.push(callbackUrl);
+        }, 100);
       }
     } catch (error) {
       setError(error.message);

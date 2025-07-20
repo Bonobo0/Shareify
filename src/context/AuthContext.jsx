@@ -63,7 +63,13 @@ export function AuthProvider({ children }) {
       }
 
       if (result.success) {
-        setUser(result.user);
+        // 로그인 성공 시 사용자 정보 즉시 새로고침
+        const authResult = await verifyAuth();
+        if (authResult.authenticated) {
+          setUser(authResult.user);
+        } else {
+          setUser(result.user);
+        }
         return { success: true };
       }
 
