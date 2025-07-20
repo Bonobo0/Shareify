@@ -266,7 +266,19 @@ export default function SharePage() {
                 : "📁"}
             </div>
 
-            <h2 className="text-xl font-semibold">{file?.originalName}</h2>
+            <h2 className="text-xl font-semibold mb-3">{file?.originalName}</h2>
+
+            {file?.owner && (
+              <div className="flex justify-center mb-3">
+                <div className="badge badge-accent gap-2">
+                  <span>👤</span>
+                  <span className="text-sm">
+                    {file.owner.name || file.owner.email}님이 공유
+                  </span>
+                </div>
+              </div>
+            )}
+
             <p className="text-gray-500 mt-2">
               {formatBytes(file?.originalSize || file?.size)}
             </p>

@@ -22,7 +22,7 @@ export const sendVerificationEmail = async (email, token, name) => {
   try {
     const transporter = createTransporter();
 
-    const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/verify-email?token=${token}`;
+    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify-email?token=${token}`;
 
     const mailOptions = {
       from: `"Shareify" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`, // 사용자 정의 도메인 또는 Gmail

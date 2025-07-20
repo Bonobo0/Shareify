@@ -364,6 +364,14 @@ export default function FilePage() {
               <div className="badge badge-primary">🔒 암호화됨</div>
             )}
             {file?.isPublic && <div className="badge badge-success">공개</div>}
+            {!isOwner && file?.owner && (
+              <div className="badge badge-accent gap-2">
+                <span>👤</span>
+                <span className="text-sm">
+                  {file.owner.name || file.owner.email}님이 공유
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

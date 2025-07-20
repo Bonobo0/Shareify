@@ -7,6 +7,7 @@ import FileList from "../components/fileList";
 import CreateDirectory from "../components/createDirectory";
 import Navbar from "../components/navbar";
 import StorageInfo from "../components/storageInfo";
+import SharedItemsPreview from "../components/sharedItemsPreview";
 import { useAuth } from "@/context/AuthContext";
 import { getStorageInfo } from "@/actions/user";
 
@@ -133,8 +134,17 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div>
-          <FileList refreshTrigger={refreshTrigger} />
+        {/* 메인 콘텐츠 영역 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 파일 목록 (왼쪽, 넓은 영역) */}
+          <div className="lg:col-span-2">
+            <FileList refreshTrigger={refreshTrigger} />
+          </div>
+
+          {/* 공유받은 항목 (오른쪽, 좁은 영역) */}
+          <div className="lg:col-span-1">
+            <SharedItemsPreview />
+          </div>
         </div>
       </main>
     </>

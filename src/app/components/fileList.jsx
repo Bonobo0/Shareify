@@ -693,7 +693,21 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                     )}
                     <td className="flex items-center gap-2">
                       <span className="text-xl">📁</span>
-                      {directory.name}
+                      <div>
+                        <div className="font-medium">{directory.name}</div>
+                        {!directory.owner && directory.ownerInfo && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <div className="badge badge-accent badge-sm gap-1">
+                              <span>👤</span>
+                              <span>
+                                {directory.ownerInfo.name ||
+                                  directory.ownerInfo.email}
+                                님이 공유
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td>-</td>
                     <td>디렉토리</td>
@@ -783,6 +797,29 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                                 공개
                               </div>
                             )}
+                            {!file.owner && file.ownerInfo && (
+                              <div className="badge badge-accent badge-sm gap-1">
+                                <span>👤</span>
+                                <span>
+                                  {file.ownerInfo.name || file.ownerInfo.email}
+                                  님이 공유
+                                </span>
+                              </div>
+                            )}
+                            {file.owner &&
+                              file.parentDirectoryInfo &&
+                              file.parentDirectoryInfo.owner.id !==
+                                file.ownerInfo.id && (
+                                <div className="badge badge-info badge-sm gap-1">
+                                  <span>📁</span>
+                                  <span>
+                                    {file.parentDirectoryInfo.owner.name ||
+                                      file.parentDirectoryInfo.owner.email}
+                                    님의 {file.parentDirectoryInfo.name}에
+                                    업로드됨
+                                  </span>
+                                </div>
+                              )}
                           </div>
                         </div>
                       </div>

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import FileList from "@/app/components/fileList";
+import FileUploader from "@/app/components/fileUploader";
 import { getSharedDirectoryInfo } from "@/actions/share";
 import { downloadSharedFile } from "@/actions/share";
 import { decryptForPreview } from "@/lib/crypto/encryption";
@@ -18,16 +19,24 @@ export default function SharedDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [permission, setPermission] = useState("read");
+  const [directoryId, setDirectoryId] = useState(null);
   const [previewModal, setPreviewModal] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewPasswordModal, setPreviewPasswordModal] = useState(false);
   const [previewPassword, setPreviewPassword] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [errorModal, setErrorModal] = useState({ show: false, message: "" });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Error modal helper function
   const showError = (message) => {
     setErrorModal({ show: true, message });
+  };
+
+  const handleUploadComplete = () => {
+    setRefreshTrigger((prev) => prev + 1);
+    // 파일 목록 새로고침
+    fetchDirectoryDetails(hash);
   };
 
   const fetchDirectoryDetails = useCallback(async (shareHash) => {
@@ -40,6 +49,7 @@ export default function SharedDirectoryPage() {
 
       if (result.success) {
         setDirectoryInfo(result.directory);
+        setDirectoryId(result.directory.id);
         setFiles(result.files || []);
         setSubdirectories(result.subdirectories || []);
         setPermission(result.permission);
@@ -218,11 +228,16 @@ export default function SharedDirectoryPage() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">{directoryInfo?.name}</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                공유자:{" "}
-                {directoryInfo?.owner?.name || directoryInfo?.owner?.email}
-              </p>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold">{directoryInfo?.name}</h1>
+                <div className="badge badge-accent gap-2">
+                  <span>👤</span>
+                  <span className="text-sm">
+                    {directoryInfo?.owner?.name || directoryInfo?.owner?.email}
+                    님이 공유
+                  </span>
+                </div>
+              </div>
               {directoryInfo?.description && (
                 <p className="text-sm text-gray-700 mt-2">
                   {directoryInfo.description}
@@ -272,7 +287,20 @@ export default function SharedDirectoryPage() {
 
         {/* Files */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">📄 파일 목록</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">📄 파일 목록</h2>
+          </div>
+          {permission === "write" && directoryId && (
+            <div className="w-auto">
+              <FileUploader
+                directoryId={directoryId}
+                shareHash={hash}
+                onUploadComplete={handleUploadComplete}
+                buttonText="파일 업로드"
+                className="btn btn-primary btn-sm"
+              />
+            </div>
+          )}
           {files.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📂</div>

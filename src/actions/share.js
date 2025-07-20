@@ -5,6 +5,7 @@ import { verifyToken } from "@/lib/auth/jwt";
 import File from "@/models/File";
 import Directory from "@/models/Directory";
 import User from "@/models/User";
+import mongoose from "mongoose";
 import { generateDownloadUrl } from "@/lib/r2/r2Client";
 import { cookies } from "next/headers";
 
@@ -246,7 +247,11 @@ export async function getSharedItems() {
 
     // 나와 공유된 파일들 조회
     const sharedFiles = await File.find({
-      "shared.userId": userId,
+      "shared": {
+        $elemMatch: {
+          "userId": new mongoose.Types.ObjectId(userId),
+        },
+      },
       deleted: { $ne: true },
     })
       .populate("owner", "name email")
@@ -255,7 +260,11 @@ export async function getSharedItems() {
 
     // 나와 공유된 디렉토리들 조회
     const sharedDirectories = await Directory.find({
-      "shared.userId": userId,
+      "shared": {
+        $elemMatch: {
+          "userId": new mongoose.Types.ObjectId(userId),
+        },
+      },
       deleted: { $ne: true },
     })
       .populate("owner", "name email")
@@ -279,9 +288,6 @@ export async function getSharedItems() {
           ownerName:
             file.owner?.name || file.owner?.email.split("@")[0] || "알 수 없음",
           permission: userShare?.permission || "read",
-          sharedAt: userShare?.sharedAt
-            ? userShare.sharedAt.toISOString()
-            : null,
         };
       }),
       directories: sharedDirectories.map((dir) => {
@@ -290,6 +296,7 @@ export async function getSharedItems() {
         );
         return {
           id: dir._id.toString(),
+          hash: dir.hash,
           name: dir.name,
           description: dir.description || "",
           createdAt: dir.createdAt ? dir.createdAt.toISOString() : null,
@@ -368,14 +375,46 @@ export async function removeShareAccess({
       // 파일 공유 해제
       const file = await File.findOne({
         _id: fileId,
-        $or: [
-          { owner: userId },
-          { "shared.userId": userId, "shared.permission": "admin" },
-        ],
       });
 
       if (!file) {
-        return { error: "파일을 찾을 수 없거나 권한이 없습니다." };
+        return { error: "파일을 찾을 수 없습니다." };
+      }
+
+      // 파일 공유 해제 권한 확인
+      const isOwner = file.owner.toString() === userId;
+      const hasDirectAdminAccess = file.shared?.some(
+        (share) =>
+          share.userId.toString() === userId && share.permission === "admin"
+      );
+
+      // 상위 디렉토리 권한 확인
+      let hasParentAdminAccess = false;
+      if (file.parentDirectory) {
+        const parentDirectory = await Directory.findOne({
+          _id: file.parentDirectory,
+          $or: [
+            { owner: new mongoose.Types.ObjectId(userId) },
+            {
+              "shared": {
+                $elemMatch: {
+                  "userId": new mongoose.Types.ObjectId(userId),
+                  "permission": "admin",
+                },
+              },
+            },
+          ],
+          deleted: { $ne: true },
+        });
+
+        if (parentDirectory) {
+          hasParentAdminAccess = true;
+        }
+      }
+
+      // 공유 해제 권한 검증
+      if (!isOwner && !hasDirectAdminAccess && !hasParentAdminAccess) {
+        return { error: "파일 공유를 해제할 권한이 없습니다." };
       }
 
       file.shared = file.shared.filter(
@@ -393,14 +432,46 @@ export async function removeShareAccess({
       // 디렉토리 공유 해제
       const directory = await Directory.findOne({
         _id: directoryId,
-        $or: [
-          { owner: userId },
-          { "shared.userId": userId, "shared.permission": "admin" },
-        ],
       });
 
       if (!directory) {
-        return { error: "디렉토리를 찾을 수 없거나 권한이 없습니다." };
+        return { error: "디렉토리를 찾을 수 없습니다." };
+      }
+
+      // 디렉토리 공유 해제 권한 확인
+      const isOwner = directory.owner.toString() === userId;
+      const hasDirectAdminAccess = directory.shared?.some(
+        (share) =>
+          share.userId.toString() === userId && share.permission === "admin"
+      );
+
+      // 상위 디렉토리 권한 확인
+      let hasParentAdminAccess = false;
+      if (directory.parent) {
+        const parentDirectory = await Directory.findOne({
+          _id: directory.parent,
+          $or: [
+            { owner: new mongoose.Types.ObjectId(userId) },
+            {
+              "shared": {
+                $elemMatch: {
+                  "userId": new mongoose.Types.ObjectId(userId),
+                  "permission": "admin",
+                },
+              },
+            },
+          ],
+          deleted: { $ne: true },
+        });
+
+        if (parentDirectory) {
+          hasParentAdminAccess = true;
+        }
+      }
+
+      // 공유 해제 권한 검증
+      if (!isOwner && !hasDirectAdminAccess && !hasParentAdminAccess) {
+        return { error: "디렉토리 공유를 해제할 권한이 없습니다." };
       }
 
       directory.shared = directory.shared.filter(

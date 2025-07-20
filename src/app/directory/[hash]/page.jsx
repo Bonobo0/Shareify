@@ -106,7 +106,17 @@ export default function DirectoryPage() {
         </ul>
       </div>
 
-      <h1 className="text-3xl font-bold mb-6">{directory?.name}</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <h1 className="text-3xl font-bold">{directory?.name}</h1>
+        {directory && !directory.owner && directory.ownerInfo && (
+          <div className="badge badge-accent gap-2">
+            <span>👤</span>
+            <span className="text-sm">
+              {directory.ownerInfo.name || directory.ownerInfo.email}님이 공유
+            </span>
+          </div>
+        )}
+      </div>
 
       {directory?.description && (
         <div className="bg-base-200 p-4 rounded-lg mb-6">

@@ -4,7 +4,11 @@ import { useState, useRef } from "react";
 import { uploadFile, completeFileUpload } from "@/actions/files";
 import { encryptFile } from "@/lib/crypto/encryption";
 
-export default function FileUploader({ onUploadComplete, directoryId = null }) {
+export default function FileUploader({
+  onUploadComplete,
+  directoryId = null,
+  shareHash = null,
+}) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({});
@@ -191,6 +195,7 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
           directoryId: directoryId,
           isEncrypted: enableE2EE,
           originalMetadata: originalMetadata,
+          shareHash: shareHash,
         });
 
         if (uploadResult.error) {
