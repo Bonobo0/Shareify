@@ -182,17 +182,13 @@ export function isMediaFile(mimetype) {
   return mediaTypes.some((type) => mimetype.startsWith(type));
 }
 
-// 암호화된 미디어 파일 미리보기용 복호화 (URL에서 다운로드해서 복호화)
-export async function decryptForPreview(downloadUrl, password, metadata = {}) {
+// 암호화된 미디어 파일 미리보기용 복호화 (ArrayBuffer에서 직접 복호화)
+export async function decryptForPreview(
+  encryptedArrayBuffer,
+  password,
+  metadata = {}
+) {
   try {
-    // 암호화된 파일 다운로드
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      throw new Error("파일 다운로드 실패");
-    }
-
-    const encryptedArrayBuffer = await response.arrayBuffer();
-
     // 복호화
     const result = await decryptFile(encryptedArrayBuffer, password, {
       originalName: metadata.originalName || "preview",
@@ -200,13 +196,22 @@ export async function decryptForPreview(downloadUrl, password, metadata = {}) {
     });
 
     if (result.success) {
-      return result.decryptedFile; // Blob 객체 반환
+      return {
+        success: true,
+        blob: result.decryptedFile, // Blob 객체를 blob 속성으로 반환
+      };
     }
 
-    throw new Error(result.error || "복호화 실패");
+    return {
+      success: false,
+      error: result.error || "복호화 실패",
+    };
   } catch (error) {
     console.error("미리보기 복호화 오류:", error);
-    throw error;
+    return {
+      success: false,
+      error: error.message || "복호화 중 오류가 발생했습니다.",
+    };
   }
 }
 

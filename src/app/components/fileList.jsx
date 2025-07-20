@@ -295,14 +295,18 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
       const response = await fetch(result.downloadUrl);
       const encryptedArrayBuffer = await response.arrayBuffer();
 
-      // 복호화
+      // 복호화 (올바른 메타데이터 전달)
       const decryptResult = await decryptForPreview(
         encryptedArrayBuffer,
-        decryptPassword
+        decryptPassword,
+        {
+          originalName: file.originalName,
+          originalMimetype: file.originalMimetype,
+        }
       );
 
-      if (decryptResult.error) {
-        setError(decryptResult.error);
+      if (!decryptResult.success || decryptResult.error) {
+        setError(decryptResult.error || "복호화에 실패했습니다.");
         return;
       }
 
@@ -311,6 +315,7 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
       setDecryptModal(null);
       setDecryptPassword("");
     } catch (err) {
+      console.error("미리보기 복호화 오류:", err);
       setError(
         "미리보기 생성 중 오류가 발생했습니다. 복호화 키가 올바른지 확인해주세요."
       );
