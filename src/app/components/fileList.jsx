@@ -388,7 +388,9 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
       setDecryptModal(null);
       setDecryptPassword("");
     } catch (err) {
-      setError("미리보기 생성 중 오류가 발생했습니다.");
+      setError(
+        "미리보기 생성 중 오류가 발생했습니다. 복호화 키가 올바른지 확인해주세요."
+      );
     } finally {
       setActionLoading((prev) => ({ ...prev, [file.id]: false }));
     }
@@ -504,12 +506,9 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
     );
   }
 
-  if (error) {
-    return <div className="alert alert-error">{error}</div>;
-  }
-
   return (
     <div>
+      {error && <div className="alert alert-error mb-4">{error}</div>}
       {/* 경로 표시 */}
       {directoryId && (
         <div className="breadcrumbs mb-4 text-sm">
@@ -529,7 +528,6 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
           </ul>
         </div>
       )}
-
       {directories.length === 0 && files.length === 0 ? (
         <div className="text-center py-8 bg-base-200 rounded-lg">
           <p className="text-lg">이 디렉토리에 파일이 없습니다.</p>
@@ -874,7 +872,6 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
           </div>
         </div>
       )}
-
       {/* 암호화 파일 복호화 모달 */}
       {decryptModal && (
         <div className="modal modal-open">
@@ -931,7 +928,6 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
           </div>
         </div>
       )}
-
       {/* 미리보기 모달 */}
       {previewModal && (
         <div className="modal modal-open">
@@ -977,7 +973,6 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
           </div>
         </div>
       )}
-
       {/* 공유 모달 */}
       {shareModal && (
         <div className="modal modal-open">
@@ -1037,7 +1032,6 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
           </div>
         </div>
       )}
-
       {/* Alert Modal */}
       {alertModal.show && (
         <div className="modal modal-open">
@@ -1055,7 +1049,6 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
           </div>
         </div>
       )}
-
       {/* Confirm Modal */}
       {confirmModal.show && (
         <div className="modal modal-open">
@@ -1086,7 +1079,6 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
           </div>
         </div>
       )}
-
       {/* 디렉토리 공유 모달 */}
       <DirectoryShareModal
         isOpen={directoryShareModal.isOpen}
