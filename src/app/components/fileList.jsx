@@ -137,6 +137,10 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
             setError(
               `일부 항목 삭제 실패: ${errors[0].error || "알 수 없는 오류"}`
             );
+            setSelectedItems(new Set());
+            setSelectMode(false);
+            // 목록 새로고침
+            await fetchData();
           } else {
             console.log("삭제 성공, 상태 업데이트");
             showAlert(
