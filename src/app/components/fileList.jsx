@@ -817,6 +817,7 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
             <div className="py-4">
               {previewModal.file.mimetype?.startsWith("image/") ||
               previewModal.file.originalMimetype?.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={previewModal.url}
                   alt={previewModal.file.originalName}
