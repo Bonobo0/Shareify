@@ -2,18 +2,33 @@
 
 import Link from "next/link";
 import Terms from "@/app/components/terms";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Signup() {
   const router = useRouter();
+  const {
+    signup: authSignup,
+    isAuthenticated,
+    loading: authLoading,
+    refreshUser,
+  } = useAuth();
   const [terms, setTerms] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // 이미 로그인된 경우 대시보드로 이동
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const signup = async (e) => {
     e.preventDefault();
@@ -37,27 +52,32 @@ export default function Signup() {
     setError("");
 
     try {
-      const response = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const result = await authSignup(email, password, name);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "회원가입 중 오류가 발생했습니다.");
+      if (result.error) {
+        throw new Error(result.error);
       }
 
-      router.push("/dashboard");
+      if (result.success) {
+        // 회원가입 성공 시 바로 대시보드로 이동
+        router.push("/dashboard");
+      }
     } catch (error) {
       setError(error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  // 인증 로딩 중일 때
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center">
+        <div className="loading loading-spinner loading-lg"></div>
+        <p className="mt-4 text-lg">로딩 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center">
@@ -70,6 +90,13 @@ export default function Signup() {
         )}
 
         <form onSubmit={signup} className="flex flex-col gap-4">
+          <input
+            type="text"
+            placeholder="이름 (선택사항)"
+            className="input input-lg border-gray-500"
+            onChange={(e) => setName(e.target.value)}
+            disabled={loading}
+          />
           <input
             type="email"
             placeholder="이메일"

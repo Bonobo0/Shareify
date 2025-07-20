@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-export default function Signin() {
+function SigninContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isAuthenticated, loading: authLoading } = useAuth();
@@ -14,6 +14,9 @@ export default function Signin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
   // 로그인 후 리다이렉션을 위한 콜백 URL 가져오기
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
@@ -31,15 +34,45 @@ export default function Signin() {
     setError("");
 
     try {
-      // useAuth 훅의 login 함수 사용
-      const result = await login(email, password);
+      // 2FA 코드가 필요한 경우
+      if (showTwoFactor) {
+        const formData = new FormData();
+        formData.append("email", email);
+        formData.append("password", password);
+        formData.append("twoFactorCode", twoFactorCode);
+        formData.append("isBackupCode", useBackupCode.toString());
 
-      if (!result.success) {
-        throw new Error(result.error || "로그인 중 오류가 발생했습니다.");
+        const result = await login(formData);
+
+        if (!result.success) {
+          if (result.requiresTwoFactor) {
+            // 여전히 2FA가 필요한 경우 (잘못된 코드)
+            throw new Error(result.error || "잘못된 인증 코드입니다.");
+          } else {
+            throw new Error(result.error || "로그인 중 오류가 발생했습니다.");
+          }
+        }
+
+        // 로그인 성공
+        router.push(callbackUrl);
+      } else {
+        // 일반 로그인 시도
+        const result = await login(email, password);
+
+        if (!result.success) {
+          if (result.requiresTwoFactor) {
+            // 2FA가 필요한 경우
+            setShowTwoFactor(true);
+            setError(""); // 에러 메시지 클리어
+            return;
+          } else {
+            throw new Error(result.error || "로그인 중 오류가 발생했습니다.");
+          }
+        }
+
+        // 로그인 성공 시 callbackUrl로 리다이렉션
+        router.push(callbackUrl);
       }
-
-      // 로그인 성공 시 callbackUrl로 리다이렉션
-      router.push(callbackUrl);
     } catch (error) {
       setError(error.message);
     } finally {
@@ -70,24 +103,80 @@ export default function Signin() {
             type="email"
             placeholder="이메일"
             className="input input-lg border-gray-500"
+            value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={loading}
+            disabled={loading || showTwoFactor}
             required
           />
           <input
             type="password"
             placeholder="비밀번호"
             className="input input-lg border-gray-500"
+            value={password}
             onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
+            disabled={loading || showTwoFactor}
             required
           />
+
+          {showTwoFactor && (
+            <div className="space-y-4">
+              <div className="alert alert-info">
+                <span>
+                  2단계 인증이 필요합니다. 인증 앱에서 생성된 6자리 코드를
+                  입력해주세요.
+                </span>
+              </div>
+
+              <input
+                type="text"
+                placeholder={
+                  useBackupCode ? "백업 코드 (XXXX-XXXX)" : "인증 코드 (6자리)"
+                }
+                className="input input-lg border-gray-500"
+                value={twoFactorCode}
+                onChange={(e) => setTwoFactorCode(e.target.value)}
+                disabled={loading}
+                maxLength={useBackupCode ? 9 : 6}
+                required
+              />
+
+              <div className="form-control">
+                <label className="label cursor-pointer">
+                  <span className="label-text">백업 코드 사용</span>
+                  <input
+                    type="checkbox"
+                    className="checkbox"
+                    checked={useBackupCode}
+                    onChange={(e) => {
+                      setUseBackupCode(e.target.checked);
+                      setTwoFactorCode("");
+                    }}
+                    disabled={loading}
+                  />
+                </label>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-outline btn-sm w-full"
+                onClick={() => {
+                  setShowTwoFactor(false);
+                  setTwoFactorCode("");
+                  setUseBackupCode(false);
+                }}
+                disabled={loading}
+              >
+                다시 로그인하기
+              </button>
+            </div>
+          )}
+
           <button
             type="submit"
             className={`btn btn-lg btn-primary ${loading ? "loading" : ""}`}
             disabled={loading}
           >
-            {loading ? "처리 중..." : "로그인"}
+            {loading ? "처리 중..." : showTwoFactor ? "로그인 완료" : "로그인"}
           </button>
         </form>
         <p className="text-gray-500 mt-4">
@@ -98,5 +187,19 @@ export default function Signin() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function Signin() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="loading loading-spinner loading-lg"></div>
+        </div>
+      }
+    >
+      <SigninContent />
+    </Suspense>
   );
 }

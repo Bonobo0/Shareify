@@ -6,7 +6,9 @@ const PROTECTED_ROUTES = [
   "/dashboard",
   "/profile",
   "/settings",
-  "/share", // 공유 기능 관련 페이지
+  "/shared", // 공유된 파일 목록 페이지
+  "/directory", // 디렉토리 페이지
+  "/file", // 파일 상세 페이지
   "/api/share", // 공유 관련 API
   // 인증이 필요한 다른 경로들 추가
 ];
@@ -18,11 +20,6 @@ const BYPASS_ROUTES = [
   "/user/signup",
   "/user/forgot-password",
   "/user/reset-password",
-
-  // 공개 API 엔드포인트
-  "/api/login",
-  "/api/logout",
-  "/api/register",
 
   // 공개 접근이 필요한 페이지
   "/",
@@ -58,7 +55,7 @@ export async function middleware(request) {
   }
 
   // 쿠키에서 토큰 가져오기
-  const token = request.cookies.get("auth_token")?.value;
+  const token = request.cookies.get("token")?.value;
 
   // 토큰이 없거나 유효하지 않으면 로그인 페이지로 리다이렉트
   const payload = await verifyToken(token);

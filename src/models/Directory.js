@@ -6,6 +6,11 @@ const DirectorySchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  description: {
+    type: String,
+    trim: true,
+    default: "",
+  },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -38,6 +43,32 @@ const DirectorySchema = new mongoose.Schema({
       },
     },
   ],
+  shareLinks: [
+    {
+      hash: {
+        type: String,
+        required: true,
+      },
+      permission: {
+        type: String,
+        enum: ["read", "write"],
+        default: "read",
+      },
+      expiresAt: {
+        type: Date,
+        required: true,
+      },
+      createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   deleted: {
     type: Boolean,
     default: false,
@@ -53,7 +84,6 @@ const DirectorySchema = new mongoose.Schema({
 });
 
 // 인덱스 설정
-DirectorySchema.index({ hash: 1 });
 DirectorySchema.index({ userId: 1 });
 DirectorySchema.index({ parent: 1 });
 

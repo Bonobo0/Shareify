@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { uploadFile, completeFileUpload } from "@/actions/files";
+import { encryptFile } from "@/lib/crypto/encryption";
 
 export default function FileUploader({ onUploadComplete, directoryId = null }) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({});
   const [error, setError] = useState("");
+  const [enableE2EE, setEnableE2EE] = useState(false);
+  const [encryptionPassword, setEncryptionPassword] = useState("");
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
 
@@ -37,9 +42,24 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
     }
   };
 
+  const handleE2EEToggle = (checked) => {
+    setEnableE2EE(checked);
+    if (checked) {
+      setShowPasswordInput(true);
+    } else {
+      setShowPasswordInput(false);
+      setEncryptionPassword("");
+    }
+  };
+
   const handleUpload = async () => {
     if (files.length === 0) {
       setError("업로드할 파일을 선택해주세요.");
+      return;
+    }
+
+    if (enableE2EE && !encryptionPassword) {
+      setError("암호화를 활성화했을 때는 암호화 키를 입력해주세요.");
       return;
     }
 
@@ -54,69 +74,81 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
           [file.name]: { percent: 0, status: "uploading" },
         }));
 
-        // 1. 업로드 URL 요청
-        const urlResponse = await fetch("/api/files/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include", // 쿠키 포함
-          body: JSON.stringify({
-            filename: file.name,
-            size: file.size,
-            mimetype: file.type,
-            directoryId: directoryId,
-          }),
-        });
+        let fileToUpload = file;
+        let originalMetadata = null;
 
-        if (!urlResponse.ok) {
-          const errorData = await urlResponse.json();
-          throw new Error(
-            errorData.error || "업로드 URL 생성 중 오류가 발생했습니다."
-          );
+        // E2EE가 활성화된 경우 파일 암호화
+        if (enableE2EE) {
+          setProgress((prev) => ({
+            ...prev,
+            [file.name]: { percent: 5, status: "encrypting" },
+          }));
+
+          const encryptResult = await encryptFile(file, encryptionPassword);
+          if (!encryptResult.success) {
+            throw new Error(encryptResult.error);
+          }
+
+          fileToUpload = encryptResult.encryptedFile;
+          originalMetadata = encryptResult.metadata;
+
+          setProgress((prev) => ({
+            ...prev,
+            [file.name]: { percent: 15, status: "uploading" },
+          }));
         }
 
-        const urlData = await urlResponse.json();
-        const { uploadUrl, fileId } = urlData;
+        // 1. 업로드 URL 요청
+        console.log("🚀 서버로 전송하는 데이터:", {
+          filename: fileToUpload.name,
+          size: fileToUpload.size,
+          mimetype: fileToUpload.type,
+          directoryId: directoryId,
+          isEncrypted: enableE2EE,
+          originalMetadata: originalMetadata,
+        });
+
+        const uploadResult = await uploadFile({
+          filename: fileToUpload.name,
+          size: fileToUpload.size,
+          mimetype: fileToUpload.type,
+          directoryId: directoryId,
+          isEncrypted: enableE2EE,
+          originalMetadata: originalMetadata,
+        });
+
+        if (uploadResult.error) {
+          throw new Error(uploadResult.error);
+        }
+
+        const { uploadUrl, fileId } = uploadResult;
 
         setProgress((prev) => ({
           ...prev,
-          [file.name]: { percent: 10, status: "uploading" },
+          [file.name]: { percent: enableE2EE ? 25 : 10, status: "uploading" },
         }));
 
         // 2. presigned URL로 직접 파일 업로드
         const uploadResponse = await fetch(uploadUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.lengthComputable) {
-              const percentComplete =
-                Math.round((progressEvent.loaded / progressEvent.total) * 80) +
-                10;
-              setProgress((prev) => ({
-                ...prev,
-                [file.name]: { percent: percentComplete, status: "uploading" },
-              }));
-            }
-          },
+          headers: { "Content-Type": fileToUpload.type },
+          body: fileToUpload,
         });
 
         if (!uploadResponse.ok) {
           throw new Error("파일 업로드 중 오류가 발생했습니다.");
         }
 
-        // 3. 서버에 업로드 완료 알림
-        const completeResponse = await fetch("/api/files/complete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include", // 쿠키 포함
-          body: JSON.stringify({ fileId }),
-        });
+        setProgress((prev) => ({
+          ...prev,
+          [file.name]: { percent: 90, status: "uploading" },
+        }));
 
-        if (!completeResponse.ok) {
-          const errorData = await completeResponse.json();
-          throw new Error(
-            errorData.error || "업로드 완료 처리 중 오류가 발생했습니다."
-          );
+        // 3. 서버에 업로드 완료 알림
+        const completeResult = await completeFileUpload({ fileId });
+
+        if (completeResult.error) {
+          throw new Error(completeResult.error);
         }
 
         setProgress((prev) => ({
@@ -226,6 +258,49 @@ export default function FileUploader({ onUploadComplete, directoryId = null }) {
             </ul>
           </div>
         )}
+
+        {/* E2EE 옵션 */}
+        <div className="border-t pt-4">
+          <div className="form-control">
+            <label className="label cursor-pointer">
+              <span className="label-text">
+                <span className="font-semibold">종단간 암호화 (E2EE)</span>
+                <br />
+                <span className="text-sm text-gray-500">
+                  파일이 디바이스에서 암호화되어 서버에 저장됩니다
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="toggle toggle-primary"
+                checked={enableE2EE}
+                onChange={(e) => handleE2EEToggle(e.target.checked)}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+
+          {showPasswordInput && (
+            <div className="mt-3">
+              <label className="label">
+                <span className="label-text">암호화 키</span>
+              </label>
+              <input
+                type="password"
+                className="input input-bordered w-full"
+                placeholder="암호화에 사용할 비밀번호를 입력하세요"
+                value={encryptionPassword}
+                onChange={(e) => setEncryptionPassword(e.target.value)}
+                disabled={uploading}
+              />
+              <label className="label">
+                <span className="label-text-alt text-warning">
+                  ⚠️ 이 비밀번호를 잊으면 파일을 복구할 수 없습니다
+                </span>
+              </label>
+            </div>
+          )}
+        </div>
 
         <button
           className={`btn btn-primary ${uploading ? "loading" : ""}`}

@@ -3,12 +3,15 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const TOKEN_NAME = "auth_token";
+const TOKEN_NAME = "token";
 const TOKEN_MAX_AGE = 7 * 24 * 60 * 60; // 7일
 
 if (!JWT_SECRET) {
+  console.error("JWT_SECRET environment variable is not set");
   throw new Error("JWT_SECRET이 환경 변수에 설정되어 있지 않습니다.");
 }
+
+// console.log("JWT_SECRET loaded:", JWT_SECRET ? "Yes" : "No");
 
 // 비밀키 변환
 const textEncoder = new TextEncoder();
@@ -19,7 +22,7 @@ export async function generateToken(userId) {
   if (!userId) throw new Error("userId is required");
 
   try {
-    return await new jose.SignJWT({ id: userId.toString() })
+    return await new jose.SignJWT({ userId: userId.toString() })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("7d")
@@ -32,7 +35,10 @@ export async function generateToken(userId) {
 
 // 토큰 검증
 export async function verifyToken(token) {
-  if (!token) return null;
+  if (!token || typeof token !== "string") {
+    console.error("Invalid token format:", token);
+    return null;
+  }
 
   try {
     const { payload } = await jose.jwtVerify(token, secretKey, {
@@ -40,7 +46,7 @@ export async function verifyToken(token) {
     });
     return payload;
   } catch (error) {
-    console.error("토큰 검증 오류:", error);
+    console.error("토큰 검증 오류:", error.message);
     return null;
   }
 }
@@ -102,9 +108,9 @@ export async function authenticateUser(req) {
   if (!token) return null;
 
   const payload = await verifyToken(token);
-  if (!payload || !payload.id) return null;
+  if (!payload || !payload.userId) return null;
 
-  return payload.id.toString();
+  return payload.userId.toString();
 }
 
 // 로그인 성공 후 쿠키 설정

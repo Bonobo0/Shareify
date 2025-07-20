@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import FileUploader from "@/app/components/fileUploader";
 import FileList from "@/app/components/fileList";
 import CreateDirectory from "@/app/components/createDirectory";
 import { useAuth } from "@/context/AuthContext";
+import { getDirectoryByHash } from "@/actions/directories";
 
 export default function DirectoryPage() {
   const params = useParams();
@@ -15,10 +16,31 @@ export default function DirectoryPage() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
 
   const [directory, setDirectory] = useState(null);
+  const [directoryId, setDirectoryId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
+
+  const fetchDirectoryDetails = useCallback(async (directoryHash) => {
+    try {
+      const result = await getDirectoryByHash({ hash: directoryHash });
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      if (result.success) {
+        setDirectory(result.directory);
+        setDirectoryId(result.directory.id);
+        setBreadcrumbs([]); // 해시로 접근하는 디렉토리는 breadcrumbs가 제한적
+      }
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -29,32 +51,11 @@ export default function DirectoryPage() {
     }
 
     if (hash) {
-      fetchDirectoryDetails();
+      setLoading(true);
+      setError("");
+      fetchDirectoryDetails(hash);
     }
-  }, [hash, refreshTrigger, isAuthenticated, authLoading, router]);
-
-  const fetchDirectoryDetails = async () => {
-    try {
-      const response = await fetch(`/api/directories/${hash}`, {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(
-          data.error || "디렉토리 정보를 가져오는 중 오류가 발생했습니다."
-        );
-      }
-
-      const data = await response.json();
-      setDirectory(data.directory);
-      setBreadcrumbs(data.breadcrumbs || []);
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [hash, isAuthenticated, authLoading, router, fetchDirectoryDetails]);
 
   const handleUploadComplete = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -107,22 +108,28 @@ export default function DirectoryPage() {
 
       <h1 className="text-3xl font-bold mb-6">{directory?.name}</h1>
 
+      {directory?.description && (
+        <div className="bg-base-200 p-4 rounded-lg mb-6">
+          <p className="text-gray-300">{directory.description}</p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-4 mb-8">
         <CreateDirectory
-          parentId={directory?.id}
+          parentId={directoryId}
           onSuccess={handleDirectoryCreated}
         />
       </div>
 
       <div className="mb-8">
         <FileUploader
-          directoryId={directory?.id}
+          directoryId={directoryId}
           onUploadComplete={handleUploadComplete}
         />
       </div>
 
       <div>
-        <FileList directoryId={directory?.id} refreshTrigger={refreshTrigger} />
+        <FileList directoryId={directoryId} refreshTrigger={refreshTrigger} />
       </div>
     </div>
   );

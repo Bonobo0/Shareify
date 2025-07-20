@@ -6,6 +6,15 @@ import { useAuth } from "@/context/AuthContext";
 export default function Navbar() {
   const { user, logout } = useAuth();
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("로그아웃 중 오류:", error);
+      // 오류가 발생해도 페이지는 리다이렉션됨
+    }
+  };
+
   return (
     <div className="navbar bg-base-100 fixed top-0 z-10 shadow-md">
       <div className="navbar-start">
@@ -40,10 +49,7 @@ export default function Navbar() {
                   <Link href="/profile">프로필</Link>
                 </li>
                 <li>
-                  <Link href="/settings">설정</Link>
-                </li>
-                <li>
-                  <button onClick={logout}>로그아웃</button>
+                  <button onClick={handleLogout}>로그아웃</button>
                 </li>
               </ul>
             </div>

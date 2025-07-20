@@ -2,9 +2,31 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Home() {
   const router = useRouter();
+  const { isAuthenticated, loading } = useAuth();
+
+  useEffect(() => {
+    // 인증 상태가 로딩 중이면 기다림
+    if (loading) return;
+
+    // 로그인된 사용자는 대시보드로 리디렉션
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, loading, router]);
+
+  // 로딩 중이거나 로그인된 상태면 로딩 화면 표시
+  if (loading || isAuthenticated) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center">
+        <div className="loading loading-spinner loading-lg"></div>
+      </main>
+    );
+  }
   return (
     <main className="flex min-h-screen flex-col items-center ">
       <h1 className="text-4xl font-bold p-16">

@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
@@ -74,21 +75,42 @@ export async function generateUploadUrl(
 }
 
 // 다운로드용 Presigned URL 생성
-export async function generateDownloadUrl(filePath, expiresIn = 3600) {
+export async function generateDownloadUrl(
+  filePath,
+  originalFilename = null,
+  expiresIn = 3600
+) {
   if (!R2_BUCKET_NAME) {
     throw new Error("R2_BUCKET_NAME이 설정되지 않았습니다.");
   }
 
+  console.log("R2 다운로드 URL 생성 요청:", {
+    bucket: R2_BUCKET_NAME,
+    filePath: filePath,
+    originalFilename: originalFilename,
+    expiresIn: expiresIn,
+  });
+
   try {
-    const command = new GetObjectCommand({
+    const commandParams = {
       Bucket: R2_BUCKET_NAME,
       Key: filePath,
-    });
+    };
+
+    // 원본 파일명이 제공된 경우 Content-Disposition 헤더 추가
+    if (originalFilename) {
+      commandParams.ResponseContentDisposition = `attachment; filename="${encodeURIComponent(
+        originalFilename
+      )}"`;
+    }
+
+    const command = new GetObjectCommand(commandParams);
 
     const presignedUrl = await getSignedUrl(s3Client, command, {
       expiresIn,
     });
 
+    console.log("R2 다운로드 URL 생성 성공:", presignedUrl);
     return presignedUrl;
   } catch (error) {
     console.error("다운로드 URL 생성 오류:", error);
@@ -104,4 +126,52 @@ export async function deleteObject(key) {
   });
 
   return s3Client.send(command);
+}
+
+// 여러 파일을 한번에 삭제하는 함수
+export async function deleteMultipleObjects(keys) {
+  if (!keys || keys.length === 0) {
+    return { success: true, deletedCount: 0 };
+  }
+
+  // S3/R2는 한 번에 최대 1000개의 객체만 삭제할 수 있음
+  const batchSize = 1000;
+  let deletedCount = 0;
+  const errors = [];
+
+  for (let i = 0; i < keys.length; i += batchSize) {
+    const batch = keys.slice(i, i + batchSize);
+
+    try {
+      const command = new DeleteObjectsCommand({
+        Bucket: R2_BUCKET_NAME,
+        Delete: {
+          Objects: batch.map((key) => ({ Key: key })),
+          Quiet: false, // 삭제 결과를 반환받기 위해 false 설정
+        },
+      });
+
+      const result = await s3Client.send(command);
+      deletedCount += result.Deleted?.length || 0;
+
+      // 삭제 실패한 파일들이 있다면 에러 정보 수집
+      if (result.Errors && result.Errors.length > 0) {
+        errors.push(...result.Errors);
+      }
+    } catch (error) {
+      console.error(`배치 삭제 실패 (${i}-${i + batch.length}):`, error);
+      errors.push({
+        Key: `batch_${i}_${i + batch.length}`,
+        Code: error.name,
+        Message: error.message,
+      });
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    deletedCount,
+    totalRequested: keys.length,
+    errors,
+  };
 }

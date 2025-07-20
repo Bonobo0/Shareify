@@ -8,6 +8,7 @@ import CreateDirectory from "../components/createDirectory";
 import Navbar from "../components/navbar";
 import StorageInfo from "../components/storageInfo";
 import { useAuth } from "@/context/AuthContext";
+import { getStorageInfo } from "@/actions/user";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -31,18 +32,17 @@ export default function Dashboard() {
 
   const fetchStorageInfo = async () => {
     try {
-      const response = await fetch("/api/user/storage", {
-        credentials: "include", // 쿠키 포함
-      });
+      const result = await getStorageInfo();
 
-      if (response.ok) {
-        const data = await response.json();
+      if (result.success) {
         setStorageInfo({
-          used: data.usedStorage || 0,
-          total: data.quota || 50 * 1024 * 1024 * 1024,
-          available: data.availableStorage || 0,
-          percentage: data.usagePercentage || 0,
+          used: result.usedStorage || 0,
+          total: result.quota || 50 * 1024 * 1024 * 1024,
+          available: result.availableStorage || 0,
+          percentage: result.usagePercentage || 0,
         });
+      } else {
+        console.error("스토리지 정보 조회 실패:", result.error);
       }
 
       setLoading(false);
@@ -85,9 +85,25 @@ export default function Dashboard() {
           <CreateDirectory onSuccess={handleDirectoryCreated} />
         </div>
 
-        <div className="mb-8">
-          <FileUploader onUploadComplete={handleUploadComplete} />
-        </div>
+        {/* 이메일 인증 확인 */}
+        {!user?.isVerified ? (
+          <div className="alert alert-warning mb-8">
+            <div>
+              <strong>이메일 인증이 필요합니다!</strong>
+              <br />
+              파일 업로드를 위해서는 이메일 인증을 완료해주세요.
+              <br />
+              <small className="text-gray-600">
+                가입 시 보내드린 이메일을 확인하거나 프로필에서 다시 인증 메일을
+                요청할 수 있습니다.
+              </small>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-8">
+            <FileUploader onUploadComplete={handleUploadComplete} />
+          </div>
+        )}
 
         <div>
           <FileList refreshTrigger={refreshTrigger} />

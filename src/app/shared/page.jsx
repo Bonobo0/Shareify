@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/navbar";
 import { useAuth } from "@/context/AuthContext";
+import { getSharedItems } from "@/actions/share";
 
 export default function SharedPage() {
   const router = useRouter();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [sharedFiles, setSharedFiles] = useState([]);
+  const [sharedDirectories, setSharedDirectories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -22,24 +24,19 @@ export default function SharedPage() {
       return;
     }
 
-    fetchSharedFiles();
+    fetchSharedItems();
   }, [isAuthenticated, authLoading, router]);
 
-  const fetchSharedFiles = async () => {
+  const fetchSharedItems = async () => {
     try {
-      const response = await fetch("/api/files/shared", {
-        credentials: "include", // 쿠키 포함
-      });
+      const result = await getSharedItems();
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(
-          data.error || "공유 파일 목록을 불러오는 중 오류가 발생했습니다."
-        );
+      if (result.error) {
+        throw new Error(result.error);
       }
 
-      const data = await response.json();
-      setSharedFiles(data.files || []);
+      setSharedFiles(result.files || []);
+      setSharedDirectories(result.directories || []);
     } catch (error) {
       setError(error.message);
     } finally {

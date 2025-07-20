@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { createDirectory } from "@/actions/directories";
 
 export default function CreateDirectory({
   parentId = null,
   onSuccess = () => {},
 }) {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -14,12 +16,14 @@ export default function CreateDirectory({
   const openModal = () => {
     setIsOpen(true);
     setName("");
+    setDescription("");
     setError("");
   };
 
   const closeModal = () => {
     setIsOpen(false);
     setName("");
+    setDescription("");
     setError("");
   };
 
@@ -35,25 +39,17 @@ export default function CreateDirectory({
     setError("");
 
     try {
-      const response = await fetch("/api/directories", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          name: name.trim(),
-          parent: parentId,
-        }),
+      const result = await createDirectory({
+        name: name.trim(),
+        parentId: parentId,
+        description: description.trim(),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "디렉토리 생성 중 오류가 발생했습니다.");
+      if (result.error) {
+        throw new Error(result.error);
       }
 
-      onSuccess(data.directory);
+      onSuccess(result.directory);
       closeModal();
     } catch (error) {
       setError(error.message);
@@ -94,7 +90,7 @@ export default function CreateDirectory({
             )}
 
             <form onSubmit={handleSubmit}>
-              <div className="form-control">
+              <div className="form-control mb-4">
                 <label className="label">
                   <span className="label-text">폴더 이름</span>
                 </label>
@@ -106,6 +102,19 @@ export default function CreateDirectory({
                   onChange={(e) => setName(e.target.value)}
                   disabled={isLoading}
                   autoFocus
+                />
+              </div>
+
+              <div className="form-control mb-4">
+                <label className="label">
+                  <span className="label-text">설명 (선택사항)</span>
+                </label>
+                <textarea
+                  placeholder="폴더 설명"
+                  className="textarea textarea-bordered"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={isLoading}
                 />
               </div>
 

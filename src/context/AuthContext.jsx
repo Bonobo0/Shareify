@@ -2,6 +2,8 @@
 
 import { createContext, useState, useEffect, useContext } from "react";
 import { useRouter } from "next/navigation";
+import { signIn, signUp, signOut, verifyAuth } from "@/actions/auth";
+import { getUserInfo } from "@/actions/user";
 
 const AuthContext = createContext();
 
@@ -14,13 +16,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("/api/user", {
-          credentials: "include", // 중요: 쿠키 포함
-        });
+        const result = await verifyAuth();
 
-        if (res.ok) {
-          const userData = await res.json();
-          setUser(userData);
+        if (result.authenticated) {
+          setUser(result.user);
         } else {
           setUser(null);
         }
@@ -35,30 +34,92 @@ export function AuthProvider({ children }) {
     fetchUser();
   }, []);
 
-  // 로그인 함수
-  const login = async (email, password) => {
+  // 로그인 함수 (2FA 지원)
+  const login = async (...args) => {
     try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
+      let formData;
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "로그인에 실패했습니다.");
+      if (args.length === 1 && args[0] instanceof FormData) {
+        // FormData가 직접 전달된 경우 (2FA 포함)
+        formData = args[0];
+      } else if (args.length >= 2) {
+        // email, password 형태로 전달된 경우
+        const [email, password] = args;
+        formData = new FormData();
+        formData.append("email", email);
+        formData.append("password", password);
+      } else {
+        throw new Error("올바르지 않은 로그인 파라미터입니다.");
       }
 
-      // 로그인 후 사용자 정보 다시 불러오기
-      const userRes = await fetch("/api/user", { credentials: "include" });
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        setUser(userData);
+      const result = await signIn(formData);
+
+      if (result.error) {
+        return {
+          success: false,
+          error: result.error,
+          requiresTwoFactor: result.requiresTwoFactor,
+        };
       }
 
-      return { success: true };
+      if (result.success) {
+        setUser(result.user);
+        return { success: true };
+      }
+
+      return { success: false, error: "로그인에 실패했습니다." };
     } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  };
+
+  // 회원가입 함수
+  const signup = async (email, password, name) => {
+    try {
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("password", password);
+      if (name) formData.append("name", name);
+
+      const result = await signUp(formData);
+
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+
+      if (result.success) {
+        // 회원가입 성공 시 사용자 상태 즉시 업데이트
+        setUser(result.user);
+        return {
+          success: true,
+          message: result.message,
+          emailSent: result.emailSent,
+        };
+      }
+
+      return { success: false, error: "회원가입에 실패했습니다." };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  // 사용자 정보 새로고침 함수
+  const refreshUser = async () => {
+    try {
+      const result = await verifyAuth();
+      if (result.authenticated) {
+        setUser(result.user);
+        return { success: true };
+      } else {
+        setUser(null);
+        return { success: false };
+      }
+    } catch (error) {
+      console.error("사용자 정보 새로고침 오류:", error);
+      setUser(null);
       return { success: false, error: error.message };
     }
   };
@@ -66,22 +127,33 @@ export function AuthProvider({ children }) {
   // 로그아웃 함수
   const logout = async () => {
     try {
-      await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-
+      await signOut();
       setUser(null);
-      router.push("/user/signin");
+      router.push("/"); // 클라이언트 사이드에서 리다이렉션
       return { success: true };
     } catch (error) {
+      console.error("로그아웃 오류:", error);
+      // redirect 오류는 무시하고 상태만 업데이트
+      if (error.message && error.message.includes("NEXT_REDIRECT")) {
+        setUser(null);
+        router.push("/");
+        return { success: true };
+      }
       return { success: false, error: error.message };
     }
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, isAuthenticated: !!user, login, logout }}
+      value={{
+        user,
+        loading,
+        isAuthenticated: !!user,
+        login,
+        signup,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>
