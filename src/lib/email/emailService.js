@@ -104,3 +104,56 @@ export const send2FASetupEmail = async (email, name) => {
     return { error: "알림 메일 전송에 실패했습니다." };
   }
 };
+
+// 비밀번호 재설정 메일 전송
+export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"Shareify" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      to,
+      subject: "Shareify - 비밀번호 재설정",
+      html: `
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
+          <h2 style="color: #333;">비밀번호 재설정</h2>
+          <p>안녕하세요${name ? ` ${name}님` : ""}!</p>
+          <p>Shareify 계정의 비밀번호 재설정을 요청하셨습니다. 아래 버튼을 클릭하여 새로운 비밀번호를 설정해주세요.</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" 
+               style="background-color: #dc3545; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+              비밀번호 재설정하기
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px;">
+            이 링크는 15분 후에 만료됩니다.<br>
+            만약 버튼이 작동하지 않는다면, 아래 링크를 복사하여 브라우저에 직접 입력해주세요:
+          </p>
+          <p style="color: #666; font-size: 12px; word-break: break-all;">
+            ${resetUrl}
+          </p>
+          
+          <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+            <p style="color: #dc3545; font-weight: bold; margin: 0;">⚠️ 주의사항</p>
+            <p style="color: #666; font-size: 14px; margin: 10px 0 0 0;">
+              만약 비밀번호 재설정을 요청하지 않으셨다면, 이 이메일을 무시하셔도 됩니다. 
+              계정의 비밀번호는 변경되지 않습니다.
+            </p>
+          </div>
+          
+          <p style="color: #999; font-size: 12px; margin-top: 30px;">
+            이 메일은 자동으로 발송된 메일입니다. 회신하지 마세요.
+          </p>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("비밀번호 재설정 메일 전송 오류:", error);
+    return { error: "비밀번호 재설정 메일 전송에 실패했습니다." };
+  }
+};

@@ -263,3 +263,243 @@ export async function verifyAuth() {
     return { authenticated: false };
   }
 }
+
+// 비밀번호 재설정 요청
+export async function requestPasswordReset({ email }) {
+  try {
+    if (!email) {
+      return { error: "이메일을 입력해주세요." };
+    }
+
+    await connectToDatabase();
+
+    // 사용자 조회
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // 보안상 사용자가 존재하지 않더라도 성공 메시지 반환
+      return {
+        success: true,
+        message: "비밀번호 재설정 링크가 이메일로 전송되었습니다.",
+      };
+    }
+
+    // 재설정 토큰 생성 (랜덤 32바이트 hex 문자열)
+    const crypto = await import("crypto");
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15분 후 만료
+
+    // 사용자에 토큰 저장
+    user.passwordResetToken = resetToken;
+    user.passwordResetExpires = resetTokenExpiry;
+    await user.save();
+
+    // 이메일 발송
+    const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/user/reset-password?token=${resetToken}`;
+
+    const { sendPasswordResetEmail } = await import("@/lib/email/emailService");
+    const emailResult = await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name || user.email,
+      resetUrl,
+    });
+
+    if (emailResult.error) {
+      console.error("Password reset email failed:", emailResult.error);
+      return {
+        error: "이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.",
+      };
+    }
+
+    return {
+      success: true,
+      message: "비밀번호 재설정 링크가 이메일로 전송되었습니다.",
+    };
+  } catch (error) {
+    console.error("Password reset request error:", error);
+    return { error: "비밀번호 재설정 요청 중 오류가 발생했습니다." };
+  }
+}
+
+// 비밀번호 재설정 토큰 확인
+export async function verifyPasswordResetToken({ token }) {
+  try {
+    if (!token) {
+      return { error: "재설정 토큰이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    // 토큰으로 사용자 조회 (만료되지 않은 토큰만)
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: new Date() },
+    }).select("+twoFactorEnabled");
+
+    if (!user) {
+      return { error: "유효하지 않거나 만료된 재설정 링크입니다." };
+    }
+
+    return {
+      success: true,
+      email: user.email,
+      name: user.name,
+      twoFactorEnabled: user.twoFactorEnabled,
+    };
+  } catch (error) {
+    console.error("Password reset token verification error:", error);
+    return { error: "토큰 확인 중 오류가 발생했습니다." };
+  }
+}
+
+// 비밀번호 재설정 실행
+export async function resetPassword({
+  token,
+  newPassword,
+  confirmPassword,
+  twoFactorCode,
+  isBackupCode = false,
+}) {
+  try {
+    if (!token) {
+      return { error: "재설정 토큰이 필요합니다." };
+    }
+
+    if (!newPassword || !confirmPassword) {
+      return { error: "새 비밀번호를 입력해주세요." };
+    }
+
+    if (newPassword !== confirmPassword) {
+      return { error: "비밀번호가 일치하지 않습니다." };
+    }
+
+    if (newPassword.length < 8) {
+      return { error: "비밀번호는 최소 8자 이상이어야 합니다." };
+    }
+
+    await connectToDatabase();
+
+    // 토큰으로 사용자 조회 (만료되지 않은 토큰만)
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: new Date() },
+    }).select(
+      "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes"
+    );
+
+    if (!user) {
+      return { error: "유효하지 않거나 만료된 재설정 링크입니다." };
+    }
+
+    // 2FA가 활성화된 경우 2FA 코드 확인
+    if (user.twoFactorEnabled) {
+      if (!twoFactorCode) {
+        return {
+          error: "2FA 인증이 활성화된 계정입니다. 인증 코드를 입력해주세요.",
+          requires2FA: true,
+        };
+      }
+
+      let is2FAValid = false;
+
+      if (isBackupCode) {
+        // 백업 코드 확인
+        const backupCodeResult = await verifyBackupCode(
+          user._id.toString(),
+          twoFactorCode
+        );
+        if (!backupCodeResult.success) {
+          return { error: backupCodeResult.error };
+        }
+        is2FAValid = true;
+      } else {
+        // TOTP 코드 확인
+        const totpResult = await verify2FAToken(
+          user.twoFactorSecret,
+          twoFactorCode
+        );
+        if (!totpResult.success) {
+          return { error: "유효하지 않은 2FA 인증 코드입니다." };
+        }
+        is2FAValid = true;
+      }
+
+      if (!is2FAValid) {
+        return { error: "2FA 인증에 실패했습니다." };
+      }
+    }
+
+    // 새 비밀번호 설정
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    user.updatedAt = new Date();
+
+    await user.save();
+
+    return {
+      success: true,
+      message: "비밀번호가 성공적으로 변경되었습니다.",
+    };
+  } catch (error) {
+    console.error("Password reset error:", error);
+    return { error: "비밀번호 재설정 중 오류가 발생했습니다." };
+  }
+}
+
+// 로그인한 사용자의 비밀번호 변경
+export async function changePassword({
+  currentPassword,
+  newPassword,
+  confirmPassword,
+}) {
+  try {
+    const token = cookies().get("token")?.value;
+    if (!token) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    const decoded = await verifyToken(token);
+    if (!decoded) {
+      return { error: "유효하지 않은 토큰입니다." };
+    }
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return { error: "모든 필드를 입력해주세요." };
+    }
+
+    if (newPassword !== confirmPassword) {
+      return { error: "새 비밀번호가 일치하지 않습니다." };
+    }
+
+    if (newPassword.length < 8) {
+      return { error: "새 비밀번호는 최소 8자 이상이어야 합니다." };
+    }
+
+    await connectToDatabase();
+
+    // 사용자 조회 (비밀번호 포함)
+    const user = await User.findById(decoded.userId).select("+password");
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+
+    // 현재 비밀번호 확인
+    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    if (!isCurrentPasswordValid) {
+      return { error: "현재 비밀번호가 올바르지 않습니다." };
+    }
+
+    // 새 비밀번호 설정
+    user.password = newPassword;
+    user.updatedAt = new Date();
+    await user.save();
+
+    return {
+      success: true,
+      message: "비밀번호가 성공적으로 변경되었습니다.",
+    };
+  } catch (error) {
+    console.error("Password change error:", error);
+    return { error: "비밀번호 변경 중 오류가 발생했습니다." };
+  }
+}

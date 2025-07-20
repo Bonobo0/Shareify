@@ -185,12 +185,25 @@ function SigninContent() {
             {loading ? "처리 중..." : showTwoFactor ? "로그인 완료" : "로그인"}
           </button>
         </form>
-        <p className="text-gray-500 mt-4">
-          계정이 없으신가요?{" "}
-          <Link href="/user/signup" className="link-hover link-primary">
-            회원가입
-          </Link>
-        </p>
+
+        <div className="space-y-3 mt-4">
+          <p className="text-gray-500">
+            계정이 없으신가요?{" "}
+            <Link href="/user/signup" className="link-hover link-primary">
+              회원가입
+            </Link>
+          </p>
+
+          <p className="text-gray-500">
+            비밀번호를 잊으셨나요?{" "}
+            <Link
+              href="/user/forgot-password"
+              className="link-hover link-primary"
+            >
+              비밀번호 재설정
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

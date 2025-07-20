@@ -102,9 +102,8 @@ export async function getFileList({
       };
     } else {
       // 루트 디렉토리의 경우:
-      // 1. 소유자이고 루트에 있는 파일들
-      // 2. 직접 공유받은 파일들
-      // 3. 사용자가 업로드한 모든 파일들 (공유받은 디렉토리에 업로드한 것 포함)
+      // 1. 소유자이고 루트에 있는 파일들만
+      // 2. 직접 공유받은 파일들 (루트에 있는 것들만)
       filter = {
         $or: [
           // 1. 소유한 파일 중 루트에 있는 것들
@@ -112,18 +111,14 @@ export async function getFileList({
             owner: new mongoose.Types.ObjectId(userId),
             parentDirectory: null,
           },
-          // 2. 직접 공유받은 파일들
+          // 2. 직접 공유받은 파일들 (루트에 있는 것들만)
           {
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
               },
             },
-          },
-          // 3. 사용자가 업로드했지만 다른 사람의 디렉토리에 있는 파일들
-          {
-            owner: new mongoose.Types.ObjectId(userId),
-            parentDirectory: { $ne: null },
+            parentDirectory: null,
           },
         ],
         deleted: { $ne: true },
@@ -891,5 +886,112 @@ export async function getSharedFileDownloadUrl({ fileId, shareHash }) {
   } catch (error) {
     console.error("공유 파일 다운로드 URL 생성 오류:", error);
     return { error: "파일 다운로드 URL을 생성하는 중 오류가 발생했습니다." };
+  }
+}
+
+// 사용자가 공유받은 디렉토리에 업로드한 파일들 조회
+export async function getMyUploadedFiles({
+  page = 1,
+  limit = 20,
+  sortBy = "createdAt",
+  sortOrder = "desc",
+}) {
+  try {
+    const userId = await getAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "인증이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    // 정렬 옵션
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+    // 사용자가 업로드한 파일들 조회
+    const filter = {
+      owner: new mongoose.Types.ObjectId(userId),
+      parentDirectory: { $ne: null },
+      deleted: { $ne: true },
+    };
+
+    // 파일 조회 (페이지네이션 적용, 상위 디렉토리 정보 포함)
+    const skip = (page - 1) * limit;
+    const files = await File.find(filter)
+      .populate({
+        path: "owner",
+        select: "name email",
+      })
+      .populate({
+        path: "parentDirectory",
+        select: "name owner",
+        populate: {
+          path: "owner",
+          select: "name email",
+        },
+      })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // 총 파일 수
+    const totalFiles = await File.countDocuments(filter);
+    const totalPages = Math.ceil(totalFiles / limit);
+
+    return {
+      files: files.map((file) => ({
+        id: file._id.toString(),
+        originalName: file.originalName,
+        fileName: file.fileName,
+        size: file.size,
+        mimetype: file.mimetype,
+        hash: file.hash,
+        isPublic: file.isPublic,
+        uploaded: file.uploaded,
+        isEncrypted: file.isEncrypted || false,
+        originalSize: file.originalSize,
+        originalMimetype: file.originalMimetype,
+        createdAt: file.createdAt ? file.createdAt.toISOString() : null,
+        updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
+        parentDirectory: file.parentDirectory._id.toString(),
+        parentDirectoryInfo: {
+          id: file.parentDirectory._id.toString(),
+          name: file.parentDirectory.name,
+          owner: {
+            id: file.parentDirectory.owner._id.toString(),
+            name: file.parentDirectory.owner.name,
+            email: file.parentDirectory.owner.email,
+          },
+        },
+        deleted: file.deleted,
+        owner: true, // 항상 true (본인이 업로드한 파일이므로)
+        ownerInfo: {
+          id: file.owner._id.toString(),
+          name: file.owner.name,
+          email: file.owner.email,
+        },
+        sharedWith:
+          file.shared?.map((share) => ({
+            userId: share.userId.toString(),
+            permission: share.permission,
+          })) || [],
+      })),
+      pagination: {
+        page,
+        limit,
+        totalFiles,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
+  } catch (error) {
+    console.error("공유 디렉토리 업로드 파일 조회 오류:", error);
+    return {
+      error:
+        "공유 디렉토리에 업로드한 파일 목록을 조회하는 중 오류가 발생했습니다.",
+    };
   }
 }

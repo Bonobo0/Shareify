@@ -138,6 +138,15 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 파일 목록 (왼쪽, 넓은 영역) */}
           <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">내 파일</h2>
+              <button
+                onClick={() => router.push("/my-uploads")}
+                className="btn btn-outline btn-sm gap-2"
+              >
+                📂 업로드한 모든 파일 보기
+              </button>
+            </div>
             <FileList refreshTrigger={refreshTrigger} />
           </div>
 

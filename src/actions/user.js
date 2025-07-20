@@ -208,7 +208,11 @@ export async function updateUserProfile({
 }
 
 // 비밀번호 변경
-export async function changePassword({ currentPassword, newPassword }) {
+export async function changePassword({
+  currentPassword,
+  newPassword,
+  confirmPassword,
+}) {
   try {
     const userId = await getAuthenticatedUser();
 
@@ -216,12 +220,16 @@ export async function changePassword({ currentPassword, newPassword }) {
       return { error: "인증이 필요합니다." };
     }
 
-    if (!currentPassword || !newPassword) {
-      return { error: "현재 비밀번호와 새 비밀번호를 입력해주세요." };
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return { error: "모든 필드를 입력해주세요." };
     }
 
-    if (newPassword.length < 6) {
-      return { error: "새 비밀번호는 최소 6자 이상이어야 합니다." };
+    if (newPassword !== confirmPassword) {
+      return { error: "새 비밀번호가 일치하지 않습니다." };
+    }
+
+    if (newPassword.length < 8) {
+      return { error: "새 비밀번호는 최소 8자 이상이어야 합니다." };
     }
 
     await connectToDatabase();
@@ -234,11 +242,12 @@ export async function changePassword({ currentPassword, newPassword }) {
     // 현재 비밀번호 확인
     const isCurrentPasswordValid = await user.comparePassword(currentPassword);
     if (!isCurrentPasswordValid) {
-      return { error: "현재 비밀번호가 일치하지 않습니다." };
+      return { error: "현재 비밀번호가 올바르지 않습니다." };
     }
 
     // 새 비밀번호 설정
     user.password = newPassword;
+    user.updatedAt = new Date();
     await user.save();
 
     return {
