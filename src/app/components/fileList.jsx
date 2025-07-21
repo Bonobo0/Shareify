@@ -22,6 +22,8 @@ import {
   decryptForPreview,
 } from "@/lib/crypto/encryption";
 import DirectoryShareModal from "./directoryShareModal";
+import EditDirectoryModal from "./editDirectoryModal";
+import BulkDownloadModal from "./bulkDownloadModal";
 import ShareModal from "./shareModal";
 import BulkActionHandler from "./bulkActionHandler";
 import Paginator from "./paginator";
@@ -66,6 +68,21 @@ export default function FileList({
 
   // 디렉토리 공유 모달 상태
   const [directoryShareModal, setDirectoryShareModal] = useState({
+    isOpen: false,
+    directoryId: null,
+    directoryName: "",
+  });
+
+  // 디렉토리 수정 모달 상태
+  const [editDirectoryModal, setEditDirectoryModal] = useState({
+    isOpen: false,
+    directoryId: null,
+    directoryName: "",
+    directoryDescription: "",
+  });
+
+  // 전체 다운로드 모달 상태
+  const [bulkDownloadModal, setBulkDownloadModal] = useState({
     isOpen: false,
     directoryId: null,
     directoryName: "",
@@ -273,6 +290,25 @@ export default function FileList({
       isOpen: true,
       directoryId,
       directoryName,
+    });
+  };
+
+  // 디렉토리 수정 핸들러
+  const handleEditDirectory = (directory) => {
+    setEditDirectoryModal({
+      isOpen: true,
+      directoryId: directory.id,
+      directoryName: directory.name,
+      directoryDescription: directory.description || "",
+    });
+  };
+
+  // 전체 다운로드 핸들러
+  const handleBulkDownload = () => {
+    setBulkDownloadModal({
+      isOpen: true,
+      directoryId: directoryId,
+      directoryName: currentDirectory?.name || "루트 폴더",
     });
   };
 
@@ -552,6 +588,19 @@ export default function FileList({
         <div className="space-y-4">
           {/* 대량 액션 컨트롤 */}
           {React.createElement(bulkHandler.BulkActionControls)}
+
+          {/* 전체 다운로드 버튼 */}
+          {(directories.length > 0 || files.length > 0) && (
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={handleBulkDownload}
+                className="btn btn-outline btn-sm gap-2"
+              >
+                📦 전체 다운로드
+              </button>
+            </div>
+          )}
+
           <div className="overflow-x-auto overflow-y-visible -mx-2 sm:mx-0 relative">
             <p className="text-xs sm:text-sm mb-2">
               {currentPage} / {Math.ceil(totalPages / 2)} 페이지 ({totalItems}
@@ -670,6 +719,19 @@ export default function FileList({
                           tabIndex={0}
                           className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-48 sm:w-56 text-xs sm:text-sm z-[9999] absolute"
                         >
+                          <li>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                document.activeElement.blur();
+                                handleEditDirectory(directory);
+                              }}
+                              className="text-green-500"
+                              disabled={!directory.owner}
+                            >
+                              ✏️ 수정하기
+                            </button>
+                          </li>
                           <li>
                             <button
                               onClick={(e) => {
@@ -1061,8 +1123,56 @@ export default function FileList({
         }
       />
 
+      {/* 디렉토리 수정 모달 */}
+      <EditDirectoryModal
+        isOpen={editDirectoryModal.isOpen}
+        onClose={() =>
+          setEditDirectoryModal({
+            isOpen: false,
+            directoryId: null,
+            directoryName: "",
+            directoryDescription: "",
+          })
+        }
+        directoryId={editDirectoryModal.directoryId}
+        directoryName={editDirectoryModal.directoryName}
+        directoryDescription={editDirectoryModal.directoryDescription}
+        onUpdate={(updatedDirectory) => {
+          if (updatedDirectory && editDirectoryModal.directoryId) {
+            // 업데이트된 디렉토리 정보를 직접 사용
+            setDirectories((prevDirs) =>
+              prevDirs.map((dir) =>
+                dir.id === editDirectoryModal.directoryId
+                  ? { ...dir, ...updatedDirectory }
+                  : dir
+              )
+            );
+          } else {
+            // fallback: 전체 새로고침
+            fetchData();
+          }
+        }}
+      />
+
+      {/* 전체 다운로드 모달 */}
+      <BulkDownloadModal
+        isOpen={bulkDownloadModal.isOpen}
+        onClose={() =>
+          setBulkDownloadModal({
+            isOpen: false,
+            directoryId: null,
+            directoryName: "",
+          })
+        }
+        directoryId={bulkDownloadModal.directoryId}
+        directoryName={bulkDownloadModal.directoryName}
+      />
+
       {/* 삭제 진행 상황 모달 */}
       {React.createElement(bulkHandler.DeleteProgressModal)}
+
+      {/* 선택 다운로드 모달 */}
+      {React.createElement(bulkHandler.SelectedDownloadModal)}
     </div>
   );
 }

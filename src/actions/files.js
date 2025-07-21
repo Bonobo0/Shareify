@@ -1085,3 +1085,204 @@ export async function removeFileShare({ fileId, shareId }) {
     return { error: "파일 공유 해제 중 오류가 발생했습니다." };
   }
 }
+
+// 디렉토리의 모든 파일을 재귀적으로 가져오는 함수
+export async function getAllFilesForDownload({ directoryId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "인증이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    // 디렉토리 권한 확인
+    if (directoryId) {
+      const directory = await Directory.findOne({
+        _id: directoryId,
+        $or: [
+          { owner: new mongoose.Types.ObjectId(userId) },
+          {
+            "shared": {
+              $elemMatch: {
+                "userId": new mongoose.Types.ObjectId(userId),
+              },
+            },
+          },
+        ],
+        deleted: { $ne: true },
+      });
+
+      if (!directory) {
+        return { error: "디렉토리에 접근할 권한이 없습니다." };
+      }
+    }
+
+    // 재귀적으로 모든 파일과 하위 디렉토리를 가져오는 함수
+    async function getFilesRecursively(parentId, path = "") {
+      const files = [];
+
+      // 현재 디렉토리의 파일들 가져오기
+      const directFiles = await File.find({
+        parentDirectory: parentId
+          ? new mongoose.Types.ObjectId(parentId)
+          : null,
+        deleted: { $ne: true },
+        uploaded: true, // 업로드 완료된 파일만
+      }).lean();
+
+      // 파일들을 결과에 추가
+      for (const file of directFiles) {
+        // 파일 접근 권한 확인
+        const isOwner = file.owner.toString() === userId;
+        const isDirectlyShared = file.shared?.some(
+          (share) => share.userId.toString() === userId
+        );
+
+        // 상위 디렉토리 권한 확인 (이미 디렉토리 권한을 확인했으므로 생략 가능)
+        if (isOwner || isDirectlyShared || directoryId) {
+          const r2Key = file.path || file.fileName;
+          const downloadUrl = await generateDownloadUrl(
+            r2Key,
+            file.originalName
+          );
+
+          files.push({
+            id: file._id.toString(),
+            originalName: file.originalName,
+            fileName: file.fileName,
+            size: file.size,
+            mimetype: file.mimetype,
+            downloadUrl,
+            path: path ? `${path}/${file.originalName}` : file.originalName,
+            isEncrypted: file.isEncrypted || false,
+          });
+        }
+      }
+
+      // 하위 디렉토리들 가져오기
+      const subDirectories = await Directory.find({
+        parent: parentId ? new mongoose.Types.ObjectId(parentId) : null,
+        $or: [
+          { owner: new mongoose.Types.ObjectId(userId) },
+          {
+            "shared": {
+              $elemMatch: {
+                "userId": new mongoose.Types.ObjectId(userId),
+              },
+            },
+          },
+        ],
+        deleted: { $ne: true },
+      }).lean();
+
+      // 각 하위 디렉토리에 대해 재귀 호출
+      for (const subDir of subDirectories) {
+        const subPath = path ? `${path}/${subDir.name}` : subDir.name;
+        const subFiles = await getFilesRecursively(
+          subDir._id.toString(),
+          subPath
+        );
+        files.push(...subFiles);
+      }
+
+      return files;
+    }
+
+    const allFiles = await getFilesRecursively(directoryId);
+
+    return {
+      success: true,
+      files: allFiles,
+    };
+  } catch (error) {
+    console.error("전체 파일 목록 조회 오류:", error);
+    return { error: "파일 목록을 조회하는 중 오류가 발생했습니다." };
+  }
+}
+
+// 선택된 파일들의 다운로드 정보를 가져오는 함수
+export async function getSelectedFilesForDownload({ fileIds }) {
+  try {
+    const userId = await getAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "인증이 필요합니다." };
+    }
+
+    if (!fileIds || fileIds.length === 0) {
+      return { error: "선택된 파일이 없습니다." };
+    }
+
+    await connectToDatabase();
+
+    const files = [];
+
+    for (const fileId of fileIds) {
+      const file = await File.findOne({
+        _id: fileId,
+        deleted: { $ne: true },
+        uploaded: true,
+      });
+
+      if (!file) {
+        continue; // 파일이 없으면 건너뛰기
+      }
+
+      // 파일 접근 권한 확인
+      const isOwner = file.owner.toString() === userId;
+      const isDirectlyShared = file.shared?.some(
+        (share) => share.userId.toString() === userId
+      );
+
+      // 상위 디렉토리 권한 확인
+      let hasParentAccess = false;
+      if (file.parentDirectory) {
+        const parentDirectory = await Directory.findOne({
+          _id: file.parentDirectory,
+          $or: [
+            { owner: new mongoose.Types.ObjectId(userId) },
+            {
+              "shared": {
+                $elemMatch: {
+                  "userId": new mongoose.Types.ObjectId(userId),
+                },
+              },
+            },
+          ],
+          deleted: { $ne: true },
+        });
+
+        if (parentDirectory) {
+          hasParentAccess = true;
+        }
+      }
+
+      // 접근 권한이 있는 파일만 추가
+      if (isOwner || isDirectlyShared || hasParentAccess) {
+        const r2Key = file.path || file.fileName;
+        const downloadUrl = await generateDownloadUrl(r2Key, file.originalName);
+
+        files.push({
+          id: file._id.toString(),
+          originalName: file.originalName,
+          fileName: file.fileName,
+          size: file.size,
+          mimetype: file.mimetype,
+          downloadUrl,
+          path: file.originalName, // 선택 다운로드는 플랫 구조
+          isEncrypted: file.isEncrypted || false,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      files,
+    };
+  } catch (error) {
+    console.error("선택 파일 다운로드 정보 조회 오류:", error);
+    return { error: "파일 정보를 조회하는 중 오류가 발생했습니다." };
+  }
+}

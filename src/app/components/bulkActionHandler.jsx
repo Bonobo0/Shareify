@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { deleteFile } from "@/actions/files";
 import { deleteDirectoryRecursive } from "@/actions/directories";
+import SelectedDownloadModal from "./selectedDownloadModal";
 
 export default function BulkActionHandler({
   selectedItems,
@@ -15,6 +16,7 @@ export default function BulkActionHandler({
 }) {
   const [selectMode, setSelectMode] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState({
     show: false,
     current: 0,
@@ -143,15 +145,34 @@ export default function BulkActionHandler({
     );
   };
 
+  const handleBulkDownload = () => {
+    if (selectedItems.size === 0) return;
+
+    // 선택된 파일들만 추출 (디렉토리는 제외)
+    const selectedFiles = Array.from(selectedItems)
+      .filter((item) => item.startsWith("file-"))
+      .map((item) => item.replace("file-", ""));
+
+    if (selectedFiles.length === 0) {
+      onShowAlert("다운로드할 파일을 선택해주세요. (폴더는 지원되지 않습니다)");
+      return;
+    }
+
+    setShowDownloadModal(true);
+  };
+
   return {
     selectMode,
     bulkActionLoading,
     deleteProgress,
+    showDownloadModal,
     toggleSelectMode,
     toggleItemSelection,
     selectAllItems,
     clearSelection,
     handleBulkDelete,
+    handleBulkDownload,
+    setShowDownloadModal,
 
     // 렌더링 컴포넌트
     BulkActionControls: () => (
@@ -195,6 +216,23 @@ export default function BulkActionHandler({
 
         {selectMode && selectedItems.size > 0 && (
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                const selectedFiles = Array.from(selectedItems).filter((item) =>
+                  item.startsWith("file-")
+                );
+                if (selectedFiles.length > 0) {
+                  handleBulkDownload();
+                } else {
+                  onShowAlert("다운로드할 파일을 선택해주세요.");
+                }
+              }}
+              className="btn btn-xs sm:btn-sm btn-info flex-1 sm:flex-none"
+              disabled={bulkActionLoading}
+            >
+              📥 다운로드
+            </button>
+
             <button
               onClick={handleBulkDelete}
               className={`btn btn-xs sm:btn-sm btn-error flex-1 sm:flex-none ${
@@ -310,5 +348,24 @@ export default function BulkActionHandler({
           </div>
         </div>
       ),
+
+    // 선택 다운로드 모달
+    SelectedDownloadModal: () => {
+      const selectedFiles = Array.from(selectedItems)
+        .filter((item) => item.startsWith("file-"))
+        .map((item) => item.replace("file-", ""));
+
+      return (
+        <SelectedDownloadModal
+          isOpen={showDownloadModal}
+          onClose={() => setShowDownloadModal(false)}
+          selectedFiles={selectedFiles}
+          onClearSelection={() => {
+            clearSelection();
+            setSelectMode(false);
+          }}
+        />
+      );
+    },
   };
 }

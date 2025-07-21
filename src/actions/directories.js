@@ -319,6 +319,7 @@ export async function updateDirectory({ directoryId, name, description }) {
         id: directory._id.toString(),
         name: directory.name,
         description: directory.description,
+        hash: directory.hash, // hash 값 추가
         updatedAt: directory.updatedAt
           ? directory.updatedAt.toISOString()
           : null,
