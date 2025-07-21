@@ -423,7 +423,7 @@ export async function deleteDirectory({ directoryId }) {
 
 export async function shareDirectory({
   directoryId,
-  targetUserEmail,
+  email,
   permission = "read",
 }) {
   try {
@@ -455,9 +455,14 @@ export async function shareDirectory({
     }
 
     // 공유받을 사용자 조회
-    const targetUser = await User.findOne({ email: targetUserEmail });
+    const targetUser = await User.findOne({ email });
     if (!targetUser) {
       return { error: "해당 이메일의 사용자를 찾을 수 없습니다." };
+    }
+
+    // 소유자가 자신에게 공유하려고 시도하는지 확인
+    if (directory.owner.toString() === targetUser._id.toString()) {
+      return { error: "디렉토리 소유자는 본인에게 공유할 수 없습니다." };
     }
 
     // 이미 공유된 사용자인지 확인
@@ -1212,5 +1217,61 @@ export async function removeDirectoryShare({ directoryId, shareId }) {
   } catch (error) {
     console.error("디렉토리 공유 해제 오류:", error);
     return { error: "디렉토리 공유 해제 중 오류가 발생했습니다." };
+  }
+}
+
+// 디렉토리의 breadcrumbs 경로를 가져오는 함수
+export async function getDirectoryBreadcrumbs({ directoryId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "인증이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    const breadcrumbs = [];
+    let currentDirectoryId = directoryId;
+
+    // 루트까지 역순으로 탐색
+    while (currentDirectoryId) {
+      const directory = await Directory.findById(currentDirectoryId)
+        .populate("owner", "name email")
+        .lean();
+
+      if (!directory || directory.deleted) {
+        break;
+      }
+
+      // 접근 권한 확인
+      const isOwner = directory.owner._id.toString() === userId;
+      const isShared = directory.shared?.some(
+        (share) => share.userId.toString() === userId
+      );
+
+      if (!isOwner && !isShared) {
+        break; // 권한이 없으면 여기서 중단
+      }
+
+      // breadcrumb 항목 추가 (역순이므로 앞에 추가)
+      breadcrumbs.unshift({
+        id: directory._id.toString(),
+        name: directory.name,
+        hash: directory.hash,
+        isOwner,
+      });
+
+      // 다음 상위 디렉토리로 이동
+      currentDirectoryId = directory.parent;
+    }
+
+    return {
+      success: true,
+      breadcrumbs,
+    };
+  } catch (error) {
+    console.error("breadcrumbs 조회 오류:", error);
+    return { error: "경로 정보를 가져오는 중 오류가 발생했습니다." };
   }
 }

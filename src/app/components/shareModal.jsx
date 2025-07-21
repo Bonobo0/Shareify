@@ -446,10 +446,10 @@ export default function ShareModal({
 
                             <div className="flex items-center gap-2">
                               <div
-                                className={`badge ${
+                                className={`btn btn-xs ${
                                   share.permission === "admin"
-                                    ? "badge-error"
-                                    : "badge-info"
+                                    ? "btn-error"
+                                    : "btn-info"
                                 }`}
                               >
                                 {share.permission === "admin"

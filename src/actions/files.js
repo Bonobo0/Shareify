@@ -715,6 +715,11 @@ export async function shareFile({ fileId, email, permission = "read" }) {
       return { error: "해당 이메일의 사용자를 찾을 수 없습니다." };
     }
 
+    // 소유자가 자신에게 공유하려고 시도하는지 확인
+    if (file.owner.toString() === targetUser._id.toString()) {
+      return { error: "파일 소유자는 본인에게 공유할 수 없습니다." };
+    }
+
     // 이미 공유된 사용자인지 확인
     const existingShare = file.shared.find(
       (share) => share.userId.toString() === targetUser._id.toString()

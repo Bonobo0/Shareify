@@ -15,6 +15,7 @@ import {
   getDirectoryList,
   getDirectoryDetails,
   deleteDirectoryRecursive,
+  getDirectoryBreadcrumbs,
 } from "@/actions/directories";
 import {
   downloadAndDecrypt,
@@ -176,8 +177,17 @@ export default function FileList({
 
           if (currentDirResult.success) {
             setCurrentDirectory(currentDirResult.directory);
-            // TODO: breadcrumbs 구현 필요
-            setBreadcrumbs([]);
+
+            // breadcrumbs 가져오기
+            const breadcrumbsResult = await getDirectoryBreadcrumbs({
+              directoryId,
+            });
+
+            if (breadcrumbsResult.success) {
+              setBreadcrumbs(breadcrumbsResult.breadcrumbs);
+            } else {
+              setBreadcrumbs([]);
+            }
           }
         } else {
           // 루트 디렉토리인 경우
@@ -317,9 +327,10 @@ export default function FileList({
     fetchData();
   }, [directoryId, refreshTrigger, fetchData]);
 
-  // 디렉토리가 변경되면 첫 페이지로 이동
+  // 디렉토리가 변경되면 첫 페이지로 이동 및 선택 초기화
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedItems(new Set()); // 디렉토리 변경 시 선택 항목도 초기화
   }, [directoryId]);
 
   // 페이지 변경 핸들러
@@ -559,20 +570,48 @@ export default function FileList({
   return (
     <div>
       {error && <div className="alert alert-error mb-4">{error}</div>}
-      {/* 경로 표시 */}
-      {directoryId && (
+      {/* 경로 표시 (breadcrumbs) */}
+      {(directoryId || breadcrumbs.length > 0) && (
         <div className="breadcrumbs mb-4 text-sm">
           <ul>
             <li>
-              <Link href="/dashboard">내 파일</Link>
+              <Link
+                href="/dashboard"
+                className="text-blue-700 hover:text-blue-800"
+              >
+                🏠 내 파일
+              </Link>
             </li>
             {breadcrumbs.map((crumb, index) => (
               <li key={crumb.id}>
-                {index === breadcrumbs.length - 1 ? (
-                  crumb.name
-                ) : (
-                  <Link href={`/directory/${crumb.hash}`}>{crumb.name}</Link>
-                )}
+                <div className="flex items-center gap-1">
+                  {index === breadcrumbs.length - 1 ? (
+                    <>
+                      <span className="text-gray-700 font-medium">
+                        {crumb.name}
+                      </span>
+                      {!crumb.isOwner && (
+                        <span className="badge badge-accent badge-xs">
+                          👤 공유받음
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/directory/${crumb.hash}`}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        {crumb.name}
+                      </Link>
+                      {!crumb.isOwner && (
+                        <span className="badge badge-accent badge-xs ml-1">
+                          👤
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

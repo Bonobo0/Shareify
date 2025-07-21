@@ -328,10 +328,10 @@ export default function DirectoryShareModal({
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <div
-                                className={`badge ${
+                                className={`btn btn-xs ${
                                   link.permission === "read"
-                                    ? "badge-info"
-                                    : "badge-warning"
+                                    ? "btn-info"
+                                    : "btn-warning"
                                 }`}
                               >
                                 {link.permission === "read"
@@ -339,7 +339,9 @@ export default function DirectoryShareModal({
                                   : "읽기/쓰기"}
                               </div>
                               {link.expired && (
-                                <div className="badge badge-error">만료됨</div>
+                                <div className="btn btn-xs btn-error">
+                                  만료됨
+                                </div>
                               )}
                             </div>
 
@@ -464,12 +466,12 @@ export default function DirectoryShareModal({
 
                           <div className="flex items-center gap-2">
                             <div
-                              className={`badge ${
+                              className={`btn btn-xs ${
                                 user.permission === "read"
-                                  ? "badge-info"
+                                  ? "btn-info"
                                   : user.permission === "write"
-                                  ? "badge-warning"
-                                  : "badge-error"
+                                  ? "btn-warning"
+                                  : "btn-error"
                               }`}
                             >
                               {user.permission === "read"
