@@ -26,6 +26,7 @@ import EditDirectoryModal from "./editDirectoryModal";
 import BulkDownloadModal from "./bulkDownloadModal";
 import ShareModal from "./shareModal";
 import BulkActionHandler from "./bulkActionHandler";
+import SelectedDownloadModal from "./selectedDownloadModal";
 import Paginator from "./paginator";
 
 export default function FileList({
@@ -1172,7 +1173,17 @@ export default function FileList({
       {React.createElement(bulkHandler.DeleteProgressModal)}
 
       {/* 선택 다운로드 모달 */}
-      {React.createElement(bulkHandler.SelectedDownloadModal)}
+      <SelectedDownloadModal
+        isOpen={bulkHandler.showDownloadModal}
+        onClose={() => bulkHandler.setShowDownloadModal(false)}
+        selectedFiles={Array.from(selectedItems)
+          .filter((item) => item.startsWith("file-"))
+          .map((item) => item.replace("file-", ""))}
+        onClearSelection={() => {
+          bulkHandler.clearSelection();
+          bulkHandler.setSelectMode && bulkHandler.setSelectMode(false);
+        }}
+      />
     </div>
   );
 }

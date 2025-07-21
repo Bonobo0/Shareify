@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useRef, memo } from "react";
 import { getSelectedFilesForDownload } from "@/actions/files";
 import {
   downloadFilesAsZip,
@@ -10,7 +10,7 @@ import {
 import DecryptionPasswordModal from "./decryptionPasswordModal";
 import MultipleDecryptionModal from "./multipleDecryptionModal";
 
-export default function SelectedDownloadModal({
+const SelectedDownloadModal = memo(function SelectedDownloadModal({
   isOpen,
   onClose,
   selectedFiles = [],
@@ -54,11 +54,15 @@ export default function SelectedDownloadModal({
         "선택 다운로드 - 암호화된 파일 개수:",
         result.files.filter((f) => f.isEncrypted).length
       );
+      console.log("setStep(confirm) 호출 직전");
       setStep("confirm");
+      console.log("setStep(confirm) 호출 완료");
     } catch (err) {
+      console.log("startScan 에러 발생:", err);
       setError(err.message);
       setStep("scan");
     } finally {
+      console.log("startScan finally 블록 실행");
       setLoading(false);
     }
   };
@@ -121,6 +125,7 @@ export default function SelectedDownloadModal({
 
   // 모달 닫기
   const handleClose = () => {
+    console.log("handleClose 호출됨 - 스택 추적:", new Error().stack);
     setStep("scan");
     setFiles([]);
     setError("");
@@ -136,6 +141,15 @@ export default function SelectedDownloadModal({
 
   const totalSize = files.length > 0 ? calculateTotalSize(files) : 0;
   const encryptedFiles = files.filter((file) => file.isEncrypted);
+
+  console.log(
+    "SelectedDownloadModal 렌더링 - step:",
+    step,
+    "files.length:",
+    files.length,
+    "loading:",
+    loading
+  );
 
   return (
     <>
@@ -177,7 +191,13 @@ export default function SelectedDownloadModal({
                   <p>파일 정보를 가져오는 중...</p>
                 </div>
               ) : (
-                <button onClick={startScan} className="btn btn-primary">
+                <button
+                  onClick={() => {
+                    console.log("다운로드 준비 버튼 클릭됨");
+                    startScan();
+                  }}
+                  className="btn btn-primary"
+                >
                   다운로드 준비
                 </button>
               )}
@@ -375,4 +395,6 @@ export default function SelectedDownloadModal({
       )}
     </>
   );
-}
+});
+
+export default SelectedDownloadModal;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { deleteFile } from "@/actions/files";
 import { deleteDirectoryRecursive } from "@/actions/directories";
 import SelectedDownloadModal from "./selectedDownloadModal";
@@ -52,6 +52,13 @@ export default function BulkActionHandler({
   const clearSelection = () => {
     onSelectionChange(new Set());
   };
+
+  // selectedFiles를 메모이제이션하여 불필요한 리렌더링 방지
+  const selectedFiles = useMemo(() => {
+    return Array.from(selectedItems)
+      .filter((item) => item.startsWith("file-"))
+      .map((item) => item.replace("file-", ""));
+  }, [selectedItems]);
 
   const handleBulkDelete = async () => {
     if (selectedItems.size === 0) return;
@@ -146,18 +153,25 @@ export default function BulkActionHandler({
   };
 
   const handleBulkDownload = () => {
-    if (selectedItems.size === 0) return;
+    console.log("handleBulkDownload 호출됨");
+    console.log("selectedItems:", selectedItems);
+    console.log("selectedItems.size:", selectedItems.size);
 
-    // 선택된 파일들만 추출 (디렉토리는 제외)
-    const selectedFiles = Array.from(selectedItems)
-      .filter((item) => item.startsWith("file-"))
-      .map((item) => item.replace("file-", ""));
+    if (selectedItems.size === 0) {
+      console.log("선택된 아이템이 없음");
+      return;
+    }
+
+    console.log("선택된 아이템들:", Array.from(selectedItems));
+    console.log("필터링된 파일 IDs:", selectedFiles);
 
     if (selectedFiles.length === 0) {
+      console.log("다운로드할 파일이 없음");
       onShowAlert("다운로드할 파일을 선택해주세요. (폴더는 지원되지 않습니다)");
       return;
     }
 
+    console.log("선택 다운로드 모달 열기");
     setShowDownloadModal(true);
   };
 
@@ -173,6 +187,7 @@ export default function BulkActionHandler({
     handleBulkDelete,
     handleBulkDownload,
     setShowDownloadModal,
+    setSelectMode, // selectMode setter 추가
 
     // 렌더링 컴포넌트
     BulkActionControls: () => (
@@ -218,9 +233,6 @@ export default function BulkActionHandler({
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => {
-                const selectedFiles = Array.from(selectedItems).filter((item) =>
-                  item.startsWith("file-")
-                );
                 if (selectedFiles.length > 0) {
                   handleBulkDownload();
                 } else {
@@ -351,12 +363,9 @@ export default function BulkActionHandler({
 
     // 선택 다운로드 모달
     SelectedDownloadModal: () => {
-      const selectedFiles = Array.from(selectedItems)
-        .filter((item) => item.startsWith("file-"))
-        .map((item) => item.replace("file-", ""));
-
       return (
         <SelectedDownloadModal
+          key={showDownloadModal ? "open" : "closed"} // 모달 상태에 따라 key 변경으로 재마운트 방지
           isOpen={showDownloadModal}
           onClose={() => setShowDownloadModal(false)}
           selectedFiles={selectedFiles}
