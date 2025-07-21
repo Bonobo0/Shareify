@@ -330,11 +330,46 @@ export async function toggleFilePublic({ fileId }) {
 
     const file = await File.findOne({
       _id: fileId,
-      owner: userId,
     });
 
     if (!file) {
-      return { error: "파일을 찾을 수 없거나 권한이 없습니다." };
+      return { error: "파일을 찾을 수 없습니다." };
+    }
+
+    // 파일 공개 설정 권한 확인
+    const isOwner = file.owner.toString() === userId;
+    const hasDirectAdminAccess = file.shared?.some(
+      (share) =>
+        share.userId.toString() === userId && share.permission === "admin"
+    );
+
+    // 상위 디렉토리 권한 확인
+    let hasParentAdminAccess = false;
+    if (file.parentDirectory) {
+      const parentDirectory = await Directory.findOne({
+        _id: file.parentDirectory,
+        $or: [
+          { owner: new mongoose.Types.ObjectId(userId) },
+          {
+            "shared": {
+              $elemMatch: {
+                "userId": new mongoose.Types.ObjectId(userId),
+                "permission": "admin",
+              },
+            },
+          },
+        ],
+        deleted: { $ne: true },
+      });
+
+      if (parentDirectory) {
+        hasParentAdminAccess = true;
+      }
+    }
+
+    // 공개 설정 권한 검증
+    if (!isOwner && !hasDirectAdminAccess && !hasParentAdminAccess) {
+      return { error: "파일 공개 설정을 변경할 권한이 없습니다." };
     }
 
     // 공개/비공개 상태 토글

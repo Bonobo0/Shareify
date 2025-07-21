@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import Navbar from "@/app/components/navbar";
+
 import ShareModal from "@/app/components/shareModal";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -319,8 +319,7 @@ export default function FilePage() {
   if (authLoading || loading) {
     return (
       <>
-        <Navbar />
-        <main className="flex min-h-screen flex-col items-center justify-center pt-20">
+        <main className="flex min-h-screen flex-col items-center justify-center">
           <div className="loading loading-spinner loading-lg"></div>
         </main>
       </>
@@ -330,8 +329,7 @@ export default function FilePage() {
   if (error) {
     return (
       <>
-        <Navbar />
-        <main className="flex min-h-screen flex-col p-8 pt-20">
+        <main className="flex min-h-screen flex-col p-8">
           <div className="alert alert-error">{error}</div>
           <button
             className="btn btn-primary mt-4"
@@ -346,38 +344,51 @@ export default function FilePage() {
 
   return (
     <>
-      <Navbar />
-      <main className="flex min-h-screen flex-col p-4 md:p-8 pt-20">
-        <div className="breadcrumbs mb-4">
+      <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
+        <div className="breadcrumbs mb-4 text-xs sm:text-sm">
           <ul>
             <li>
               <button onClick={() => router.push("/dashboard")}>내 파일</button>
             </li>
-            <li>{file?.originalName}</li>
+            <li className="truncate max-w-[200px] sm:max-w-none">
+              {file?.originalName}
+            </li>
           </ul>
         </div>
 
-        <div className="card bg-base-200 p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <h1 className="text-3xl font-bold">{file?.originalName}</h1>
-            {file?.isEncrypted && (
-              <div className="badge badge-primary">🔒 암호화됨</div>
-            )}
-            {file?.isPublic && <div className="badge badge-success">공개</div>}
-            {!isOwner && file?.owner && (
-              <div className="badge badge-accent gap-2">
-                <span>👤</span>
-                <span className="text-sm">
-                  {file.owner.name || file.owner.email}님이 공유
-                </span>
-              </div>
-            )}
+        <div className="card bg-base-200 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold break-words min-w-0 flex-1">
+              {file?.originalName}
+            </h1>
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+              {file?.isEncrypted && (
+                <div className="badge badge-primary badge-xs sm:badge-sm whitespace-nowrap">
+                  🔒 암호화됨
+                </div>
+              )}
+              {file?.isPublic && (
+                <div className="badge badge-success badge-xs sm:badge-sm whitespace-nowrap">
+                  공개
+                </div>
+              )}
+              {!isOwner && file?.owner && (
+                <div className="badge badge-accent badge-xs sm:badge-sm gap-1 whitespace-nowrap">
+                  <span>👤</span>
+                  <span className="truncate max-w-[80px] sm:max-w-none text-xs sm:text-sm">
+                    {file.owner.name || file.owner.email}님이 공유
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 sm:mb-6">
             <div>
-              <h2 className="text-lg font-semibold mb-2">파일 정보</h2>
-              <ul className="space-y-2">
+              <h2 className="text-base sm:text-lg font-semibold mb-2">
+                파일 정보
+              </h2>
+              <ul className="space-y-1 sm:space-y-2 text-sm sm:text-base">
                 <li>
                   <strong>크기:</strong>{" "}
                   {formatBytes(
@@ -386,10 +397,17 @@ export default function FilePage() {
                 </li>
                 <li>
                   <strong>유형:</strong>{" "}
-                  {file?.isEncrypted ? file?.originalMimetype : file?.mimetype}
+                  <span className="break-all">
+                    {file?.isEncrypted
+                      ? file?.originalMimetype
+                      : file?.mimetype}
+                  </span>
                 </li>
                 <li>
-                  <strong>업로드 일시:</strong> {formatDate(file?.createdAt)}
+                  <strong>업로드 일시:</strong>{" "}
+                  <span className="text-xs sm:text-sm">
+                    {formatDate(file?.createdAt)}
+                  </span>
                 </li>
                 {file?.isEncrypted && (
                   <li>
@@ -402,13 +420,17 @@ export default function FilePage() {
 
             {isOwner && (
               <div>
-                <h2 className="text-lg font-semibold mb-2">액세스 설정</h2>
+                <h2 className="text-base sm:text-lg font-semibold mb-2">
+                  액세스 설정
+                </h2>
                 <div className="form-control">
                   <label className="label cursor-pointer">
-                    <span className="label-text">공개 액세스 허용</span>
+                    <span className="label-text text-sm sm:text-base">
+                      공개 액세스 허용
+                    </span>
                     <input
                       type="checkbox"
-                      className="toggle toggle-primary"
+                      className="toggle toggle-primary toggle-sm sm:toggle-md"
                       checked={isPublic}
                       onChange={togglePublicAccess}
                     />
@@ -417,15 +439,15 @@ export default function FilePage() {
 
                 {isPublic && shareUrl && (
                   <div className="mt-4">
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="text"
-                        className="input input-bordered flex-grow"
+                        className="input input-bordered input-sm sm:input-md flex-grow text-xs sm:text-sm"
                         value={shareUrl}
                         readOnly
                       />
                       <button
-                        className="btn btn-primary"
+                        className="btn btn-primary btn-sm sm:btn-md whitespace-nowrap"
                         onClick={copyShareUrl}
                       >
                         복사
@@ -437,41 +459,49 @@ export default function FilePage() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1 sm:gap-2">
             <button
-              className={`btn btn-primary ${downloadLoading ? "loading" : ""}`}
+              className={`btn btn-primary btn-sm sm:btn-md ${
+                downloadLoading ? "loading" : ""
+              }`}
               onClick={handleDownload}
               disabled={downloadLoading}
             >
-              다운로드
+              ⬇️ 다운로드
             </button>
 
             {isMediaFile(
               file?.isEncrypted ? file?.originalMimetype : file?.mimetype
             ) && (
-              <button className="btn btn-secondary" onClick={handlePreview}>
-                미리보기
+              <button
+                className="btn btn-secondary btn-sm sm:btn-md"
+                onClick={handlePreview}
+              >
+                👁️ 미리보기
               </button>
             )}
 
             <button
-              className="btn btn-secondary"
+              className="btn btn-secondary btn-sm sm:btn-md"
               onClick={() => setIsShareModalOpen(true)}
             >
-              공유하기
+              📤 공유하기
             </button>
 
             {isOwner && (
-              <button className="btn btn-error" onClick={handleDeleteFile}>
-                삭제
+              <button
+                className="btn btn-error btn-sm sm:btn-md"
+                onClick={handleDeleteFile}
+              >
+                🗑️ 삭제
               </button>
             )}
 
             <button
-              className="btn btn-ghost"
+              className="btn btn-ghost btn-sm sm:btn-md"
               onClick={() => router.push("/dashboard")}
             >
-              대시보드로 돌아가기
+              🏠 대시보드
             </button>
           </div>
         </div>
@@ -487,22 +517,24 @@ export default function FilePage() {
       {/* 암호화된 파일 복호화 모달 */}
       {decryptModal && (
         <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">파일 다운로드</h3>
-            <p className="py-4">
+          <div className="modal-box w-full max-w-sm sm:max-w-md mx-2">
+            <h3 className="font-bold text-base sm:text-lg">파일 다운로드</h3>
+            <p className="py-4 text-sm sm:text-base">
               이 파일은 암호화되어 있습니다. 복호화 키를 입력해주세요.
             </p>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-xs sm:text-sm text-gray-500 mb-4 break-words">
               파일: {file?.originalName}
             </p>
 
             <div className="form-control">
               <label className="label">
-                <span className="label-text">복호화 키</span>
+                <span className="label-text text-sm sm:text-base">
+                  복호화 키
+                </span>
               </label>
               <input
                 type="password"
-                className="input input-bordered"
+                className="input input-bordered input-sm sm:input-md"
                 placeholder="암호화 시 사용한 비밀번호를 입력하세요"
                 value={decryptPassword}
                 onChange={(e) => setDecryptPassword(e.target.value)}
@@ -511,7 +543,7 @@ export default function FilePage() {
 
             <div className="modal-action">
               <button
-                className="btn"
+                className="btn btn-sm sm:btn-md"
                 onClick={() => {
                   setDecryptModal(false);
                   setDecryptPassword("");
@@ -520,7 +552,7 @@ export default function FilePage() {
                 취소
               </button>
               <button
-                className={`btn btn-primary ${
+                className={`btn btn-primary btn-sm sm:btn-md ${
                   downloadLoading ? "loading" : ""
                 }`}
                 onClick={handleEncryptedDownload}
@@ -536,23 +568,25 @@ export default function FilePage() {
       {/* 미리보기용 복호화 모달 */}
       {previewDecryptModal && (
         <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">파일 미리보기</h3>
-            <p className="py-4">
+          <div className="modal-box w-full max-w-sm sm:max-w-md mx-2">
+            <h3 className="font-bold text-base sm:text-lg">파일 미리보기</h3>
+            <p className="py-4 text-sm sm:text-base">
               이 파일은 암호화되어 있습니다. 미리보기를 위해 복호화 키를
               입력해주세요.
             </p>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-xs sm:text-sm text-gray-500 mb-4 break-words">
               파일: {file?.originalName}
             </p>
 
             <div className="form-control">
               <label className="label">
-                <span className="label-text">복호화 키</span>
+                <span className="label-text text-sm sm:text-base">
+                  복호화 키
+                </span>
               </label>
               <input
                 type="password"
-                className="input input-bordered"
+                className="input input-bordered input-sm sm:input-md"
                 placeholder="암호화 시 사용한 비밀번호를 입력하세요"
                 value={previewDecryptPassword}
                 onChange={(e) => setPreviewDecryptPassword(e.target.value)}
@@ -567,7 +601,7 @@ export default function FilePage() {
 
             <div className="modal-action">
               <button
-                className="btn"
+                className="btn btn-sm sm:btn-md"
                 onClick={() => {
                   setPreviewDecryptModal(false);
                   setPreviewDecryptPassword("");
@@ -577,7 +611,9 @@ export default function FilePage() {
                 취소
               </button>
               <button
-                className={`btn btn-primary ${previewLoading ? "loading" : ""}`}
+                className={`btn btn-primary btn-sm sm:btn-md ${
+                  previewLoading ? "loading" : ""
+                }`}
                 onClick={handlePreviewDecrypt}
                 disabled={previewLoading || !previewDecryptPassword.trim()}
               >
@@ -591,13 +627,14 @@ export default function FilePage() {
       {/* 미리보기 모달 */}
       {previewModal && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-4xl">
-            <h3 className="font-bold text-lg">
+          <div className="modal-box max-w-xs sm:max-w-2xl md:max-w-4xl w-full mx-2">
+            <h3 className="font-bold text-base sm:text-lg break-words">
               {previewModal.file.originalName}
             </h3>
             <div className="py-4">
               {previewModal.file.mimetype?.startsWith("image/") ||
               previewModal.file.originalMimetype?.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={previewModal.url}
                   alt={previewModal.file.originalName}
@@ -637,12 +674,14 @@ export default function FilePage() {
       {/* Alert 모달 */}
       {alertModal.show && (
         <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">알림</h3>
-            <p className="py-4">{alertModal.message}</p>
+          <div className="modal-box w-full max-w-sm sm:max-w-md mx-2">
+            <h3 className="font-bold text-base sm:text-lg">알림</h3>
+            <p className="py-4 text-sm sm:text-base break-words">
+              {alertModal.message}
+            </p>
             <div className="modal-action">
               <button
-                className="btn btn-primary"
+                className="btn btn-primary btn-sm sm:btn-md"
                 onClick={() => setAlertModal({ show: false, message: "" })}
               >
                 확인
@@ -655,12 +694,14 @@ export default function FilePage() {
       {/* Confirm 모달 */}
       {confirmModal.show && (
         <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">확인</h3>
-            <p className="py-4">{confirmModal.message}</p>
+          <div className="modal-box w-full max-w-sm sm:max-w-md mx-2">
+            <h3 className="font-bold text-base sm:text-lg">확인</h3>
+            <p className="py-4 text-sm sm:text-base break-words">
+              {confirmModal.message}
+            </p>
             <div className="modal-action">
               <button
-                className="btn"
+                className="btn btn-sm sm:btn-md"
                 onClick={() =>
                   setConfirmModal({ show: false, message: "", onConfirm: null })
                 }
@@ -668,7 +709,7 @@ export default function FilePage() {
                 취소
               </button>
               <button
-                className="btn btn-error"
+                className="btn btn-error btn-sm sm:btn-md"
                 onClick={() => {
                   confirmModal.onConfirm?.();
                   setConfirmModal({

@@ -4,7 +4,7 @@ export default function StorageInfo({
   usedStorage,
   totalStorage,
   availableStorage,
-  percentage
+  percentage,
 }) {
   const formatBytes = (bytes, decimals = 2) => {
     if (bytes === 0) return "0 Bytes";
@@ -20,10 +20,10 @@ export default function StorageInfo({
 
   // 만약 값이 없으면 기본값 사용
   const used = usedStorage || 0;
-  const total = totalStorage || 50 * 1024 * 1024 * 1024; // 50GB
-  const available = availableStorage || (total - used);
-  const usagePercentage = percentage || ((used / total) * 100);
-  
+  const total = totalStorage || 5 * 1024 * 1024 * 1024; // 5GB
+  const available = availableStorage || total - used;
+  const usagePercentage = percentage || (used / total) * 100;
+
   // 경고 수준에 따라 색상 결정
   const getProgressColor = () => {
     if (usagePercentage > 90) return "progress-error";
@@ -42,7 +42,7 @@ export default function StorageInfo({
           </span>
           <span>{usagePercentage.toFixed(1)}%</span>
         </div>
-        
+
         <progress
           className={`progress w-full ${getProgressColor()}`}
           value={usagePercentage}

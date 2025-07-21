@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Navbar from "../components/navbar";
+
 import { useAuth } from "@/context/AuthContext";
 import { getSharedItems } from "@/actions/share";
 
@@ -88,8 +88,7 @@ export default function SharedPage() {
   if (authLoading || loading) {
     return (
       <>
-        <Navbar />
-        <main className="flex min-h-screen flex-col items-center justify-center pt-20">
+        <main className="flex min-h-screen flex-col items-center justify-center">
           <div className="loading loading-spinner loading-lg"></div>
         </main>
       </>
@@ -98,8 +97,7 @@ export default function SharedPage() {
 
   return (
     <>
-      <Navbar />
-      <main className="flex min-h-screen flex-col p-4 md:p-8 pt-20">
+      <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
         <h1 className="text-3xl font-bold mb-6">나와 공유된 항목</h1>
 
         {error && <div className="alert alert-error mb-6">{error}</div>}

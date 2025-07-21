@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Navbar from "../components/navbar";
+
 import StorageInfo from "../components/storageInfo";
 import TwoFactorSetup from "../components/twoFactorSetup";
 import ThemeSelector from "../components/themeSelector";
@@ -219,15 +219,13 @@ export default function ProfilePage() {
 
   const tabs = [
     { id: "profile", label: "프로필", icon: "👤" },
-    { id: "appearance", label: "테마", icon: "🎨" },
     { id: "storage", label: "저장소", icon: "💾" },
     { id: "security", label: "보안", icon: "🔒" },
   ];
 
   return (
     <>
-      <Navbar />
-      <main className="flex min-h-screen flex-col p-4 md:p-8 pt-20">
+      <main className="flex flex-col p-4 md:p-8">
         <div className="max-w-6xl mx-auto w-full">
           <h1 className="text-3xl font-bold mb-6">프로필 및 설정</h1>
 
@@ -280,7 +278,6 @@ export default function ProfilePage() {
                       sendingVerification={sendingVerification}
                     />
                   )}
-                  {activeTab === "appearance" && <AppearanceSettings />}
                   {activeTab === "storage" && (
                     <StorageSettings
                       storageInfo={storageInfo}
@@ -413,24 +410,6 @@ function ProfileSettings({
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-}
-
-// 테마 설정 컴포넌트
-function AppearanceSettings() {
-  return (
-    <div>
-      <h2 className="text-2xl font-bold mb-4">테마 설정</h2>
-
-      <div className="space-y-6">
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text">테마 선택</span>
-          </label>
-          <ThemeSelector />
-        </div>
       </div>
     </div>
   );

@@ -29,6 +29,13 @@ export default function DirectoryShareModal({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // 확인 모달 상태
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    message: "",
+    callback: null,
+  });
+
   const fetchShareLinks = useCallback(async () => {
     setLoading(true);
     try {
@@ -100,19 +107,26 @@ export default function DirectoryShareModal({
   };
 
   const handleDeleteShare = async (shareHash) => {
-    if (!confirm("이 공유 링크를 삭제하시겠습니까?")) return;
-
-    try {
-      const result = await deleteDirectoryShareLink({ directoryId, shareHash });
-      if (result.success) {
-        setSuccess(result.message);
-        await fetchShareLinks();
-      } else {
-        setError(result.error);
-      }
-    } catch (error) {
-      setError("공유 링크 삭제에 실패했습니다.");
-    }
+    setConfirmModal({
+      show: true,
+      message: "이 공유 링크를 삭제하시겠습니까?",
+      callback: async () => {
+        try {
+          const result = await deleteDirectoryShareLink({
+            directoryId,
+            shareHash,
+          });
+          if (result.success) {
+            setSuccess(result.message);
+            await fetchShareLinks();
+          } else {
+            setError(result.error);
+          }
+        } catch (error) {
+          setError("공유 링크 삭제에 실패했습니다.");
+        }
+      },
+    });
   };
 
   const handleShareWithUser = async () => {
@@ -128,7 +142,7 @@ export default function DirectoryShareModal({
     try {
       const result = await shareDirectory({
         directoryId,
-        email: userEmail.trim(),
+        targetUserEmail: userEmail.trim(),
         permission: userPermission,
       });
 
@@ -147,22 +161,26 @@ export default function DirectoryShareModal({
   };
 
   const handleUnshareUser = async (userId) => {
-    if (!confirm("이 사용자와의 공유를 해제하시겠습니까?")) return;
-
-    try {
-      const result = await unshareDirectory({
-        directoryId,
-        targetUserId: userId,
-      });
-      if (result.success) {
-        setSuccess(result.message);
-        await fetchSharedUsers();
-      } else {
-        setError(result.error);
-      }
-    } catch (error) {
-      setError("공유 해제에 실패했습니다.");
-    }
+    setConfirmModal({
+      show: true,
+      message: "이 사용자와의 공유를 해제하시겠습니까?",
+      callback: async () => {
+        try {
+          const result = await unshareDirectory({
+            directoryId,
+            targetUserId: userId,
+          });
+          if (result.success) {
+            setSuccess(result.message);
+            await fetchSharedUsers();
+          } else {
+            setError(result.error);
+          }
+        } catch (error) {
+          setError("공유 해제에 실패했습니다.");
+        }
+      },
+    });
   };
 
   const copyToClipboard = async (url) => {
@@ -426,28 +444,19 @@ export default function DirectoryShareModal({
                 <div className="space-y-3">
                   {sharedUsers.map((user) => (
                     <div
-                      key={user._id}
+                      key={user.userId}
                       className="card bg-base-100 border border-base-300"
                     >
                       <div className="card-body p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="avatar">
-                              <div className="w-10 h-10 rounded-full bg-base-300 flex items-center justify-center">
-                                <span className="text-sm font-medium">
-                                  {user.name
-                                    ? user.name[0].toUpperCase()
-                                    : user.email[0].toUpperCase()}
-                                </span>
-                              </div>
-                            </div>
                             <div>
                               <div className="font-medium">
-                                {user.name || user.email}
+                                {user.user.name || user.user.email}
                               </div>
-                              {user.name && (
+                              {user.user.name && (
                                 <div className="text-sm text-gray-500">
-                                  {user.email}
+                                  {user.user.email}
                                 </div>
                               )}
                             </div>
@@ -492,6 +501,37 @@ export default function DirectoryShareModal({
           </button>
         </div>
       </div>
+
+      {/* 확인 모달 */}
+      {confirmModal.show && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">확인</h3>
+            <p className="py-4">{confirmModal.message}</p>
+            <div className="modal-action">
+              <button
+                className="btn btn-outline"
+                onClick={() =>
+                  setConfirmModal({ show: false, message: "", callback: null })
+                }
+              >
+                취소
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  if (confirmModal.callback) {
+                    confirmModal.callback();
+                  }
+                  setConfirmModal({ show: false, message: "", callback: null });
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

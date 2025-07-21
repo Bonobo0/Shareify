@@ -15,6 +15,12 @@ export default function BulkActionHandler({
 }) {
   const [selectMode, setSelectMode] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState({
+    show: false,
+    current: 0,
+    total: 0,
+    currentItem: "",
+  });
 
   const toggleSelectMode = () => {
     setSelectMode(!selectMode);
@@ -46,59 +52,89 @@ export default function BulkActionHandler({
   };
 
   const handleBulkDelete = async () => {
-    console.log("handleBulkDelete 호출됨, selectedItems:", selectedItems);
     if (selectedItems.size === 0) return;
 
     onShowConfirm(
       `선택된 ${selectedItems.size}개 항목을 삭제하시겠습니까?`,
       async () => {
-        console.log("삭제 확인됨, 삭제 시작");
         setBulkActionLoading(true);
+        setDeleteProgress({
+          show: true,
+          current: 0,
+          total: selectedItems.size,
+          currentItem: "",
+        });
+
         try {
-          const deletePromises = [];
+          const itemsArray = Array.from(selectedItems);
+          const results = [];
 
-          selectedItems.forEach((itemKey) => {
+          // 순차적으로 삭제하여 진행 상황 표시
+          for (let i = 0; i < itemsArray.length; i++) {
+            const itemKey = itemsArray[i];
             const [type, id] = itemKey.split("-");
-            console.log(`삭제할 항목: ${type} - ${id}`);
 
+            // 현재 삭제 중인 항목 정보 찾기
+            let itemName = "";
             if (type === "file") {
-              deletePromises.push(deleteFile({ fileId: id }));
+              const file = files.find((f) => f.id === id);
+              itemName = file ? file.originalName : `파일 ${id}`;
             } else if (type === "directory") {
-              deletePromises.push(
-                deleteDirectoryRecursive({ directoryId: id })
-              );
+              const directory = directories.find((d) => d.id === id);
+              itemName = directory ? directory.name : `폴더 ${id}`;
             }
-          });
 
-          console.log("삭제 요청들:", deletePromises.length);
-          const results = await Promise.all(deletePromises);
-          console.log("삭제 결과:", results);
+            setDeleteProgress((prev) => ({
+              ...prev,
+              current: i + 1,
+              currentItem: itemName,
+            }));
 
-          // 에러 확인 - success가 false이거나 error가 있는 경우
+            try {
+              let result;
+              if (type === "file") {
+                result = await deleteFile({ fileId: id });
+              } else if (type === "directory") {
+                result = await deleteDirectoryRecursive({ directoryId: id });
+              }
+              results.push(result);
+            } catch (error) {
+              results.push({ success: false, error: error.message });
+            }
+          }
+
+          // 에러 확인
           const errors = results.filter(
             (result) => !result.success || result.error
           );
+
+          setDeleteProgress({
+            show: false,
+            current: 0,
+            total: 0,
+            currentItem: "",
+          });
+
           if (errors.length > 0) {
-            console.error("삭제 오류:", errors);
             onShowAlert(
               `일부 항목 삭제 실패: ${errors[0].error || "알 수 없는 오류"}`
             );
-            onSelectionChange(new Set());
-            setSelectMode(false);
-            // 목록 새로고침
-            await onRefresh();
           } else {
-            console.log("삭제 성공, 상태 업데이트");
             onShowAlert(
               `${selectedItems.size}개 항목이 성공적으로 삭제되었습니다.`
             );
-            onSelectionChange(new Set());
-            setSelectMode(false);
-            // 목록 새로고침
-            await onRefresh();
           }
+
+          onSelectionChange(new Set());
+          setSelectMode(false);
+          await onRefresh();
         } catch (error) {
-          console.error("대량 삭제 오류:", error);
+          setDeleteProgress({
+            show: false,
+            current: 0,
+            total: 0,
+            currentItem: "",
+          });
           onShowAlert("대량 삭제 중 오류가 발생했습니다.");
         } finally {
           setBulkActionLoading(false);
@@ -110,6 +146,7 @@ export default function BulkActionHandler({
   return {
     selectMode,
     bulkActionLoading,
+    deleteProgress,
     toggleSelectMode,
     toggleItemSelection,
     selectAllItems,
@@ -118,11 +155,11 @@ export default function BulkActionHandler({
 
     // 렌더링 컴포넌트
     BulkActionControls: () => (
-      <div className="flex items-center justify-between bg-base-200 p-4 rounded-lg">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-base-200 p-4 sm:p-4 rounded-lg gap-2 sm:gap-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <button
             onClick={toggleSelectMode}
-            className={`btn btn-sm ${
+            className={`btn btn-xs sm:btn-sm ${
               selectMode ? "btn-primary" : "btn-outline"
             }`}
           >
@@ -133,7 +170,7 @@ export default function BulkActionHandler({
             <>
               <button
                 onClick={selectAllItems}
-                className="btn btn-sm btn-ghost"
+                className="btn btn-xs sm:btn-sm btn-ghost"
                 disabled={
                   selectedItems.size === files.length + directories.length
                 }
@@ -143,29 +180,29 @@ export default function BulkActionHandler({
 
               <button
                 onClick={clearSelection}
-                className="btn btn-sm btn-ghost"
+                className="btn btn-xs sm:btn-sm btn-ghost"
                 disabled={selectedItems.size === 0}
               >
                 선택 해제
               </button>
 
-              <span className="text-sm text-gray-600">
-                {selectedItems.size}개 항목 선택됨
+              <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                {selectedItems.size}개 선택됨
               </span>
             </>
           )}
         </div>
 
         {selectMode && selectedItems.size > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={handleBulkDelete}
-              className={`btn btn-sm btn-error ${
+              className={`btn btn-xs sm:btn-sm btn-error flex-1 sm:flex-none ${
                 bulkActionLoading ? "loading" : ""
               }`}
               disabled={bulkActionLoading}
             >
-              선택한 항목 삭제
+              🗑️ 삭제
             </button>
           </div>
         )}
@@ -206,6 +243,72 @@ export default function BulkActionHandler({
             onClick={onClick}
           />
         </td>
+      ),
+
+    // 삭제 진행 상황 모달
+    DeleteProgressModal: () =>
+      deleteProgress.show && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg mb-4">항목 삭제 중...</h3>
+
+            <div className="space-y-4">
+              {/* 진행률 바 */}
+              <div className="w-full">
+                <div className="flex justify-between text-sm mb-2">
+                  <span>진행률</span>
+                  <span>
+                    {deleteProgress.current} / {deleteProgress.total}
+                  </span>
+                </div>
+                <progress
+                  className="progress progress-primary w-full"
+                  value={deleteProgress.current}
+                  max={deleteProgress.total}
+                ></progress>
+                <div className="text-center text-sm mt-1 text-gray-600">
+                  {Math.round(
+                    (deleteProgress.current / deleteProgress.total) * 100
+                  )}
+                  %
+                </div>
+              </div>
+
+              {/* 현재 처리 중인 항목 */}
+              <div className="text-center">
+                <div className="text-sm text-gray-600 mb-2">현재 삭제 중:</div>
+                <div className="font-medium text-primary">
+                  {deleteProgress.currentItem}
+                </div>
+              </div>
+
+              {/* 로딩 스피너 */}
+              <div className="flex justify-center">
+                <div className="loading loading-spinner loading-md"></div>
+              </div>
+
+              {/* 주의사항 */}
+              <div className="alert alert-warning">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="stroke-current shrink-0 h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+                <span className="text-sm">
+                  작업을 취소하지 마세요. 데이터 손실이 발생할 수 있습니다.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       ),
   };
 }

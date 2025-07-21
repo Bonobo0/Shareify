@@ -40,7 +40,7 @@ export default function Home() {
           시작하기
         </button>
         <p className="text-gray-500 mt-4">
-          계정 1개당 50GB의 용량을 무료로 사용할 수 있습니다.
+          계정 1개당 5GB의 용량을 무료로 사용할 수 있습니다.
         </p>
         <p className="text-gray-500 mt-4">
           해당 서비스를 이용함으로써{" "}

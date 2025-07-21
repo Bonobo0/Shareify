@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import ThemeSelector from "./themeSelector";
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -43,20 +44,37 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 left-0 w-full bg-base-100 shadow-md z-50">
-      <div className="container mx-auto navbar px-4">
+      <div className="container mx-auto navbar px-4 sm:px-6">
         <div className="navbar-start">
-          <Link href="/" className="text-xl font-bold">
+          <Link href="/" className="text-lg sm:text-xl font-bold">
             Shareify
           </Link>
         </div>
         <div className="navbar-center hidden lg:flex">
           {isAuthenticated && (
-            <Link href="/dashboard" className="btn btn-ghost">
-              대시보드
-            </Link>
+            <>
+              <Link
+                href="/dashboard"
+                className="btn btn-ghost btn-sm lg:btn-md"
+              >
+                대시보드
+              </Link>
+              <Link href="/shared" className="btn btn-ghost btn-sm lg:btn-md">
+                공유된 파일
+              </Link>
+              <Link
+                href="/my-uploads"
+                className="btn btn-ghost btn-sm lg:btn-md"
+              >
+                내 업로드
+              </Link>
+            </>
           )}
         </div>
         <div className="navbar-end">
+          {/* 테마 선택기 */}
+          <ThemeSelector compact={true} />
+
           {isAuthenticated ? (
             <>
               <div className="dropdown dropdown-end">
@@ -88,10 +106,16 @@ export default function Header() {
             </>
           ) : (
             <>
-              <Link href="/user/signin" className="btn btn-ghost mr-2">
+              <Link
+                href="/user/signin"
+                className="btn btn-ghost btn-sm sm:btn-md mr-1 sm:mr-2"
+              >
                 로그인
               </Link>
-              <Link href="/user/signup" className="btn btn-primary">
+              <Link
+                href="/user/signup"
+                className="btn btn-primary btn-sm sm:btn-md"
+              >
                 회원가입
               </Link>
             </>

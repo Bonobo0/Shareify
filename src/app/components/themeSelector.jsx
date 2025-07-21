@@ -1,33 +1,80 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { themeChange } from "theme-change";
+import { useState, useEffect } from "react";
 
-export default function ThemeSelector() {
-  const [theme, setTheme] = useState();
-  const themeRef = useRef(theme);
+export default function ThemeSelector({ compact = false }) {
+  const [currentTheme, setCurrentTheme] = useState("light");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    themeChange(false);
+    setMounted(true);
+
+    // 저장된 테마가 있으면 사용, 없으면 dark 사용
+    const savedTheme = localStorage.getItem("theme") || "dark";
+    setCurrentTheme(savedTheme);
+
+    // HTML 태그와 body에 테마 적용
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    document.body.setAttribute("data-theme", savedTheme);
   }, []);
-  useEffect(() => {
-    if (themeRef.current == null) {
-      themeRef.current = localStorage.getItem("theme") || "light";
-    }
-    const theme = themeRef.current;
-    setTheme(theme);
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
-  }, [theme]);
 
-  return (
-    <>
-      <label className="fixed top-0 right-0 p-4 ">
-        <button
-          data-act-class="bg-gray-200"
-          data-set-theme="cupcake"
-          className="rounded-lg p-1 mr-2"
+  const toggleTheme = () => {
+    const newTheme = currentTheme === "light" ? "dark" : "light";
+    setCurrentTheme(newTheme);
+
+    // HTML 태그와 body에 테마 적용
+    document.documentElement.setAttribute("data-theme", newTheme);
+    document.body.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+  };
+
+  // 마운트 되기 전에는 기본 아이콘 표시
+  if (!mounted) {
+    return compact ? (
+      <div className="btn btn-ghost btn-circle">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
+          <circle cx="12" cy="12" r="5" />
+          <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+        </svg>
+      </div>
+    ) : (
+      <div className="skeleton h-20 w-full"></div>
+    );
+  }
+
+  // 간단한 버전 (헤더용)
+  if (compact) {
+    return (
+      <button
+        onClick={toggleTheme}
+        className="btn btn-ghost btn-circle"
+        title={`${currentTheme === "light" ? "다크" : "라이트"} 모드로 전환`}
+      >
+        {currentTheme === "dark" ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        ) : (
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
@@ -42,27 +89,45 @@ export default function ThemeSelector() {
             <circle cx="12" cy="12" r="5" />
             <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
           </svg>
-        </button>
-        <button
-          data-act-class="bg-slate-200"
-          data-set-theme="dark"
-          className="rounded-lg p-1"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-        </button>
-      </label>
-    </>
+        )}
+      </button>
+    );
+  }
+
+  // 프로파일 페이지용 전체 버전
+  return (
+    <div className="space-y-4">
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text">
+            현재 테마: {currentTheme === "light" ? "라이트 모드" : "다크 모드"}
+          </span>
+        </label>
+      </div>
+
+      <div className="form-control">
+        <label className="label cursor-pointer justify-start gap-4">
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={currentTheme === "dark"}
+            onChange={toggleTheme}
+          />
+          <span className="label-text flex items-center gap-2">
+            {currentTheme === "light" ? (
+              <>
+                <span>☀️</span>
+                <span>라이트 모드</span>
+              </>
+            ) : (
+              <>
+                <span>🌙</span>
+                <span>다크 모드</span>
+              </>
+            )}
+          </span>
+        </label>
+      </div>
+    </div>
   );
 }

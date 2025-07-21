@@ -7,6 +7,7 @@ import Directory from "@/models/Directory";
 import User from "@/models/User";
 import mongoose from "mongoose";
 import { cookies } from "next/headers";
+import { checkActionRateLimit } from "@/lib/actionRateLimit";
 import {
   generateUniqueFilename,
   generateFileHash,
@@ -140,6 +141,10 @@ export async function getFileList({
           select: "name email",
         },
       })
+      .populate({
+        path: "shared.userId",
+        select: "name email",
+      })
       .sort(sortOptions)
       .skip(skip)
       .limit(limit)
@@ -198,7 +203,12 @@ export async function getFileList({
         },
         sharedWith:
           file.shared?.map((share) => ({
-            userId: share.userId.toString(),
+            _id: share._id.toString(),
+            userId: share.userId._id.toString(),
+            user: {
+              name: share.userId.name,
+              email: share.userId.email,
+            },
             permission: share.permission,
           })) || [],
       })),
@@ -229,6 +239,15 @@ export async function uploadFile({
   shareHash = null,
 }) {
   try {
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("upload");
+    if (!rateLimitResult.allowed) {
+      return {
+        success: false,
+        error: rateLimitResult.error,
+      };
+    }
+
     console.log("📥 서버에서 받은 매개변수:", {
       filename,
       size,
@@ -272,7 +291,7 @@ export async function uploadFile({
     if (directoryId) {
       let hasAccess = false;
 
-      // 1. 일반 사용자 권한 확인 (소유자이거나 사용자 공유받은 경우)
+      // 1. 일반 사용자 권한 확인 (소유자이거나 관리자 권한으로 공유받은 경우)
       const directory = await Directory.findOne({
         _id: directoryId,
         $or: [
@@ -281,7 +300,7 @@ export async function uploadFile({
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
-                "permission": { $in: ["write", "admin"] },
+                "permission": "admin",
               },
             },
           },
@@ -305,7 +324,7 @@ export async function uploadFile({
             (link) => link.hash === shareHash
           );
 
-          // 링크가 유효하고 쓰기 권한이 있으며 만료되지 않은 경우
+          // 링크가 유효하고 업로드 권한이 있으며 만료되지 않은 경우
           if (
             shareLink &&
             shareLink.permission === "write" &&
@@ -469,14 +488,13 @@ export async function deleteFile({ fileId }) {
 
     // 파일 삭제 권한 확인
     const isOwner = file.owner.toString() === userId;
-    const hasDirectWriteAccess = file.shared?.some(
+    const hasDirectAdminAccess = file.shared?.some(
       (share) =>
-        share.userId.toString() === userId &&
-        ["write", "admin"].includes(share.permission)
+        share.userId.toString() === userId && share.permission === "admin"
     );
 
     // 상위 디렉토리 권한 확인
-    let hasParentWriteAccess = false;
+    let hasParentAdminAccess = false;
     if (file.parentDirectory) {
       const parentDirectory = await Directory.findOne({
         _id: file.parentDirectory,
@@ -486,7 +504,7 @@ export async function deleteFile({ fileId }) {
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
-                "permission": { $in: ["write", "admin"] },
+                "permission": "admin",
               },
             },
           },
@@ -495,12 +513,12 @@ export async function deleteFile({ fileId }) {
       });
 
       if (parentDirectory) {
-        hasParentWriteAccess = true;
+        hasParentAdminAccess = true;
       }
     }
 
     // 삭제 권한 검증
-    if (!isOwner && !hasDirectWriteAccess && !hasParentWriteAccess) {
+    if (!isOwner && !hasDirectAdminAccess && !hasParentAdminAccess) {
       return { error: "파일을 삭제할 권한이 없습니다." };
     }
 
@@ -629,6 +647,15 @@ export async function getFileDownloadUrl({ fileId }) {
 
 export async function shareFile({ fileId, email, permission = "read" }) {
   try {
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("share");
+    if (!rateLimitResult.allowed) {
+      return {
+        success: false,
+        error: rateLimitResult.error,
+      };
+    }
+
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
@@ -701,7 +728,6 @@ export async function shareFile({ fileId, email, permission = "read" }) {
       file.shared.push({
         userId: targetUser._id,
         permission,
-        sharedAt: new Date(),
       });
     }
 
@@ -717,7 +743,7 @@ export async function shareFile({ fileId, email, permission = "read" }) {
   }
 }
 
-export async function getFileDetails({ hash }) {
+export async function getFileDetails({ hash, fileId }) {
   try {
     const userId = await getAuthenticatedUser();
 
@@ -725,14 +751,26 @@ export async function getFileDetails({ hash }) {
       return { error: "인증이 필요합니다." };
     }
 
-    if (!hash) {
-      return { error: "파일 해시가 필요합니다." };
+    if (!hash && !fileId) {
+      return { error: "파일 해시 또는 파일 ID가 필요합니다." };
     }
 
     await connectToDatabase();
 
-    // 파일 조회
-    const file = await File.findOne({ hash }).populate("owner", "name email");
+    // 파일 조회 (hash 또는 fileId로)
+    let query = {};
+    if (hash) {
+      query.hash = hash;
+    } else if (fileId) {
+      query._id = fileId;
+    }
+
+    const file = await File.findOne(query)
+      .populate("owner", "name email")
+      .populate({
+        path: "shared.userId",
+        select: "name email",
+      });
 
     if (!file) {
       return { error: "파일을 찾을 수 없습니다." };
@@ -741,7 +779,7 @@ export async function getFileDetails({ hash }) {
     // 접근 권한 확인
     const isOwner = file.owner._id.toString() === userId;
     const isShared = file.shared.some(
-      (share) => share.userId.toString() === userId
+      (share) => share.userId._id.toString() === userId
     );
 
     // 상위 디렉토리 권한 확인
@@ -777,7 +815,7 @@ export async function getFileDetails({ hash }) {
       permission = "admin";
     } else if (isShared) {
       const userShare = file.shared.find(
-        (share) => share.userId.toString() === userId
+        (share) => share.userId._id.toString() === userId
       );
       permission = userShare ? userShare.permission : "read";
     }
@@ -804,12 +842,16 @@ export async function getFileDetails({ hash }) {
           email: file.owner.email,
         },
         sharedWith: file.shared.map((share) => ({
-          userId: share.userId.toString(),
+          _id: share._id.toString(),
+          userId: share.userId._id.toString(),
+          user: {
+            name: share.userId.name,
+            email: share.userId.email,
+          },
           permission: share.permission,
-          sharedAt: share.sharedAt ? share.sharedAt.toISOString() : null,
         })),
         userPermission: permission,
-        canEdit: permission === "write" || permission === "admin",
+        canEdit: permission === "admin",
         canDelete: permission === "admin",
         canShare: permission === "admin",
       },
@@ -912,7 +954,6 @@ export async function getMyUploadedFiles({
     // 사용자가 업로드한 파일들 조회
     const filter = {
       owner: new mongoose.Types.ObjectId(userId),
-      parentDirectory: { $ne: null },
       deleted: { $ne: true },
     };
 
@@ -930,6 +971,10 @@ export async function getMyUploadedFiles({
           path: "owner",
           select: "name email",
         },
+      })
+      .populate({
+        path: "shared.userId",
+        select: "name email",
       })
       .sort(sortOptions)
       .skip(skip)
@@ -955,14 +1000,14 @@ export async function getMyUploadedFiles({
         originalMimetype: file.originalMimetype,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
         updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
-        parentDirectory: file.parentDirectory._id.toString(),
+        parentDirectory: file.parentDirectory?._id.toString(),
         parentDirectoryInfo: {
-          id: file.parentDirectory._id.toString(),
-          name: file.parentDirectory.name,
+          id: file.parentDirectory?._id.toString(),
+          name: file.parentDirectory?.name,
           owner: {
-            id: file.parentDirectory.owner._id.toString(),
-            name: file.parentDirectory.owner.name,
-            email: file.parentDirectory.owner.email,
+            id: file.parentDirectory?.owner._id.toString(),
+            name: file.parentDirectory?.owner.name,
+            email: file.parentDirectory?.owner.email,
           },
         },
         deleted: file.deleted,
@@ -974,7 +1019,12 @@ export async function getMyUploadedFiles({
         },
         sharedWith:
           file.shared?.map((share) => ({
-            userId: share.userId.toString(),
+            _id: share._id.toString(),
+            userId: share.userId._id.toString(),
+            user: {
+              name: share.userId.name,
+              email: share.userId.email,
+            },
             permission: share.permission,
           })) || [],
       })),
@@ -993,5 +1043,45 @@ export async function getMyUploadedFiles({
       error:
         "공유 디렉토리에 업로드한 파일 목록을 조회하는 중 오류가 발생했습니다.",
     };
+  }
+}
+
+export async function removeFileShare({ fileId, shareId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "인증이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    // 파일 조회 및 권한 확인
+    const file = await File.findById(fileId);
+
+    if (!file) {
+      return { error: "파일을 찾을 수 없습니다." };
+    }
+
+    // 파일 소유자이거나 관리자 권한이 있는지 확인
+    const isOwner = file.owner.toString() === userId;
+    const hasAdminPermission = file.shared.some(
+      (share) =>
+        share.userId.toString() === userId && share.permission === "admin"
+    );
+
+    if (!isOwner && !hasAdminPermission) {
+      return { error: "공유를 해제할 권한이 없습니다." };
+    }
+
+    // 공유 제거
+    await File.findByIdAndUpdate(fileId, {
+      $pull: { shared: { _id: shareId } },
+    });
+
+    return { message: "공유가 해제되었습니다." };
+  } catch (error) {
+    console.error("파일 공유 해제 오류:", error);
+    return { error: "파일 공유 해제 중 오류가 발생했습니다." };
   }
 }

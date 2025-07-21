@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import FileUploader from "../components/fileUploader";
 import FileList from "../components/fileList";
 import CreateDirectory from "../components/createDirectory";
-import Navbar from "../components/navbar";
+
 import StorageInfo from "../components/storageInfo";
 import SharedItemsPreview from "../components/sharedItemsPreview";
 import { useAuth } from "@/context/AuthContext";
@@ -66,7 +66,7 @@ export default function Dashboard() {
       if (result.success) {
         setStorageInfo({
           used: result.usedStorage || 0,
-          total: result.quota || 50 * 1024 * 1024 * 1024,
+          total: result.quota || 5 * 1024 * 1024 * 1024,
           available: result.availableStorage || 0,
           percentage: result.usagePercentage || 0,
         });
@@ -99,9 +99,10 @@ export default function Dashboard() {
 
   return (
     <>
-      <Navbar />
-      <main className="flex min-h-screen flex-col p-4 md:p-8 pt-20">
-        <h1 className="text-3xl font-bold mb-6">내 파일</h1>
+      <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
+          스토리지
+        </h1>
 
         <StorageInfo
           usedStorage={storageInfo.used}
@@ -110,19 +111,15 @@ export default function Dashboard() {
           percentage={storageInfo.percentage}
         />
 
-        <div className="flex flex-wrap gap-4 mb-8 mt-4">
-          <CreateDirectory onSuccess={handleDirectoryCreated} />
-        </div>
-
         {/* 이메일 인증 확인 */}
         {!user?.isVerified ? (
-          <div className="alert alert-warning mb-8">
+          <div className="alert alert-warning mb-6 sm:mb-8 text-sm sm:text-base">
             <div>
               <strong>이메일 인증이 필요합니다!</strong>
               <br />
               파일 업로드를 위해서는 이메일 인증을 완료해주세요.
               <br />
-              <small className="text-gray-600">
+              <small className="text-gray-600 text-xs sm:text-sm">
                 가입 시 보내드린 이메일을 확인하거나 프로필에서 다시 인증 메일을
                 요청할 수 있습니다.
               </small>
@@ -140,12 +137,15 @@ export default function Dashboard() {
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">내 파일</h2>
-              <button
-                onClick={() => router.push("/my-uploads")}
-                className="btn btn-outline btn-sm gap-2"
-              >
-                📂 업로드한 모든 파일 보기
-              </button>
+              <div className="flex items-center gap-2 sm:gap-4">
+                <button
+                  onClick={() => router.push("/my-uploads")}
+                  className="btn btn-outline gap-2"
+                >
+                  📂 업로드한 모든 파일 보기
+                </button>
+                <CreateDirectory onSuccess={handleDirectoryCreated} />
+              </div>
             </div>
             <FileList refreshTrigger={refreshTrigger} />
           </div>

@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Navbar from "@/app/components/navbar";
 import { useAuth } from "@/context/AuthContext";
 import { getSharedFileInfo, downloadSharedFile } from "@/actions/share";
 import { downloadAndDecrypt, decryptForPreview } from "@/lib/crypto/encryption";
@@ -214,8 +213,7 @@ export default function SharePage() {
   if (loading) {
     return (
       <>
-        <Navbar />
-        <main className="flex min-h-screen flex-col items-center justify-center pt-20">
+        <main className="flex min-h-screen flex-col items-center justify-center">
           <div className="loading loading-spinner loading-lg"></div>
         </main>
       </>
@@ -225,8 +223,7 @@ export default function SharePage() {
   if (error) {
     return (
       <>
-        <Navbar />
-        <main className="flex min-h-screen flex-col items-center p-8 pt-20">
+        <main className="flex min-h-screen flex-col items-center p-8">
           <div className="alert alert-error max-w-md">{error}</div>
           <p className="mt-4">
             이 파일은 존재하지 않거나, 접근 권한이 없거나, 공개 상태가
@@ -248,13 +245,14 @@ export default function SharePage() {
 
   return (
     <>
-      <Navbar />
-      <main className="flex min-h-screen flex-col items-center p-4 md:p-8 pt-20">
-        <div className="card bg-base-200 p-6 max-w-xl w-full">
-          <h1 className="text-3xl font-bold mb-6 text-center">공유된 파일</h1>
+      <main className="flex min-h-screen flex-col items-center p-2 sm:p-4 md:p-8">
+        <div className="card bg-base-200 p-4 sm:p-6 max-w-xl w-full">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
+            공유된 파일
+          </h1>
 
-          <div className="text-center mb-8">
-            <div className="text-5xl mb-4">
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="text-4xl sm:text-5xl mb-4">
               {file?.mimetype?.includes("image")
                 ? "🖼️"
                 : file?.mimetype?.includes("pdf")
@@ -266,34 +264,38 @@ export default function SharePage() {
                 : "📁"}
             </div>
 
-            <h2 className="text-xl font-semibold mb-3">{file?.originalName}</h2>
+            <h2 className="text-lg sm:text-xl font-semibold mb-3 px-2 break-words">
+              {file?.originalName}
+            </h2>
 
             {file?.owner && (
               <div className="flex justify-center mb-3">
-                <div className="badge badge-accent gap-2">
+                <div className="badge badge-accent badge-sm sm:badge-md gap-1 sm:gap-2 whitespace-nowrap">
                   <span>👤</span>
-                  <span className="text-sm">
+                  <span className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">
                     {file.owner.name || file.owner.email}님이 공유
                   </span>
                 </div>
               </div>
             )}
 
-            <p className="text-gray-500 mt-2">
+            <p className="text-gray-500 mt-2 text-sm sm:text-base">
               {formatBytes(file?.originalSize || file?.size)}
             </p>
 
             {file?.isEncrypted && (
               <div className="mt-4">
-                <span className="badge badge-warning">🔒 암호화된 파일</span>
+                <span className="badge badge-warning badge-sm sm:badge-md whitespace-nowrap">
+                  🔒 암호화된 파일
+                </span>
               </div>
             )}
           </div>
 
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4">
             {isPreviewable(file?.mimetype) && (
               <button
-                className={`btn btn-secondary btn-lg ${
+                className={`btn btn-secondary btn-sm sm:btn-lg flex-1 sm:flex-none ${
                   previewLoading ? "loading" : ""
                 }`}
                 onClick={handlePreview}
@@ -303,23 +305,34 @@ export default function SharePage() {
                   ? "로딩 중..."
                   : file?.isEncrypted
                   ? "🔒 복호화 후 미리보기"
-                  : "미리보기"}
+                  : "👁️ 미리보기"}
               </button>
             )}
-            <button className="btn btn-primary btn-lg" onClick={handleDownload}>
-              {file?.isEncrypted ? "🔒 복호화 후 다운로드" : "다운로드"}
+            <button
+              className="btn btn-primary btn-sm sm:btn-lg flex-1 sm:flex-none"
+              onClick={handleDownload}
+            >
+              {file?.isEncrypted ? "🔒 복호화 후 다운로드" : "⬇️ 다운로드"}
             </button>
           </div>
 
           {!user && (
-            <div className="text-center mt-8 pt-4 border-t">
-              <p>더 많은 파일을 공유하고 관리하세요</p>
-              <div className="flex justify-center gap-2 mt-2">
-                <Link href="/user/signin" className="btn">
-                  로그인
+            <div className="text-center mt-6 sm:mt-8 pt-4 border-t">
+              <p className="text-sm sm:text-base">
+                더 많은 파일을 공유하고 관리하세요
+              </p>
+              <div className="flex flex-col sm:flex-row justify-center gap-2 mt-2">
+                <Link
+                  href="/user/signin"
+                  className="btn btn-sm sm:btn-md flex-1 sm:flex-none"
+                >
+                  👤 로그인
                 </Link>
-                <Link href="/user/signup" className="btn btn-outline">
-                  회원가입
+                <Link
+                  href="/user/signup"
+                  className="btn btn-outline btn-sm sm:btn-md flex-1 sm:flex-none"
+                >
+                  ✨ 회원가입
                 </Link>
               </div>
             </div>

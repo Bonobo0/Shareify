@@ -15,5 +15,10 @@ module.exports = {
     },
   },
   plugins: [require("daisyui")],
-  daisyui: { themes: ["cupcake", "dark", "cmyk"] },
+  daisyui: {
+    themes: ["light", "dark"],
+    base: true,
+    styled: true,
+    utils: true,
+  },
 };

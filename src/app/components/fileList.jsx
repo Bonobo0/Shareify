@@ -8,6 +8,8 @@ import {
   getFileDownloadUrl,
   deleteFile,
   shareFile,
+  getFileDetails,
+  getMyUploadedFiles,
 } from "@/actions/files";
 import {
   getDirectoryList,
@@ -20,9 +22,16 @@ import {
   decryptForPreview,
 } from "@/lib/crypto/encryption";
 import DirectoryShareModal from "./directoryShareModal";
+import ShareModal from "./shareModal";
 import BulkActionHandler from "./bulkActionHandler";
+import Paginator from "./paginator";
 
-export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
+export default function FileList({
+  directoryId = null,
+  refreshTrigger = 0,
+  mode = "directory", // "directory" | "my-uploads"
+  showDirectories = true,
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -33,15 +42,19 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
   const [actionLoading, setActionLoading] = useState({});
-  const [shareModal, setShareModal] = useState(null);
-  const [shareEmail, setShareEmail] = useState("");
-  const [sharePermission, setSharePermission] = useState("read");
+  const [shareModal, setShareModal] = useState({ isOpen: false, fileId: null });
   const [decryptModal, setDecryptModal] = useState(null);
   const [decryptPassword, setDecryptPassword] = useState("");
   const [previewModal, setPreviewModal] = useState(null);
 
   // 선택 관련 상태 (BulkActionHandler로 이동)
   const [selectedItems, setSelectedItems] = useState(new Set());
+
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [itemsPerPage] = useState(10); // 페이지당 아이템 수(디렉토리, 파일 별개 처리)
 
   // 모달 상태들
   const [alertModal, setAlertModal] = useState({ show: false, message: "" });
@@ -72,46 +85,87 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
     setError("");
 
     try {
-      // 파일 목록 가져오기
-      const fileResult = await getFileList({
-        directoryId: directoryId || null,
-        sortBy,
-        sortOrder,
-      });
-
-      if (fileResult.error) {
-        console.error("파일 목록 조회 오류:", fileResult.error);
-        throw new Error(fileResult.error);
-      }
-
-      setFiles(fileResult.files || []);
-
-      // 디렉토리 목록 가져오기
-      const dirResult = await getDirectoryList({
-        parentId: directoryId || null,
-      });
-
-      if (dirResult.error) {
-        throw new Error(dirResult.error);
-      }
-
-      setDirectories(dirResult.directories || []);
-
-      // 현재 디렉토리 정보 가져오기 (만약 하위 디렉토리라면)
-      if (directoryId) {
-        const currentDirResult = await getDirectoryDetails({
-          directoryId,
+      if (mode === "my-uploads") {
+        // my-uploads 모드: 내가 업로드한 파일만 가져오기
+        const result = await getMyUploadedFiles({
+          page: currentPage,
+          limit: itemsPerPage,
+          sortBy,
+          sortOrder,
         });
 
-        if (currentDirResult.success) {
-          setCurrentDirectory(currentDirResult.directory);
-          // TODO: breadcrumbs 구현 필요
-          setBreadcrumbs([]);
+        if (result.error) {
+          throw new Error(result.error);
         }
-      } else {
-        // 루트 디렉토리인 경우
+
+        setFiles(result.files || []);
+        setDirectories([]); // my-uploads에서는 디렉토리 없음
+        setTotalItems(result.pagination?.totalFiles || 0);
+        setTotalPages(result.pagination?.totalPages || 1);
         setCurrentDirectory(null);
         setBreadcrumbs([]);
+      } else {
+        // directory 모드: 기존 로직
+        // 파일 목록 가져오기 (페이지네이션 포함)
+        const fileResult = await getFileList({
+          directoryId: directoryId || null,
+          sortBy,
+          sortOrder,
+          page: currentPage,
+          limit: itemsPerPage,
+        });
+
+        if (fileResult.error) {
+          throw new Error(fileResult.error);
+        }
+
+        setFiles(fileResult.files || []);
+
+        if (showDirectories) {
+          // 디렉토리 목록 가져오기 (디렉토리는 페이지네이션 없이)
+          const dirResult = await getDirectoryList({
+            parentId: directoryId || null,
+            page: currentPage,
+            limit: itemsPerPage,
+            sortBy,
+            sortOrder,
+          });
+
+          if (dirResult.error) {
+            throw new Error(dirResult.error);
+          }
+          setDirectories(dirResult.directories || []);
+          const dirCount = dirResult.pagination?.totalDirectories || 0;
+
+          // 파일과 디렉토리 총 개수를 한 번에 설정
+          setTotalItems((fileResult.pagination.totalFiles || 0) + dirCount);
+          setTotalPages(
+            Math.ceil(
+              (fileResult.pagination.totalFiles + dirCount) / itemsPerPage
+            ) || 1
+          );
+        } else {
+          setDirectories([]);
+          setTotalItems(fileResult.pagination.totalFiles || 0);
+          setTotalPages(fileResult.pagination.totalPages || 1);
+        }
+
+        // 현재 디렉토리 정보 가져오기 (만약 하위 디렉토리라면)
+        if (directoryId) {
+          const currentDirResult = await getDirectoryDetails({
+            directoryId,
+          });
+
+          if (currentDirResult.success) {
+            setCurrentDirectory(currentDirResult.directory);
+            // TODO: breadcrumbs 구현 필요
+            setBreadcrumbs([]);
+          }
+        } else {
+          // 루트 디렉토리인 경우
+          setCurrentDirectory(null);
+          setBreadcrumbs([]);
+        }
       }
     } catch (error) {
       console.error("데이터 조회 에러:", error);
@@ -119,7 +173,55 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
     } finally {
       setLoading(false);
     }
-  }, [directoryId, sortBy, sortOrder]);
+  }, [
+    directoryId,
+    sortBy,
+    sortOrder,
+    currentPage,
+    itemsPerPage,
+    mode,
+    showDirectories,
+  ]);
+
+  // 개별 파일 업데이트 함수 (깜빡임 방지)
+  const updateSingleFile = useCallback(
+    async (fileId) => {
+      try {
+        const result = await getFileDetails({ fileId });
+        if (result.success && result.file) {
+          setFiles((prevFiles) =>
+            prevFiles.map((file) => (file.id === fileId ? result.file : file))
+          );
+        }
+      } catch (error) {
+        console.error("파일 업데이트 에러:", error);
+        // 실패 시 전체 새로고침으로 폴백
+        await fetchData();
+      }
+    },
+    [fetchData]
+  );
+
+  // 개별 디렉토리 업데이트 함수 (깜빡임 방지)
+  const updateSingleDirectory = useCallback(
+    async (directoryId) => {
+      try {
+        const result = await getDirectoryDetails({ directoryId });
+        if (result.success && result.directory) {
+          setDirectories((prevDirs) =>
+            prevDirs.map((dir) =>
+              dir.id === directoryId ? result.directory : dir
+            )
+          );
+        }
+      } catch (error) {
+        console.error("디렉토리 업데이트 에러:", error);
+        // 실패 시 전체 새로고침으로 폴백
+        await fetchData();
+      }
+    },
+    [fetchData]
+  );
 
   // BulkActionHandler 초기화
   const bulkHandler = BulkActionHandler({
@@ -155,6 +257,7 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
           } else {
             await fetchData(); // 목록 새로고침
           }
+          showAlert("디렉토리와 모든 하위 항목이 성공적으로 삭제되었습니다.");
         } catch (error) {
           setError("디렉토리 삭제 중 오류가 발생했습니다.");
         } finally {
@@ -175,7 +278,18 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
 
   useEffect(() => {
     fetchData();
-  }, [directoryId, refreshTrigger, sortBy, sortOrder, fetchData]);
+  }, [directoryId, refreshTrigger, fetchData]);
+
+  // 디렉토리가 변경되면 첫 페이지로 이동
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [directoryId]);
+
+  // 페이지 변경 핸들러
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    setSelectedItems(new Set()); // 페이지 변경 시 선택 초기화
+  };
 
   // E2EE 관련 함수들
   const handleDownload = async (file) => {
@@ -339,6 +453,7 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
 
         // 파일 목록에서 제거
         setFiles((prev) => prev.filter((file) => file.id !== fileId));
+        showAlert("파일이 성공적으로 삭제되었습니다.");
       } catch (err) {
         setError("파일 삭제 중 오류가 발생했습니다.");
       } finally {
@@ -347,38 +462,8 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
     });
   };
 
-  const handleShare = async () => {
-    if (!shareEmail) {
-      setError("공유할 이메일을 입력해주세요.");
-      return;
-    }
-
-    setActionLoading((prev) => ({ ...prev, share: true }));
-    setError("");
-
-    try {
-      const result = await shareFile({
-        fileId: shareModal.id,
-        email: shareEmail,
-        permission: sharePermission,
-      });
-
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-
-      setShareModal(null);
-      setShareEmail("");
-      setSharePermission("read");
-    } catch (err) {
-      setError("파일 공유 중 오류가 발생했습니다.");
-    } finally {
-      setActionLoading((prev) => ({ ...prev, share: false }));
-    }
-  };
-
   const handleSort = (column) => {
+    setCurrentPage(1); // 정렬 시 첫 페이지로 이동
     if (sortBy === column) {
       // 같은 컬럼을 다시 클릭하면 정렬 방향 전환
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -467,11 +552,18 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
         <div className="space-y-4">
           {/* 대량 액션 컨트롤 */}
           {React.createElement(bulkHandler.BulkActionControls)}
-
-          <div className="overflow-x-auto">
-            <table className="table w-full">
+          <div className="overflow-x-auto overflow-y-visible -mx-2 sm:mx-0 relative">
+            <p className="text-xs sm:text-sm mb-2">
+              {currentPage} / {Math.ceil(totalPages / 2)} 페이지 ({totalItems}
+              개의 아이템)
+            </p>
+            <p className="text-xs sm:text-sm mb-2">
+              각 페이지애는 조회 조건에 맞춰 디렉토리 및 파일이 각각 최대 10개씩
+              표시됩니다.
+            </p>
+            <table className="table w-full text-xs sm:text-sm">
               <thead>
-                <tr>
+                <tr className="text-xs sm:text-sm">
                   {React.createElement(bulkHandler.SelectAllCheckbox)}
                   <th
                     className="cursor-pointer"
@@ -484,6 +576,7 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                       </span>
                     )}
                   </th>
+                  {mode === "my-uploads" && <th>위치</th>}
                   <th
                     className="cursor-pointer"
                     onClick={() => handleSort("size")}
@@ -517,7 +610,7 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                       </span>
                     )}
                   </th>
-                  <th>Actions</th>
+                  <th>작업</th>
                 </tr>
               </thead>
               <tbody>
@@ -549,9 +642,9 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                         <div className="font-medium">{directory.name}</div>
                         {!directory.owner && directory.ownerInfo && (
                           <div className="flex items-center gap-1 mt-1">
-                            <div className="badge badge-accent badge-sm gap-1">
+                            <div className="badge badge-accent badge-xs sm:badge-sm gap-1 text-xs whitespace-nowrap">
                               <span>👤</span>
-                              <span>
+                              <span className="truncate max-w-[100px] sm:max-w-none">
                                 {directory.ownerInfo.name ||
                                   directory.ownerInfo.email}
                                 님이 공유
@@ -565,22 +658,23 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                     <td>디렉토리</td>
                     <td>{formatDate(directory.createdAt)}</td>
                     <td>
-                      <div className="dropdown dropdown-end">
+                      <div className="dropdown dropdown-end dropdown-top">
                         <label
                           tabIndex={0}
-                          className="btn btn-ghost btn-sm"
+                          className="btn btn-ghost btn-xs sm:btn-sm"
                           onClick={(e) => e.stopPropagation()}
                         >
                           ⋮
                         </label>
                         <ul
                           tabIndex={0}
-                          className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52"
+                          className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-48 sm:w-56 text-xs sm:text-sm z-[9999] absolute"
                         >
                           <li>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                document.activeElement.blur();
                                 handleShareDirectory(
                                   directory.id,
                                   directory.name
@@ -588,19 +682,20 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                               }}
                               className="text-blue-500"
                             >
-                              공유하기
+                              📤 공유하기
                             </button>
                           </li>
                           <li>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                document.activeElement.blur();
                                 handleRecursiveDelete(directory.id);
                               }}
                               className="text-red-500"
                               disabled={actionLoading[directory.id]}
                             >
-                              삭제 (모든 하위 항목 포함)
+                              🗑️ 삭제 (모든 하위 항목 포함)
                             </button>
                           </li>
                         </ul>
@@ -633,21 +728,21 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                         <span className="text-xl">{getFileIcon(file)}</span>
                         <div>
                           <div className="font-medium">{file.originalName}</div>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             {file.isEncrypted && (
-                              <div className="badge badge-primary badge-sm">
+                              <div className="badge badge-primary badge-xs sm:badge-sm whitespace-nowrap">
                                 🔒 암호화됨
                               </div>
                             )}
                             {file.isPublic && (
-                              <div className="badge badge-success badge-sm">
+                              <div className="badge badge-success badge-xs sm:badge-sm whitespace-nowrap">
                                 공개
                               </div>
                             )}
                             {!file.owner && file.ownerInfo && (
-                              <div className="badge badge-accent badge-sm gap-1">
+                              <div className="badge badge-accent badge-xs sm:badge-sm gap-1 whitespace-nowrap">
                                 <span>👤</span>
-                                <span>
+                                <span className="truncate max-w-[80px] sm:max-w-none">
                                   {file.ownerInfo.name || file.ownerInfo.email}
                                   님이 공유
                                 </span>
@@ -657,9 +752,9 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                               file.parentDirectoryInfo &&
                               file.parentDirectoryInfo.owner.id !==
                                 file.ownerInfo.id && (
-                                <div className="badge badge-info badge-sm gap-1">
+                                <div className="badge badge-info badge-xs sm:badge-sm gap-1 whitespace-nowrap">
                                   <span>📁</span>
-                                  <span>
+                                  <span className="truncate max-w-[100px] sm:max-w-none">
                                     {file.parentDirectoryInfo.owner.name ||
                                       file.parentDirectoryInfo.owner.email}
                                     님의 {file.parentDirectoryInfo.name}에
@@ -671,6 +766,20 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                         </div>
                       </div>
                     </td>
+                    {mode === "my-uploads" && (
+                      <td>
+                        <div className="badge badge-info badge-xs sm:badge-sm gap-1 whitespace-nowrap">
+                          <span>📁</span>
+                          <span className="truncate max-w-[100px] sm:max-w-none">
+                            {file.parentDirectoryInfo?.owner?.name ||
+                              file.parentDirectoryInfo?.owner?.email ||
+                              file.ownerInfo?.name}
+                            님의{" "}
+                            {file.parentDirectoryInfo?.name || "루트 디렉토리"}
+                          </span>
+                        </div>
+                      </td>
+                    )}
                     <td>
                       {formatBytes(
                         file.isEncrypted ? file.originalSize : file.size
@@ -684,69 +793,75 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
                     </td>
                     <td>{formatDate(file.createdAt)}</td>
                     <td>
-                      <div className="flex gap-2">
-                        <button
-                          className={`btn btn-primary btn-sm ${
-                            actionLoading[file.id] ? "loading" : ""
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownload(file);
-                          }}
-                          disabled={actionLoading[file.id]}
+                      <div className="dropdown dropdown-end dropdown-top">
+                        <label
+                          tabIndex={0}
+                          className="btn btn-ghost btn-xs sm:btn-sm"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          다운로드
-                        </button>
-
-                        {isPreviewable(file) && (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreview(file);
-                            }}
-                            disabled={actionLoading[file.id]}
-                          >
-                            미리보기
-                          </button>
-                        )}
-
-                        <div className="dropdown dropdown-end">
-                          <label
-                            tabIndex={0}
-                            className="btn btn-ghost btn-sm"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            ⋮
-                          </label>
-                          <ul
-                            tabIndex={0}
-                            className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52"
-                          >
+                          ⋮
+                        </label>
+                        <ul
+                          tabIndex={0}
+                          className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-48 sm:w-56 text-xs sm:text-sm z-[9999] absolute"
+                        >
+                          <li>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                document.activeElement.blur();
+                                handleDownload(file);
+                              }}
+                              disabled={actionLoading[file.id]}
+                              className={
+                                actionLoading[file.id] ? "loading" : ""
+                              }
+                            >
+                              ⬇️ 다운로드
+                            </button>
+                          </li>
+                          {isPreviewable(file) && (
                             <li>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setShareModal(file);
+                                  document.activeElement.blur();
+                                  handlePreview(file);
                                 }}
-                              >
-                                공유
-                              </button>
-                            </li>
-                            <li>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(file.id);
-                                }}
-                                className="text-red-500"
                                 disabled={actionLoading[file.id]}
                               >
-                                삭제
+                                👁️ 미리보기
                               </button>
                             </li>
-                          </ul>
-                        </div>
+                          )}
+                          <li>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                document.activeElement.blur();
+                                setShareModal({
+                                  isOpen: true,
+                                  fileId: file.id,
+                                });
+                              }}
+                            >
+                              📤 공유하기
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                document.activeElement.blur();
+                                handleDelete(file.id);
+                              }}
+                              className="text-red-500"
+                              disabled={actionLoading[file.id]}
+                            >
+                              🗑️ 삭제
+                            </button>
+                          </li>
+                        </ul>
                       </div>
                     </td>
                   </tr>
@@ -754,6 +869,15 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
               </tbody>
             </table>
           </div>
+          {/* 페이지네이터 */}
+          <Paginator
+            currentPage={currentPage}
+            totalPages={Math.ceil(totalPages / 2)} // 디렉토리와 파일을 합쳐서 페이지네이션
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+            className="mt-6 mb-20"
+          />
         </div>
       )}
       {/* 암호화 파일 복호화 모달 */}
@@ -859,64 +983,18 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
         </div>
       )}
       {/* 공유 모달 */}
-      {shareModal && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">파일 공유</h3>
-            <p className="py-4">파일: {shareModal.originalName}</p>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">이메일</span>
-              </label>
-              <input
-                type="email"
-                className="input input-bordered"
-                placeholder="공유할 사용자의 이메일"
-                value={shareEmail}
-                onChange={(e) => setShareEmail(e.target.value)}
-              />
-            </div>
-
-            <div className="form-control mt-4">
-              <label className="label">
-                <span className="label-text">권한</span>
-              </label>
-              <select
-                className="select select-bordered"
-                value={sharePermission}
-                onChange={(e) => setSharePermission(e.target.value)}
-              >
-                <option value="read">읽기</option>
-                <option value="write">읽기/쓰기</option>
-                <option value="admin">관리자</option>
-              </select>
-            </div>
-
-            <div className="modal-action">
-              <button
-                className="btn"
-                onClick={() => {
-                  setShareModal(null);
-                  setShareEmail("");
-                  setSharePermission("read");
-                }}
-              >
-                취소
-              </button>
-              <button
-                className={`btn btn-primary ${
-                  actionLoading.share ? "loading" : ""
-                }`}
-                onClick={handleShare}
-                disabled={actionLoading.share}
-              >
-                공유
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ShareModal
+        file={
+          shareModal.fileId
+            ? files.find((f) => f.id === shareModal.fileId)
+            : null
+        }
+        isOpen={shareModal.isOpen}
+        onClose={() => setShareModal({ isOpen: false, fileId: null })}
+        onUpdate={() =>
+          shareModal.fileId ? updateSingleFile(shareModal.fileId) : fetchData()
+        }
+      />
       {/* Alert Modal */}
       {alertModal.show && (
         <div className="modal modal-open">
@@ -976,7 +1054,15 @@ export default function FileList({ directoryId = null, refreshTrigger = 0 }) {
         }
         directoryId={directoryShareModal.directoryId}
         directoryName={directoryShareModal.directoryName}
+        onUpdate={() =>
+          directoryShareModal.directoryId
+            ? updateSingleDirectory(directoryShareModal.directoryId)
+            : fetchData()
+        }
       />
+
+      {/* 삭제 진행 상황 모달 */}
+      {React.createElement(bulkHandler.DeleteProgressModal)}
     </div>
   );
 }

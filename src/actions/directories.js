@@ -29,7 +29,13 @@ async function getAuthenticatedUser() {
   return decoded.userId;
 }
 
-export async function getDirectoryList({ parentId }) {
+export async function getDirectoryList({
+  parentId,
+  page = 1,
+  limit = 20,
+  sortBy = "name",
+  sortOrder = "asc",
+}) {
   try {
     const userId = await getAuthenticatedUser();
 
@@ -113,8 +119,17 @@ export async function getDirectoryList({ parentId }) {
         path: "owner",
         select: "name email",
       })
-      .sort({ name: 1 })
-      .lean();
+      .populate({
+        path: "shared.userId",
+        select: "name email",
+      })
+      .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
+      .lean()
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    // 디렉토리 개수 조회
+    const totalDirectories = await Directory.countDocuments(filter);
 
     return {
       directories: directories.map((dir) => ({
@@ -135,10 +150,20 @@ export async function getDirectoryList({ parentId }) {
         },
         sharedWith:
           dir.shared?.map((share) => ({
-            userId: share.userId.toString(),
+            _id: share._id.toString(),
+            userId: share.userId._id.toString(),
+            user: {
+              name: share.userId.name,
+              email: share.userId.email,
+            },
             permission: share.permission,
           })) || [],
       })),
+      pagination: {
+        totalDirectories,
+        currentPage: page,
+        limit,
+      },
     };
   } catch (error) {
     console.error("디렉토리 목록 조회 오류:", error);
@@ -172,7 +197,7 @@ export async function createDirectory({ name, parentId, description }) {
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
-                "permission": { $in: ["write", "admin"] },
+                "permission": "admin",
               },
             },
           },
@@ -254,7 +279,7 @@ export async function updateDirectory({ directoryId, name, description }) {
           "shared": {
             $elemMatch: {
               "userId": new mongoose.Types.ObjectId(userId),
-              "permission": { $in: ["write", "admin"] },
+              "permission": "admin",
             },
           },
         },
@@ -447,7 +472,6 @@ export async function shareDirectory({
       directory.shared.push({
         userId: targetUser._id,
         permission,
-        sharedAt: new Date(),
       });
     }
 
@@ -536,17 +560,18 @@ export async function getDirectorySharedUsers({ directoryId }) {
         },
       ],
     }).populate("shared.userId", "name email");
-
     if (!directory) {
       return { error: "디렉토리를 찾을 수 없거나 조회 권한이 없습니다." };
     }
 
     const sharedUsers = directory.shared.map((share) => ({
-      _id: share.userId._id.toString(),
-      name: share.userId.name,
-      email: share.userId.email,
+      _id: share._id.toString(),
+      userId: share.userId._id.toString(),
+      user: {
+        name: share.userId.name,
+        email: share.userId.email,
+      },
       permission: share.permission,
-      sharedAt: share.sharedAt,
     }));
     return {
       success: true,
@@ -581,7 +606,12 @@ export async function getDirectoryDetails({ directoryId }) {
         },
       ],
       deleted: { $ne: true },
-    }).lean();
+    })
+      .populate({
+        path: "shared.userId",
+        select: "name email",
+      })
+      .lean();
 
     if (!directory) {
       return { error: "디렉토리를 찾을 수 없거나 접근 권한이 없습니다." };
@@ -619,9 +649,13 @@ export async function getDirectoryDetails({ directoryId }) {
         fileCount,
         sharedWith:
           directory.shared?.map((share) => ({
-            userId: share.userId.toString(),
+            _id: share._id.toString(),
+            userId: share.userId._id.toString(),
+            user: {
+              name: share.userId.name,
+              email: share.userId.email,
+            },
             permission: share.permission,
-            sharedAt: share.sharedAt ? share.sharedAt.toISOString() : null,
           })) || [],
       },
     };
@@ -650,6 +684,10 @@ export async function getDirectoryByHash({ hash }) {
     })
       .populate({
         path: "owner",
+        select: "name email",
+      })
+      .populate({
+        path: "shared.userId",
         select: "name email",
       })
       .lean();
@@ -734,9 +772,13 @@ export async function getDirectoryByHash({ hash }) {
         fileCount,
         sharedWith:
           directory.shared?.map((share) => ({
-            userId: share.userId.toString(),
+            _id: share._id.toString(),
+            userId: share.userId._id.toString(),
+            user: {
+              name: share.userId.name,
+              email: share.userId.email,
+            },
             permission: share.permission,
-            sharedAt: share.sharedAt ? share.sharedAt.toISOString() : null,
           })) || [],
       },
     };
@@ -854,8 +896,7 @@ export async function createDirectoryShareLink({
       directory.owner.toString() === userId ||
       directory.shared.some(
         (share) =>
-          share.userId.toString() === userId &&
-          (share.permission === "admin" || share.permission === "write")
+          share.userId.toString() === userId && share.permission === "admin"
       );
 
     if (!hasPermission) {
@@ -1130,5 +1171,45 @@ export async function getSharedDirectoryFiles({
   } catch (error) {
     console.error("공유 디렉토리 파일 목록 조회 오류:", error);
     return { error: "파일 목록을 조회하는 중 오류가 발생했습니다." };
+  }
+}
+
+export async function removeDirectoryShare({ directoryId, shareId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "인증이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    // 디렉토리 조회 및 권한 확인
+    const directory = await Directory.findById(directoryId);
+
+    if (!directory) {
+      return { error: "디렉토리를 찾을 수 없습니다." };
+    }
+
+    // 디렉토리 소유자이거나 관리자 권한이 있는지 확인
+    const isOwner = directory.owner.toString() === userId;
+    const hasAdminPermission = directory.shared.some(
+      (share) =>
+        share.userId.toString() === userId && share.permission === "admin"
+    );
+
+    if (!isOwner && !hasAdminPermission) {
+      return { error: "공유를 해제할 권한이 없습니다." };
+    }
+
+    // 공유 제거
+    await Directory.findByIdAndUpdate(directoryId, {
+      $pull: { shared: { _id: shareId } },
+    });
+
+    return { message: "공유가 해제되었습니다." };
+  } catch (error) {
+    console.error("디렉토리 공유 해제 오류:", error);
+    return { error: "디렉토리 공유 해제 중 오류가 발생했습니다." };
   }
 }

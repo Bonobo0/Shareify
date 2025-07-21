@@ -91,7 +91,7 @@ export async function getStorageInfo() {
     }
 
     // 사용자의 스토리지 할당량
-    const storageQuota = user.storageLimit || 50 * 1024 * 1024 * 1024; // 50GB in bytes
+    const storageQuota = user.storageLimit || 5 * 1024 * 1024 * 1024; // 5GB in bytes
 
     // 사용자가 업로드한 모든 파일 크기의 합계 계산
     const aggregationResult = await File.aggregate([

@@ -9,9 +9,18 @@ import {
   sendVerificationEmail,
 } from "@/lib/email/emailService";
 import { verify2FAToken, verifyBackupCode } from "@/lib/auth/twoFactor";
+import { checkActionRateLimit } from "@/lib/actionRateLimit";
 
 export async function signIn(formData) {
   try {
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("signin");
+    if (!rateLimitResult.allowed) {
+      return {
+        error: rateLimitResult.error,
+      };
+    }
+
     await connectToDatabase();
 
     const email = formData.get("email");
@@ -115,6 +124,14 @@ export async function signIn(formData) {
 
 export async function signUp(formData) {
   try {
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("signup");
+    if (!rateLimitResult.allowed) {
+      return {
+        error: rateLimitResult.error,
+      };
+    }
+
     await connectToDatabase();
 
     const email = formData.get("email");
@@ -267,6 +284,14 @@ export async function verifyAuth() {
 // 비밀번호 재설정 요청
 export async function requestPasswordReset({ email }) {
   try {
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("forgot-password");
+    if (!rateLimitResult.allowed) {
+      return {
+        error: rateLimitResult.error,
+      };
+    }
+
     if (!email) {
       return { error: "이메일을 입력해주세요." };
     }
@@ -360,6 +385,14 @@ export async function resetPassword({
   isBackupCode = false,
 }) {
   try {
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("reset-password");
+    if (!rateLimitResult.allowed) {
+      return {
+        error: rateLimitResult.error,
+      };
+    }
+
     if (!token) {
       return { error: "재설정 토큰이 필요합니다." };
     }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import FileUploader from "@/app/components/fileUploader";
 import FileList from "@/app/components/fileList";
 import CreateDirectory from "@/app/components/createDirectory";
+import DirectoryShareModal from "@/app/components/directoryShareModal";
 import { useAuth } from "@/context/AuthContext";
 import { getDirectoryByHash } from "@/actions/directories";
 
@@ -21,6 +22,13 @@ export default function DirectoryPage() {
   const [error, setError] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
+
+  // 디렉토리 공유 모달 상태
+  const [directoryShareModal, setDirectoryShareModal] = useState({
+    isOpen: false,
+    directoryId: null,
+    directoryName: "",
+  });
 
   const fetchDirectoryDetails = useCallback(async (directoryHash) => {
     try {
@@ -65,6 +73,25 @@ export default function DirectoryPage() {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  // 디렉토리 공유 핸들러
+  const handleShareDirectory = () => {
+    if (directory) {
+      setDirectoryShareModal({
+        isOpen: true,
+        directoryId: directory.id,
+        directoryName: directory.name,
+      });
+    }
+  };
+
+  // 디렉토리 업데이트 핸들러 (공유 후 새로고침)
+  const handleDirectoryUpdate = () => {
+    if (hash) {
+      fetchDirectoryDetails(hash);
+    }
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -106,14 +133,24 @@ export default function DirectoryPage() {
         </ul>
       </div>
 
-      <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-3xl font-bold">{directory?.name}</h1>
-        {directory && !directory.owner && directory.ownerInfo && (
-          <div className="badge badge-accent gap-2">
-            <span>👤</span>
-            <span className="text-sm">
-              {directory.ownerInfo.name || directory.ownerInfo.email}님이 공유
-            </span>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold">{directory?.name}</h1>
+          {directory && !directory.owner && directory.ownerInfo && (
+            <div className="badge badge-accent gap-2">
+              <span>👤</span>
+              <span className="text-sm">
+                {directory.ownerInfo.name || directory.ownerInfo.email}님이 공유
+              </span>
+            </div>
+          )}
+        </div>
+
+        {directory && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => router.back()} className="btn btn-ghost">
+              ← 뒤로가기
+            </button>
           </div>
         )}
       </div>
@@ -124,11 +161,17 @@ export default function DirectoryPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-4 mb-8">
+      <div className="flex flex-wrap gap-4 mb-8 justify-between">
         <CreateDirectory
           parentId={directoryId}
           onSuccess={handleDirectoryCreated}
         />
+        <button
+          onClick={handleShareDirectory}
+          className="btn btn-outline gap-2"
+        >
+          📤 디렉토리 공유
+        </button>
       </div>
 
       <div className="mb-8">
@@ -141,6 +184,21 @@ export default function DirectoryPage() {
       <div>
         <FileList directoryId={directoryId} refreshTrigger={refreshTrigger} />
       </div>
+
+      {/* 디렉토리 공유 모달 */}
+      <DirectoryShareModal
+        isOpen={directoryShareModal.isOpen}
+        onClose={() =>
+          setDirectoryShareModal({
+            isOpen: false,
+            directoryId: null,
+            directoryName: "",
+          })
+        }
+        directoryId={directoryShareModal.directoryId}
+        directoryName={directoryShareModal.directoryName}
+        onUpdate={handleDirectoryUpdate}
+      />
     </div>
   );
 }
