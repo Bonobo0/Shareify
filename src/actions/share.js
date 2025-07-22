@@ -84,21 +84,28 @@ export async function getSharedFileInfo({ hash }) {
       }
     }
 
-    // 5. 상위 디렉토리에 활성화된 공유 링크가 있는 경우
+    // 5. 상위 디렉토리 계층에서 활성화된 공유 링크가 있는 경우
     if (file.parentDirectory) {
-      const parentDirectory = await Directory.findById(file.parentDirectory);
-      if (
-        parentDirectory &&
-        parentDirectory.shareLinks &&
-        parentDirectory.shareLinks.length > 0
-      ) {
-        // 만료되지 않은 공유 링크가 있는지 확인
-        const activeShareLink = parentDirectory.shareLinks.find(
-          (link) => new Date() <= link.expiresAt
-        );
-        if (activeShareLink) {
-          hasAccess = true;
+      let currentDirId = file.parentDirectory;
+
+      // 디렉토리 계층을 따라 올라가면서 공유 링크 확인
+      while (currentDirId) {
+        const directory = await Directory.findById(currentDirId);
+        if (!directory) break;
+
+        // 현재 디렉토리에 활성화된 공유 링크가 있는지 확인
+        if (directory.shareLinks && directory.shareLinks.length > 0) {
+          const activeShareLink = directory.shareLinks.find(
+            (link) => new Date() <= link.expiresAt
+          );
+          if (activeShareLink) {
+            hasAccess = true;
+            break;
+          }
         }
+
+        // 상위 디렉토리로 이동
+        currentDirId = directory.parent;
       }
     }
 
@@ -190,21 +197,28 @@ export async function downloadSharedFile({ hash }) {
       }
     }
 
-    // 5. 상위 디렉토리에 활성화된 공유 링크가 있는 경우
+    // 5. 상위 디렉토리 계층에서 활성화된 공유 링크가 있는 경우
     if (file.parentDirectory) {
-      const parentDirectory = await Directory.findById(file.parentDirectory);
-      if (
-        parentDirectory &&
-        parentDirectory.shareLinks &&
-        parentDirectory.shareLinks.length > 0
-      ) {
-        // 만료되지 않은 공유 링크가 있는지 확인
-        const activeShareLink = parentDirectory.shareLinks.find(
-          (link) => new Date() <= link.expiresAt
-        );
-        if (activeShareLink) {
-          hasAccess = true;
+      let currentDirId = file.parentDirectory;
+
+      // 디렉토리 계층을 따라 올라가면서 공유 링크 확인
+      while (currentDirId) {
+        const directory = await Directory.findById(currentDirId);
+        if (!directory) break;
+
+        // 현재 디렉토리에 활성화된 공유 링크가 있는지 확인
+        if (directory.shareLinks && directory.shareLinks.length > 0) {
+          const activeShareLink = directory.shareLinks.find(
+            (link) => new Date() <= link.expiresAt
+          );
+          if (activeShareLink) {
+            hasAccess = true;
+            break;
+          }
         }
+
+        // 상위 디렉토리로 이동
+        currentDirId = directory.parent;
       }
     }
 
@@ -530,7 +544,7 @@ export async function removeShareAccess({
 }
 
 // 공유 디렉토리 정보 조회 (링크 기반)
-export async function getSharedDirectoryInfo({ shareHash }) {
+export async function getSharedDirectoryInfo({ shareHash, subPath }) {
   try {
     await connectToDatabase();
 
@@ -557,33 +571,69 @@ export async function getSharedDirectoryInfo({ shareHash }) {
       return { error: "만료된 공유 링크입니다." };
     }
 
-    // 디렉토리 내 파일 목록 조회
+    // 현재 탐색할 디렉토리 결정
+    let currentDirectory = directory;
+    let breadcrumbPath = [
+      { name: directory.name, path: "", description: directory.description },
+    ];
+
+    // subPath가 있는 경우 해당 경로의 디렉토리를 찾음
+    if (subPath) {
+      const pathParts = subPath.split("/").filter((p) => p);
+      let currentParent = directory._id;
+      let currentPath = "";
+
+      for (const part of pathParts) {
+        const subDir = await Directory.findOne({
+          parent: currentParent,
+          name: part,
+          deleted: { $ne: true },
+        });
+
+        if (!subDir) {
+          return { error: "요청한 경로를 찾을 수 없습니다." };
+        }
+
+        currentPath += (currentPath ? "/" : "") + part;
+        breadcrumbPath.push({
+          name: subDir.name,
+          path: currentPath,
+          description: subDir.description,
+        });
+
+        currentDirectory = subDir;
+        currentParent = subDir._id;
+      }
+    }
+
+    // 현재 디렉토리 내 파일 목록 조회
     const files = await File.find({
-      parentDirectory: directory._id,
+      parentDirectory: currentDirectory._id,
       deleted: { $ne: true },
     }).select(
       "originalName size createdAt hash mimetype originalMimetype originalSize isEncrypted"
     );
 
-    // 하위 디렉토리 목록 조회
+    // 현재 디렉토리의 하위 디렉토리 목록 조회
     const subdirectories = await Directory.find({
-      parent: directory._id,
+      parent: currentDirectory._id,
       deleted: { $ne: true },
     }).select("name createdAt hash");
 
     return {
       success: true,
       directory: {
-        id: directory._id.toString(),
-        name: directory.name,
-        description: directory.description,
+        id: currentDirectory._id.toString(),
+        name: currentDirectory.name,
+        description: currentDirectory.description,
         owner: {
-          name: directory.owner?.name,
+          name: directory.owner?.name, // 루트 디렉토리의 소유자 정보 사용
           email: directory.owner?.email,
         },
-        createdAt: directory.createdAt,
-        hash: directory.hash,
+        createdAt: currentDirectory.createdAt,
+        hash: currentDirectory.hash,
       },
+      breadcrumbs: breadcrumbPath, // 브레드크럼 정보 추가
       files: files.map((file) => ({
         id: file._id.toString(),
         name: file.originalName,

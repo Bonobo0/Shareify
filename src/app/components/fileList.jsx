@@ -724,9 +724,7 @@ export default function FileList({
                 <div className="flex items-center gap-1">
                   {index === breadcrumbs.length - 1 ? (
                     <>
-                      <span className="text-gray-700 font-medium">
-                        {crumb.name}
-                      </span>
+                      <span className="  font-medium">{crumb.name}</span>
                       {!crumb.isOwner && (
                         <span className="badge badge-accent badge-xs">
                           👤 공유받음

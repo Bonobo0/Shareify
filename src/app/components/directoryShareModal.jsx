@@ -91,16 +91,20 @@ export default function DirectoryShareModal({
       });
 
       if (result.success) {
-        setSuccess("공유 링크가 생성되었습니다.");
         await fetchShareLinks();
         // 클립보드에 복사
-        await navigator.clipboard.writeText(result.shareUrl);
-        setSuccess("공유 링크가 생성되고 클립보드에 복사되었습니다.");
+        try {
+          await navigator.clipboard.writeText(result.shareUrl);
+          setSuccess("공유 링크가 생성되고 클립보드에 복사되었습니다.");
+        } catch (clipboardError) {
+          setSuccess("공유 링크가 생성되었습니다.");
+        }
       } else {
-        setError(result.error);
+        setError(result.error || "공유 링크 생성에 실패했습니다.");
       }
     } catch (error) {
-      setError("공유 링크 생성에 실패했습니다.");
+      console.error("공유 링크 생성 오류:", error);
+      setError("공유 링크 생성 중 오류가 발생했습니다.");
     } finally {
       setCreating(false);
     }

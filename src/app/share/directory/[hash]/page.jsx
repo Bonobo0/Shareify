@@ -20,6 +20,8 @@ export default function SharedDirectoryPage() {
   const [error, setError] = useState("");
   const [permission, setPermission] = useState("read");
   const [directoryId, setDirectoryId] = useState(null);
+  const [currentPath, setCurrentPath] = useState(""); // 현재 경로 추적
+  const [breadcrumbs, setBreadcrumbs] = useState([]); // 브레드크럼 추적
   const [previewModal, setPreviewModal] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewPasswordModal, setPreviewPasswordModal] = useState(false);
@@ -36,12 +38,30 @@ export default function SharedDirectoryPage() {
   const handleUploadComplete = () => {
     setRefreshTrigger((prev) => prev + 1);
     // 파일 목록 새로고침
-    fetchDirectoryDetails(hash);
+    fetchDirectoryDetails(hash, currentPath);
   };
 
-  const fetchDirectoryDetails = useCallback(async (shareHash) => {
+  // 하위 디렉토리 클릭 핸들러
+  const handleDirectoryClick = (directoryName) => {
+    const newPath = currentPath
+      ? `${currentPath}/${directoryName}`
+      : directoryName;
+    setLoading(true);
+    fetchDirectoryDetails(hash, newPath);
+  };
+
+  // 브레드크럼 클릭 핸들러
+  const handleBreadcrumbClick = (path) => {
+    setLoading(true);
+    fetchDirectoryDetails(hash, path);
+  };
+
+  const fetchDirectoryDetails = useCallback(async (shareHash, subPath = "") => {
     try {
-      const result = await getSharedDirectoryInfo({ shareHash });
+      const result = await getSharedDirectoryInfo({
+        shareHash,
+        subPath: subPath || undefined,
+      });
 
       if (result.error) {
         throw new Error(result.error);
@@ -53,6 +73,22 @@ export default function SharedDirectoryPage() {
         setFiles(result.files || []);
         setSubdirectories(result.subdirectories || []);
         setPermission(result.permission);
+        setCurrentPath(subPath);
+
+        // 서버에서 받은 브레드크럼 정보 사용
+        if (result.breadcrumbs) {
+          setBreadcrumbs(result.breadcrumbs);
+        } else {
+          // 폴백: 기본 브레드크럼 설정
+          setBreadcrumbs([
+            {
+              name: result.directory.name,
+              path: "",
+              description: result.directory.description,
+            },
+          ]);
+        }
+
         setLoading(false);
       }
     } catch (error) {
@@ -157,19 +193,41 @@ export default function SharedDirectoryPage() {
       if (file.isEncrypted && password) {
         console.log("암호화된 파일 복호화 시작...");
         try {
-          const decryptedBlob = await decryptForPreview(
-            result.downloadUrl,
+          // URL에서 ArrayBuffer 가져오기
+          const response = await fetch(result.downloadUrl);
+          if (!response.ok) {
+            throw new Error("파일 다운로드 실패");
+          }
+          const encryptedArrayBuffer = await response.arrayBuffer();
+
+          const decryptResult = await decryptForPreview(
+            encryptedArrayBuffer,
             password,
             {
               originalName: file.name,
               originalMimetype: file.originalMimetype || file.mimeType,
             }
           );
-          previewUrl = URL.createObjectURL(decryptedBlob);
-          console.log("암호화된 파일 복호화 완료");
+
+          if (decryptResult.success) {
+            previewUrl = URL.createObjectURL(decryptResult.blob);
+            console.log("암호화된 파일 복호화 완료");
+          } else {
+            throw new Error(decryptResult.error || "복호화 실패");
+          }
         } catch (decryptError) {
           console.error("복호화 실패:", decryptError);
-          throw new Error("복호화에 실패했습니다. 비밀번호를 확인해주세요.");
+          // 더 구체적인 에러 메시지 제공
+          if (
+            decryptError.message?.includes("incorrect password") ||
+            decryptError.message?.includes("wrong password") ||
+            decryptError.message?.includes("decryption failed") ||
+            decryptError.message?.includes("Decryption failed")
+          ) {
+            throw new Error("복호화에 실패했습니다. 비밀번호를 확인해주세요.");
+          } else {
+            throw new Error(`복호화 오류: ${decryptError.message}`);
+          }
         }
       }
 
@@ -226,11 +284,37 @@ export default function SharedDirectoryPage() {
       {/* Header */}
       <div className="bg-base-200 py-6">
         <div className="container mx-auto px-4">
+          {/* 브레드크럼 네비게이션 */}
+          {breadcrumbs.length > 0 && (
+            <div className="breadcrumbs text-sm mb-4">
+              <ul>
+                {breadcrumbs.map((crumb, index) => (
+                  <li key={index}>
+                    {index === breadcrumbs.length - 1 ? (
+                      <span className="  font-medium">{crumb.name}</span>
+                    ) : (
+                      <button
+                        className="text-blue-600 hover:text-blue-800"
+                        onClick={() => handleBreadcrumbClick(crumb.path)}
+                      >
+                        {crumb.name}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold">{directoryInfo?.name}</h1>
-                <div className="badge badge-accent gap-2">
+                <h1 className="text-3xl font-bold">
+                  {breadcrumbs.length > 1
+                    ? breadcrumbs[breadcrumbs.length - 1].name
+                    : directoryInfo?.name}
+                </h1>
+                <div className="btn btn-accent btn-xs gap-2">
                   <span>👤</span>
                   <span className="text-sm">
                     {directoryInfo?.owner?.name || directoryInfo?.owner?.email}
@@ -238,9 +322,14 @@ export default function SharedDirectoryPage() {
                   </span>
                 </div>
               </div>
-              {directoryInfo?.description && (
-                <p className="text-sm text-gray-700 mt-2">
-                  {directoryInfo.description}
+              {/* 현재 디렉토리의 설명 표시 */}
+              {(breadcrumbs.length > 1
+                ? breadcrumbs[breadcrumbs.length - 1].description
+                : directoryInfo?.description) && (
+                <p className="text-sm   mt-2">
+                  {breadcrumbs.length > 1
+                    ? breadcrumbs[breadcrumbs.length - 1].description
+                    : directoryInfo?.description}
                 </p>
               )}
             </div>
@@ -266,13 +355,16 @@ export default function SharedDirectoryPage() {
               {subdirectories.map((directory) => (
                 <div
                   key={directory.id}
-                  className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow"
+                  className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleDirectoryClick(directory.name)}
                 >
                   <div className="card-body p-4">
                     <div className="flex items-center">
                       <span className="text-2xl mr-3">📁</span>
                       <div className="flex-1">
-                        <h3 className="font-medium">{directory.name}</h3>
+                        <h3 className="font-medium hover:text-blue-600">
+                          {directory.name}
+                        </h3>
                         <p className="text-sm text-gray-600">
                           {formatDate(directory.createdAt)}
                         </p>
@@ -291,7 +383,7 @@ export default function SharedDirectoryPage() {
             <h2 className="text-xl font-semibold">📄 파일 목록</h2>
           </div>
           {permission === "write" && directoryId && (
-            <div className="w-auto">
+            <div className="w-auto mb-4">
               <FileUploader
                 directoryId={directoryId}
                 shareHash={hash}
@@ -301,58 +393,52 @@ export default function SharedDirectoryPage() {
               />
             </div>
           )}
+
           {files.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📂</div>
               <p className="text-gray-600">이 폴더에는 파일이 없습니다.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table table-zebra w-full">
-                <thead>
-                  <tr>
-                    <th>파일명</th>
-                    <th>크기</th>
-                    <th>업로드일</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {files.map((file) => (
-                    <tr
-                      key={file.id}
-                      className="hover:bg-base-300 cursor-pointer transition-colors"
-                      onClick={(e) => handleFileClick(file, e)}
-                    >
-                      <td>
-                        <div className="flex items-center">
-                          <span className="mr-2">
-                            {(
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {files.map((file) => (
+                <div
+                  key={file.id}
+                  className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={(e) => handleFileClick(file, e)}
+                >
+                  <div className="card-body p-4">
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-3">
+                        {(file.originalMimetype || file.mimeType)?.startsWith(
+                          "image/"
+                        )
+                          ? "🖼️"
+                          : (
                               file.originalMimetype || file.mimeType
-                            )?.startsWith("image/")
-                              ? "🖼️"
-                              : (
-                                  file.originalMimetype || file.mimeType
-                                )?.startsWith("video/")
-                              ? "🎥"
-                              : (
-                                  file.originalMimetype || file.mimeType
-                                )?.startsWith("audio/")
-                              ? "🎵"
-                              : (
-                                  file.originalMimetype || file.mimeType
-                                )?.includes("pdf")
-                              ? "📄"
-                              : (
-                                  file.originalMimetype || file.mimeType
-                                )?.includes("document")
-                              ? "📝"
-                              : (
-                                  file.originalMimetype || file.mimeType
-                                )?.includes("spreadsheet")
-                              ? "📊"
-                              : "📄"}
-                          </span>
-                          <span className="font-medium">{file.name}</span>
+                            )?.startsWith("video/")
+                          ? "🎥"
+                          : (
+                              file.originalMimetype || file.mimeType
+                            )?.startsWith("audio/")
+                          ? "🎵"
+                          : (file.originalMimetype || file.mimeType)?.includes(
+                              "pdf"
+                            )
+                          ? "📄"
+                          : (file.originalMimetype || file.mimeType)?.includes(
+                              "document"
+                            )
+                          ? "📝"
+                          : (file.originalMimetype || file.mimeType)?.includes(
+                              "spreadsheet"
+                            )
+                          ? "📊"
+                          : "📄"}
+                      </span>
+                      <div className="flex-1">
+                        <h3 className="font-medium hover:text-blue-600 truncate">
+                          {file.name}
                           {file.isEncrypted && (
                             <span className="ml-2">
                               <span className="badge badge-warning badge-sm">
@@ -360,14 +446,16 @@ export default function SharedDirectoryPage() {
                               </span>
                             </span>
                           )}
+                        </h3>
+                        <div className="text-sm text-gray-600">
+                          <p>{formatFileSize(file.size)}</p>
+                          <p>{formatDate(file.uploadedAt)}</p>
                         </div>
-                      </td>
-                      <td>{formatFileSize(file.size)}</td>
-                      <td>{formatDate(file.uploadedAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -519,7 +607,7 @@ export default function SharedDirectoryPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4 text-error">❌ 오류</h2>
-            <p className="text-sm text-gray-700 mb-6">{errorModal.message}</p>
+            <p className="text-sm mb-6">{errorModal.message}</p>
             <div className="flex justify-end">
               <button
                 className="btn btn-primary"

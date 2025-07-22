@@ -215,7 +215,7 @@ function ResetPasswordForm() {
             <div>
               <label
                 htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium  "
               >
                 비밀번호 확인
               </label>
@@ -237,7 +237,7 @@ function ResetPasswordForm() {
               <div>
                 <label
                   htmlFor="twoFactorCode"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium  "
                 >
                   {useBackupCode ? "백업 코드" : "2FA 인증 코드"}
                 </label>

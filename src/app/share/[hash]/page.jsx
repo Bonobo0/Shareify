@@ -270,7 +270,7 @@ export default function SharePage() {
 
             {file?.owner && (
               <div className="flex justify-center mb-3">
-                <div className="badge badge-accent badge-sm sm:badge-md gap-1 sm:gap-2 whitespace-nowrap">
+                <div className="btn btn-accent btn-xs gap-1 sm:gap-2 whitespace-nowrap">
                   <span>👤</span>
                   <span className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">
                     {file.owner.name || file.owner.email}님이 공유
