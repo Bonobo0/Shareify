@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import FileList from "@/app/components/fileList";
 import FileUploader from "@/app/components/fileUploader";
+import SelectedDownloadModal from "@/app/components/selectedDownloadModal";
+import BulkDownloadModal from "@/app/components/bulkDownloadModal";
 import { getSharedDirectoryInfo } from "@/actions/share";
-import { downloadSharedFile } from "@/actions/share";
+import {
+  downloadSharedFile,
+  downloadSharedDirectoryFile,
+} from "@/actions/share";
 import { decryptForPreview } from "@/lib/crypto/encryption";
 
 export default function SharedDirectoryPage() {
   const params = useParams();
+  const router = useRouter();
   const { hash } = params;
 
   const [directoryInfo, setDirectoryInfo] = useState(null);
@@ -30,6 +35,27 @@ export default function SharedDirectoryPage() {
   const [errorModal, setErrorModal] = useState({ show: false, message: "" });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // 파일 선택 관련 상태
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadingFiles, setDownloadingFiles] = useState({});
+
+  // 다운로드 모달 상태
+  const [showSelectedDownloadModal, setShowSelectedDownloadModal] =
+    useState(false);
+  const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false);
+
+  // 파일 선택 토글 함수
+  const toggleFileSelection = (fileId) => {
+    const isSelected = selectedFiles.includes(fileId);
+    if (isSelected) {
+      setSelectedFiles((prev) => prev.filter((id) => id !== fileId));
+    } else {
+      setSelectedFiles((prev) => [...prev, fileId]);
+    }
+  };
+
   // Error modal helper function
   const showError = (message) => {
     setErrorModal({ show: true, message });
@@ -39,6 +65,44 @@ export default function SharedDirectoryPage() {
     setRefreshTrigger((prev) => prev + 1);
     // 파일 목록 새로고침
     fetchDirectoryDetails(hash, currentPath);
+  };
+
+  // 개별 파일 다운로드 (미리보기 불가능한 경우)
+  const downloadSingleFile = async (file) => {
+    try {
+      setDownloadingFiles((prev) => ({ ...prev, [file.id]: true }));
+
+      const result = await downloadSharedDirectoryFile({
+        shareHash: hash,
+        fileId: file.id,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "다운로드 실패");
+      }
+
+      // 다운로드 URL로 파일 다운로드
+      const response = await fetch(result.downloadUrl);
+      if (!response.ok) {
+        throw new Error(`다운로드 실패: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("파일 다운로드 실패:", error);
+      showError("파일 다운로드에 실패했습니다: " + error.message);
+    } finally {
+      setDownloadingFiles((prev) => ({ ...prev, [file.id]: false }));
+    }
   };
 
   // 하위 디렉토리 클릭 핸들러
@@ -134,44 +198,66 @@ export default function SharedDirectoryPage() {
   };
 
   const handleFileClick = async (file, event) => {
-    event.stopPropagation();
+    // 미리보기 가능한 파일인지 확인
+    const mimeType = file.originalMimetype || file.mimeType || "";
+    const isPreviewableFile =
+      mimeType.startsWith("image/") ||
+      mimeType.startsWith("video/") ||
+      mimeType.startsWith("audio/") ||
+      mimeType === "application/pdf" ||
+      mimeType.startsWith("text/");
 
-    console.log(
-      "파일 클릭:",
-      file.name,
-      "암호화 여부:",
-      file.isEncrypted,
-      "현재 MIME 타입:",
-      file.mimeType,
-      "원본 MIME 타입:",
-      file.originalMimetype,
-      "미리보기 가능 (현재):",
-      isPreviewable(file.mimeType),
-      "미리보기 가능 (원본):",
-      isPreviewable(file.originalMimetype)
-    );
+    // 암호화된 파일이고 미리보기 가능한 경우 비밀번호 모달 표시
+    if (file.isEncrypted && isPreviewableFile) {
+      setSelectedFile(file);
+      setPreviewPasswordModal(true);
+      return;
+    }
 
-    // 미리보기 가능한 파일인 경우 (암호화된 파일은 originalMimetype, 일반 파일은 mimeType 사용)
-    const mimeTypeToCheck = file.isEncrypted
-      ? file.originalMimetype || file.mimeType
-      : file.mimeType;
+    // 암호화된 파일이지만 미리보기 불가능한 경우 파일 상세페이지로 이동
+    if (file.isEncrypted && !isPreviewableFile) {
+      router.push(`/share/${file.hash}`);
+      return;
+    }
 
-    if (isPreviewable(mimeTypeToCheck)) {
-      // 암호화된 파일인 경우 비밀번호 입력 모달 표시
-      if (file.isEncrypted) {
-        console.log("암호화된 파일 - 비밀번호 모달 표시");
-        setSelectedFile(file);
-        setPreviewPasswordModal(true);
-        return;
+    // 암호화되지 않은 파일 처리
+    if (isPreviewableFile) {
+      // 미리보기 모달 열기
+      try {
+        const result = await downloadSharedDirectoryFile({
+          shareHash: hash,
+          fileId: file.id,
+        });
+
+        if (result.success) {
+          const response = await fetch(result.downloadUrl);
+
+          if (response.ok) {
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+
+            setPreviewModal({
+              isOpen: true,
+              file: file,
+              url: url,
+              mimeType: mimeType,
+              type: mimeType.split("/")[0], // image, video, audio 등
+            });
+          } else {
+            // 미리보기 실패시 파일 상세페이지로 이동
+            router.push(`/share/${file.hash}`);
+          }
+        } else {
+          // 미리보기 실패시 파일 상세페이지로 이동
+          router.push(`/share/${file.hash}`);
+        }
+      } catch (error) {
+        console.error("미리보기 실패:", error);
+        router.push(`/share/${file.hash}`);
       }
-
-      console.log("일반 파일 - 바로 미리보기");
-      // 일반 파일 미리보기
-      await performPreview(file);
     } else {
-      console.log("미리보기 불가능한 파일 - 상세 페이지로 이동");
-      // 미리보기 불가능한 파일은 공유 파일 페이지로 이동
-      window.open(`/share/${file.hash}`, "_blank");
+      // 미리보기 불가능한 파일은 파일 상세페이지로 이동
+      router.push(`/share/${file.hash}`);
     }
   };
 
@@ -179,7 +265,10 @@ export default function SharedDirectoryPage() {
     setPreviewLoading(true);
 
     try {
-      const result = await downloadSharedFile({ hash: file.hash });
+      const result = await downloadSharedDirectoryFile({
+        shareHash: hash,
+        fileId: file.id,
+      });
 
       if (!result.success) {
         throw new Error(
@@ -229,12 +318,23 @@ export default function SharedDirectoryPage() {
             throw new Error(`복호화 오류: ${decryptError.message}`);
           }
         }
+      } else if (!file.isEncrypted) {
+        // 암호화되지 않은 파일의 경우 직접 fetch
+        const response = await fetch(result.downloadUrl);
+        if (!response.ok) {
+          throw new Error("파일 다운로드 실패");
+        }
+        const blob = await response.blob();
+        previewUrl = URL.createObjectURL(blob);
       }
 
+      const mimeType = file.originalMimetype || file.mimeType;
       setPreviewModal({
+        isOpen: true,
         file: file,
         url: previewUrl,
-        type: (file.originalMimetype || file.mimeType).split("/")[0],
+        mimeType: mimeType,
+        type: mimeType.split("/")[0],
         isDecrypted: file.isEncrypted && password,
       });
     } catch (error) {
@@ -379,9 +479,6 @@ export default function SharedDirectoryPage() {
 
         {/* Files */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">📄 파일 목록</h2>
-          </div>
           {permission === "write" && directoryId && (
             <div className="w-auto mb-4">
               <FileUploader
@@ -400,63 +497,149 @@ export default function SharedDirectoryPage() {
               <p className="text-gray-600">이 폴더에는 파일이 없습니다.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {files.map((file) => (
-                <div
-                  key={file.id}
-                  className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={(e) => handleFileClick(file, e)}
-                >
-                  <div className="card-body p-4">
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-3">
-                        {(file.originalMimetype || file.mimeType)?.startsWith(
-                          "image/"
-                        )
-                          ? "🖼️"
-                          : (
-                              file.originalMimetype || file.mimeType
-                            )?.startsWith("video/")
-                          ? "🎥"
-                          : (
-                              file.originalMimetype || file.mimeType
-                            )?.startsWith("audio/")
-                          ? "🎵"
-                          : (file.originalMimetype || file.mimeType)?.includes(
-                              "pdf"
-                            )
-                          ? "📄"
-                          : (file.originalMimetype || file.mimeType)?.includes(
-                              "document"
-                            )
-                          ? "📝"
-                          : (file.originalMimetype || file.mimeType)?.includes(
-                              "spreadsheet"
-                            )
-                          ? "📊"
-                          : "📄"}
-                      </span>
-                      <div className="flex-1">
-                        <h3 className="font-medium hover:text-blue-600 truncate">
-                          {file.name}
-                          {file.isEncrypted && (
-                            <span className="ml-2">
-                              <span className="badge badge-warning badge-sm">
-                                🔒
-                              </span>
-                            </span>
+            <>
+              {/* 벌크 액션 컨트롤러를 위한 커스텀 버튼들 */}
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex gap-2">
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() => setIsSelectionMode(!isSelectionMode)}
+                  >
+                    {isSelectionMode ? "선택 취소" : "파일 선택"}
+                  </button>
+
+                  {isSelectionMode && (
+                    <>
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => {
+                          if (selectedFiles.length === files.length) {
+                            setSelectedFiles([]);
+                          } else {
+                            setSelectedFiles(files.map((file) => file.id));
+                          }
+                        }}
+                      >
+                        {selectedFiles.length === files.length
+                          ? "전체 해제"
+                          : "전체 선택"}
+                      </button>
+
+                      {selectedFiles.length > 0 && (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => {
+                            console.log("선택된 파일들:", selectedFiles);
+                            console.log(
+                              "파일 목록:",
+                              files.map((f) => ({ id: f.id, name: f.name }))
+                            );
+                            setShowSelectedDownloadModal(true);
+                          }}
+                          disabled={isDownloading}
+                        >
+                          다운로드 ({selectedFiles.length})
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {files.length > 0 && (
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() => setShowBulkDownloadModal(true)}
+                    disabled={isDownloading}
+                  >
+                    📦 전체 다운로드
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                {files.map((file) => {
+                  const isSelected = selectedFiles.includes(file.id);
+                  return (
+                    <div
+                      key={file.id}
+                      className={`card shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
+                        isSelected
+                          ? "bg-primary/20 border-2 border-primary"
+                          : "bg-base-200"
+                      }`}
+                      onClick={(e) => {
+                        if (isSelectionMode) {
+                          // 선택 모드에서는 파일 선택/해제만
+                          toggleFileSelection(file.id);
+                        } else {
+                          // 일반 모드에서는 파일 클릭 (미리보기/다운로드)
+                          handleFileClick(file, e);
+                        }
+                      }}
+                    >
+                      <div className="card-body p-4">
+                        <div className="flex items-center">
+                          {isSelectionMode && (
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-primary mr-3"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                toggleFileSelection(file.id);
+                              }}
+                            />
                           )}
-                        </h3>
-                        <div className="text-sm text-gray-600">
-                          <p>{formatFileSize(file.size)}</p>
-                          <p>{formatDate(file.uploadedAt)}</p>
+                          <span className="text-2xl mr-3">
+                            {(
+                              file.originalMimetype || file.mimeType
+                            )?.startsWith("image/")
+                              ? "🖼️"
+                              : (
+                                  file.originalMimetype || file.mimeType
+                                )?.startsWith("video/")
+                              ? "🎥"
+                              : (
+                                  file.originalMimetype || file.mimeType
+                                )?.startsWith("audio/")
+                              ? "🎵"
+                              : (
+                                  file.originalMimetype || file.mimeType
+                                )?.includes("pdf")
+                              ? "📄"
+                              : (
+                                  file.originalMimetype || file.mimeType
+                                )?.includes("document")
+                              ? "📝"
+                              : (
+                                  file.originalMimetype || file.mimeType
+                                )?.includes("spreadsheet")
+                              ? "📊"
+                              : "📄"}
+                          </span>
+                          <div className="flex-1">
+                            <h3 className="font-medium hover:text-blue-600 truncate">
+                              {file.name}
+                              {file.isEncrypted && (
+                                <span className="ml-2">
+                                  <span className="badge badge-warning badge-sm">
+                                    🔒
+                                  </span>
+                                </span>
+                              )}
+                            </h3>
+                            <div className="text-sm text-gray-600">
+                              <p>{formatFileSize(file.size)}</p>
+                              <p>{formatDate(file.uploadedAt)}</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -574,16 +757,39 @@ export default function SharedDirectoryPage() {
                   </audio>
                 </div>
               )}
+              {(previewModal.mimeType === "application/pdf" ||
+                previewModal.type === "application") && (
+                <iframe
+                  src={previewModal.url}
+                  className="w-full h-[70vh]"
+                  title={previewModal.file.name}
+                >
+                  PDF를 표시할 수 없습니다.
+                </iframe>
+              )}
+              {previewModal.type === "text" && (
+                <iframe
+                  src={previewModal.url}
+                  className="w-full h-[70vh]"
+                  title={previewModal.file.name}
+                >
+                  텍스트를 표시할 수 없습니다.
+                </iframe>
+              )}
             </div>
 
             <div className="mt-4 text-center">
               <button
                 className="btn btn-primary"
-                onClick={() =>
-                  window.open(`/share/${previewModal.file.hash}`, "_blank")
-                }
+                onClick={() => {
+                  // 다운로드 링크로 이동
+                  const link = document.createElement("a");
+                  link.href = previewModal.url;
+                  link.download = previewModal.file.name;
+                  link.click();
+                }}
               >
-                파일 페이지로 이동
+                파일 다운로드
               </button>
             </div>
           </div>
@@ -619,6 +825,53 @@ export default function SharedDirectoryPage() {
           </div>
         </div>
       )}
+
+      {/* 선택 다운로드 모달 */}
+      <SelectedDownloadModal
+        isOpen={showSelectedDownloadModal}
+        onClose={() => {
+          setShowSelectedDownloadModal(false);
+          setSelectedFiles([]);
+          setIsSelectionMode(false);
+        }}
+        selectedFiles={selectedFiles}
+        onClearSelection={() => {
+          setSelectedFiles([]);
+          setIsSelectionMode(false);
+        }}
+        // 공유 파일용 커스텀 액션 함수 전달
+        getFilesAction={async (fileIds) => {
+          console.log("선택된 파일 IDs:", fileIds);
+          console.log("공유 해시:", hash);
+          const { getSharedSelectedFilesForDownload } = await import(
+            "@/actions/share"
+          );
+          const result = await getSharedSelectedFilesForDownload({
+            shareHash: hash,
+            fileIds: fileIds,
+          });
+          console.log("서버 액션 결과:", result);
+          return result;
+        }}
+      />
+
+      {/* 전체 다운로드 모달 */}
+      <BulkDownloadModal
+        isOpen={showBulkDownloadModal}
+        onClose={() => setShowBulkDownloadModal(false)}
+        directoryId={directoryId}
+        directoryName={directoryInfo?.name || "공유 폴더"}
+        // 공유 파일용 커스텀 액션 함수 전달
+        getFilesAction={async (dirId) => {
+          const { getSharedAllFilesForDownload } = await import(
+            "@/actions/share"
+          );
+          return getSharedAllFilesForDownload({
+            shareHash: hash,
+            directoryId: dirId,
+          });
+        }}
+      />
     </div>
   );
 }

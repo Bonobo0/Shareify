@@ -313,25 +313,35 @@ export async function uploadFile({
 
       // 2. 링크 공유를 통한 접근인 경우 추가 확인
       if (!hasAccess && shareHash) {
-        const sharedDirectory = await Directory.findOne({
-          _id: directoryId,
-          "shareLinks.hash": shareHash,
-          deleted: { $ne: true },
-        }).lean();
+        // 현재 디렉토리부터 상위 디렉토리까지 올라가면서 공유 링크 확인
+        let currentDirId = directoryId;
 
-        if (sharedDirectory) {
-          const shareLink = sharedDirectory.shareLinks.find(
-            (link) => link.hash === shareHash
-          );
+        while (currentDirId && !hasAccess) {
+          const sharedDirectory = await Directory.findOne({
+            _id: currentDirId,
+            "shareLinks.hash": shareHash,
+            deleted: { $ne: true },
+          }).lean();
 
-          // 링크가 유효하고 업로드 권한이 있으며 만료되지 않은 경우
-          if (
-            shareLink &&
-            shareLink.permission === "write" &&
-            new Date() <= shareLink.expiresAt
-          ) {
-            hasAccess = true;
+          if (sharedDirectory) {
+            const shareLink = sharedDirectory.shareLinks.find(
+              (link) => link.hash === shareHash
+            );
+
+            // 링크가 유효하고 업로드 권한이 있으며 만료되지 않은 경우
+            if (
+              shareLink &&
+              shareLink.permission === "write" &&
+              new Date() <= shareLink.expiresAt
+            ) {
+              hasAccess = true;
+              break;
+            }
           }
+
+          // 상위 디렉토리로 이동
+          const currentDir = await Directory.findById(currentDirId).lean();
+          currentDirId = currentDir?.parent;
         }
       }
 

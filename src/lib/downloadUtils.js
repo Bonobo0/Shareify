@@ -97,6 +97,15 @@ export async function downloadFilesAsZip(
 
         // 암호화된 파일인 경우 복호화 처리
         if (file.isEncrypted) {
+          console.log(`암호화된 파일 처리 시작: ${file.originalName}`);
+          console.log(`파일 정보:`, {
+            id: file.id,
+            originalName: file.originalName,
+            originalMimetype: file.originalMimetype,
+            mimetype: file.mimetype || file.mimeType,
+            isEncrypted: file.isEncrypted,
+          });
+
           let password = null;
 
           // 비밀번호 맵에서 해당 파일의 비밀번호 찾기
@@ -105,8 +114,13 @@ export async function downloadFilesAsZip(
             encryptionPasswordMap !== null
           ) {
             password = encryptionPasswordMap[file.id];
+            console.log(
+              `파일 ${file.id}의 비밀번호 찾기 결과:`,
+              password ? "있음" : "없음"
+            );
           } else if (typeof encryptionPasswordMap === "string") {
             password = encryptionPasswordMap;
+            console.log(`단일 비밀번호 사용:`, password ? "있음" : "없음");
           }
 
           if (!password) {
@@ -116,10 +130,17 @@ export async function downloadFilesAsZip(
           }
 
           try {
+            console.log(`복호화 시작: ${file.originalName}`);
             const originalMetadata = {
               originalName: file.originalName || file.name,
-              originalType: file.mimeType || "application/octet-stream",
+              originalType:
+                file.originalMimetype ||
+                file.mimeType ||
+                file.mimetype ||
+                "application/octet-stream",
             };
+            console.log(`복호화 메타데이터:`, originalMetadata);
+
             const decryptResult = await decryptFile(
               await blob.arrayBuffer(),
               password,
@@ -129,7 +150,9 @@ export async function downloadFilesAsZip(
               throw new Error(decryptResult.error);
             }
             blob = decryptResult.decryptedFile;
+            console.log(`복호화 성공: ${file.originalName}`);
           } catch (decryptError) {
+            console.error(`복호화 실패: ${file.originalName}`, decryptError);
             throw new Error(
               `${file.originalName} 복호화 실패: 비밀번호를 확인해주세요.`
             );
@@ -149,7 +172,13 @@ export async function downloadFilesAsZip(
           fileData = await newBlob.arrayBuffer();
         }
 
-        zip.file(file.path || file.originalName, fileData);
+        // 파일명은 originalName을 우선 사용, path는 폴더 구조가 있을 때만 사용
+        const fileName = file.originalName || file.name || file.path;
+        console.log(
+          `ZIP에 추가할 파일명: ${fileName} (원본: ${file.originalName})`
+        );
+
+        zip.file(fileName, fileData);
 
         completedFiles++;
 

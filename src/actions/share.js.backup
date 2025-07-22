@@ -666,11 +666,6 @@ export async function getSharedSelectedFilesForDownload({
   fileIds,
 }) {
   try {
-    console.log("getSharedSelectedFilesForDownload 호출됨:", {
-      shareHash,
-      fileIds,
-    });
-
     if (!shareHash || !fileIds || fileIds.length === 0) {
       return { error: "필수 정보가 누락되었습니다." };
     }
@@ -702,8 +697,6 @@ export async function getSharedSelectedFilesForDownload({
       uploaded: true,
     }).lean();
 
-    console.log("조회된 파일들:", files.length, "개");
-
     if (files.length === 0) {
       return { error: "다운로드할 수 있는 파일이 없습니다." };
     }
@@ -731,8 +724,6 @@ export async function getSharedSelectedFilesForDownload({
       }
     }
 
-    console.log("유효한 파일들:", validFiles.length, "개");
-
     if (validFiles.length === 0) {
       return { error: "공유 디렉토리에 포함된 파일이 없습니다." };
     }
@@ -747,31 +738,16 @@ export async function getSharedSelectedFilesForDownload({
           file.originalName
         );
 
-        const fileData = {
+        fileList.push({
           id: file._id.toString(),
           originalName: file.originalName,
           size: file.size,
           mimetype: file.mimetype,
-          mimeType: file.mimetype, // downloadFilesAsZip에서 사용하는 필드명
-          originalMimetype: file.originalMimetype, // 암호화된 파일의 원본 MIME 타입
-          originalSize: file.originalSize, // 암호화된 파일의 원본 크기
           isEncrypted: file.isEncrypted || false,
           fileName: file.fileName,
-          path: file.originalName, // 선택 다운로드에서는 원본 파일명 사용
+          path: file.path || file.fileName,
           downloadUrl: downloadUrl, // 다운로드 URL 추가
-        };
-
-        console.log(
-          "파일 처리됨:",
-          fileData.originalName,
-          "암호화:",
-          fileData.isEncrypted,
-          "originalMimetype:",
-          fileData.originalMimetype,
-          "mimetype:",
-          fileData.mimetype
-        );
-        fileList.push(fileData);
+        });
       } catch (urlError) {
         console.error(
           `Failed to generate download URL for ${file.originalName}:`,
@@ -786,7 +762,6 @@ export async function getSharedSelectedFilesForDownload({
       return { error: "다운로드 URL을 생성할 수 있는 파일이 없습니다." };
     }
 
-    console.log("최종 파일 목록:", fileList.length, "개");
     return {
       success: true,
       files: fileList,
@@ -800,11 +775,6 @@ export async function getSharedSelectedFilesForDownload({
 // 공유된 디렉토리의 모든 파일을 다운로드용으로 가져오기
 export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
   try {
-    console.log("getSharedAllFilesForDownload 호출됨:", {
-      shareHash,
-      directoryId,
-    });
-
     if (!shareHash || !directoryId) {
       return { error: "필수 정보가 누락되었습니다." };
     }
@@ -816,11 +786,6 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
       "shareLinks.hash": shareHash,
       deleted: { $ne: true },
     }).populate("shareLinks");
-
-    console.log(
-      "루트 공유 디렉토리 조회 결과:",
-      rootSharedDirectory ? "찾음" : "못찾음"
-    );
 
     if (!rootSharedDirectory) {
       return { error: "공유 링크를 찾을 수 없습니다." };
@@ -840,8 +805,6 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
       return { error: "디렉토리를 찾을 수 없습니다." };
     }
 
-    console.log("현재 디렉토리:", currentDirectory.name);
-
     // 현재 디렉토리가 공유 디렉토리 계층에 속하는지 확인
     let isInSharedHierarchy = false;
     let checkDirId = directoryId;
@@ -857,8 +820,6 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
       checkDirId = parentDir.parent;
     }
 
-    console.log("공유 계층에 속함:", isInSharedHierarchy);
-
     if (!isInSharedHierarchy) {
       return { error: "이 디렉토리는 공유된 계층에 속하지 않습니다." };
     }
@@ -873,10 +834,6 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
         deleted: { $ne: true },
         uploaded: true,
       }).lean();
-
-      console.log(
-        `디렉토리 ${basePath || "루트"}에서 ${directFiles.length}개 파일 발견`
-      );
 
       for (const file of directFiles) {
         const relativePath = basePath
@@ -895,9 +852,6 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
             originalName: file.originalName,
             size: file.size,
             mimetype: file.mimetype,
-            mimeType: file.mimetype, // downloadFilesAsZip에서 사용하는 필드명
-            originalMimetype: file.originalMimetype, // 암호화된 파일의 원본 MIME 타입
-            originalSize: file.originalSize, // 암호화된 파일의 원본 크기
             isEncrypted: file.isEncrypted || false,
             fileName: file.fileName,
             path: relativePath,
@@ -920,6 +874,31 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
       }).lean();
 
       for (const subdir of subdirectories) {
+        const subdirPath = basePath ? `${basePath}/${subdir.name}` : subdir.name;
+        const subFiles = await getAllFilesRecursively(subdir._id, subdirPath);
+        files.push(...subFiles);
+      }
+
+      return files;
+    };
+
+    const files = await getAllFilesRecursively(directoryId);
+
+    if (files.length === 0) {
+      return { error: "다운로드할 파일이 없습니다." };
+    }
+
+    return {
+      success: true,
+      files: files,
+    };
+  } catch (error) {
+    console.error("공유 디렉토리 전체 다운로드 조회 오류:", error);
+    return { error: "파일 정보를 가져오는 중 오류가 발생했습니다." };
+  }
+}
+
+      for (const subdir of subdirectories) {
         const subdirPath = basePath
           ? `${basePath}/${subdir.name}`
           : subdir.name;
@@ -931,8 +910,6 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
     };
 
     const files = await getAllFilesRecursively(directoryId);
-
-    console.log("전체 파일 수:", files.length);
 
     if (files.length === 0) {
       return { error: "다운로드할 파일이 없습니다." };

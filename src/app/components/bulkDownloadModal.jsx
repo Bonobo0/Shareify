@@ -15,6 +15,7 @@ export default function BulkDownloadModal({
   onClose,
   directoryId,
   directoryName = "폴더",
+  getFilesAction, // 커스텀 파일 조회 액션 (공유 파일용)
 }) {
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState([]);
@@ -32,7 +33,10 @@ export default function BulkDownloadModal({
     setStep("scan");
 
     try {
-      const result = await getAllFilesForDownload({ directoryId });
+      // 커스텀 액션이 있으면 사용, 없으면 기본 액션 사용
+      const result = getFilesAction
+        ? await getFilesAction(directoryId)
+        : await getAllFilesForDownload({ directoryId });
 
       if (result.error) {
         throw new Error(result.error);

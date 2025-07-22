@@ -15,6 +15,7 @@ const SelectedDownloadModal = memo(function SelectedDownloadModal({
   onClose,
   selectedFiles = [],
   onClearSelection,
+  getFilesAction, // 커스텀 파일 조회 액션 (공유 파일용)
 }) {
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState([]);
@@ -36,9 +37,12 @@ const SelectedDownloadModal = memo(function SelectedDownloadModal({
         throw new Error("선택된 파일이 없습니다.");
       }
 
-      const result = await getSelectedFilesForDownload({
-        fileIds: selectedFiles,
-      });
+      // 커스텀 액션이 있으면 사용, 없으면 기본 액션 사용
+      const result = getFilesAction
+        ? await getFilesAction(selectedFiles)
+        : await getSelectedFilesForDownload({
+            fileIds: selectedFiles,
+          });
 
       if (result.error) {
         throw new Error(result.error);
@@ -50,6 +54,18 @@ const SelectedDownloadModal = memo(function SelectedDownloadModal({
 
       setFiles(result.files);
       console.log("선택 다운로드 - 스캔된 파일들:", result.files);
+      console.log("선택 다운로드 - 파일별 상세 정보:");
+      result.files.forEach((file, index) => {
+        console.log(`파일 ${index + 1}:`, {
+          id: file.id,
+          originalName: file.originalName,
+          isEncrypted: file.isEncrypted,
+          mimetype: file.mimetype,
+          mimeType: file.mimeType,
+          originalMimetype: file.originalMimetype,
+          downloadUrl: file.downloadUrl ? "있음" : "없음",
+        });
+      });
       console.log(
         "선택 다운로드 - 암호화된 파일 개수:",
         result.files.filter((f) => f.isEncrypted).length
