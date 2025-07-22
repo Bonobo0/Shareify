@@ -16,30 +16,14 @@ export default function FileUploader({
   const [enableE2EE, setEnableE2EE] = useState(false);
   const [encryptionPassword, setEncryptionPassword] = useState("");
   const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [uploadResults, setUploadResults] = useState({}); // 업로드 결과 추적
+  const [retryMode, setRetryMode] = useState(false); // 재시도 모드
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
 
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
-
-      // E2EE 활성화 시 파일 크기 검증
-      if (enableE2EE) {
-        const MAX_ENCRYPT_SIZE = 100 * 1024 * 1024; // 100MB
-        const oversizedFiles = selectedFiles.filter(
-          (file) => file.size > MAX_ENCRYPT_SIZE
-        );
-
-        if (oversizedFiles.length > 0) {
-          setError(
-            `암호화 모드에서는 100MB 이하의 파일만 업로드할 수 있습니다. 큰 파일: ${oversizedFiles
-              .map((f) => f.name)
-              .join(", ")}`
-          );
-          return;
-        }
-      }
-
       setFiles(selectedFiles);
       setError(""); // 에러 메시지 클리어
     }
@@ -63,24 +47,6 @@ export default function FileUploader({
 
     if (e.dataTransfer.files.length > 0) {
       const selectedFiles = Array.from(e.dataTransfer.files);
-
-      // E2EE 활성화 시 파일 크기 검증
-      if (enableE2EE) {
-        const MAX_ENCRYPT_SIZE = 100 * 1024 * 1024; // 100MB
-        const oversizedFiles = selectedFiles.filter(
-          (file) => file.size > MAX_ENCRYPT_SIZE
-        );
-
-        if (oversizedFiles.length > 0) {
-          setError(
-            `암호화 모드에서는 100MB 이하의 파일만 업로드할 수 있습니다. 큰 파일: ${oversizedFiles
-              .map((f) => f.name)
-              .join(", ")}`
-          );
-          return;
-        }
-      }
-
       setFiles(selectedFiles);
       setError(""); // 에러 메시지 클리어
     }
@@ -90,24 +56,6 @@ export default function FileUploader({
     setEnableE2EE(checked);
     if (checked) {
       setShowPasswordInput(true);
-
-      // 이미 선택된 파일이 있다면 크기 검증
-      if (files.length > 0) {
-        const MAX_ENCRYPT_SIZE = 100 * 1024 * 1024; // 100MB
-        const oversizedFiles = files.filter(
-          (file) => file.size > MAX_ENCRYPT_SIZE
-        );
-
-        if (oversizedFiles.length > 0) {
-          setError(
-            `암호화 모드에서는 100MB 이하의 파일만 업로드할 수 있습니다. 큰 파일: ${oversizedFiles
-              .map((f) => f.name)
-              .join(", ")}`
-          );
-          // 큰 파일들 제거
-          setFiles(files.filter((file) => file.size <= MAX_ENCRYPT_SIZE));
-        }
-      }
     } else {
       setShowPasswordInput(false);
       setEncryptionPassword("");
@@ -115,7 +63,7 @@ export default function FileUploader({
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (isRetry = false) => {
     if (files.length === 0) {
       setError("업로드할 파일을 선택해주세요.");
       return;
@@ -129,27 +77,49 @@ export default function FileUploader({
     setUploading(true);
     setError("");
 
+    // 재시도 모드일 때는 실패한 파일만 업로드
+    const filesToUpload = isRetry
+      ? files.filter(
+          (file) =>
+            !uploadResults[file.name] ||
+            uploadResults[file.name].status === "error"
+        )
+      : files;
+
+    if (filesToUpload.length === 0 && isRetry) {
+      setError("재시도할 파일이 없습니다. 모든 파일이 이미 업로드되었습니다.");
+      setUploading(false);
+      return;
+    }
+
+    let hasErrors = false;
+
     try {
       // 각 파일별로 업로드
-      for (const file of files) {
-        setProgress((prev) => ({
-          ...prev,
-          [file.name]: { percent: 0, status: "uploading" },
-        }));
+      for (const file of filesToUpload) {
+        // 이미 성공한 파일은 건너뛰기
+        if (uploadResults[file.name]?.status === "success") {
+          continue;
+        }
 
-        let fileToUpload = file;
-        let originalMetadata = null;
-
-        // E2EE가 활성화된 경우 파일 암호화
-        if (enableE2EE) {
+        try {
           setProgress((prev) => ({
             ...prev,
-            [file.name]: { percent: 5, status: "encrypting" },
+            [file.name]: { percent: 0, status: "uploading" },
           }));
 
-          console.log("파일 암호화 시작:", file.name);
+          let fileToUpload = file;
+          let originalMetadata = null;
 
-          try {
+          // E2EE가 활성화된 경우 파일 암호화
+          if (enableE2EE) {
+            setProgress((prev) => ({
+              ...prev,
+              [file.name]: { percent: 5, status: "encrypting" },
+            }));
+
+            console.log("파일 암호화 시작:", file.name);
+
             const encryptResult = await encryptFile(file, encryptionPassword);
             if (!encryptResult.success) {
               throw new Error(encryptResult.error);
@@ -168,91 +138,131 @@ export default function FileUploader({
               ...prev,
               [file.name]: { percent: 15, status: "uploading" },
             }));
-          } catch (encryptError) {
-            console.error("암호화 실패:", encryptError);
-            setProgress((prev) => ({
-              ...prev,
-              [file.name]: { percent: 0, status: "error" },
-            }));
-            throw new Error(`암호화 실패: ${encryptError.message}`);
           }
+
+          // 1. 업로드 URL 요청
+          console.log("🚀 서버로 전송하는 데이터:", {
+            filename: fileToUpload.name,
+            size: fileToUpload.size,
+            mimetype: fileToUpload.type,
+            directoryId: directoryId,
+            isEncrypted: enableE2EE,
+            originalMetadata: originalMetadata,
+          });
+
+          const uploadResult = await uploadFile({
+            filename: fileToUpload.name,
+            size: fileToUpload.size,
+            mimetype: fileToUpload.type,
+            directoryId: directoryId,
+            isEncrypted: enableE2EE,
+            originalMetadata: originalMetadata,
+            shareHash: shareHash,
+          });
+
+          if (uploadResult.error) {
+            throw new Error(uploadResult.error);
+          }
+
+          const { uploadUrl, fileId } = uploadResult;
+
+          setProgress((prev) => ({
+            ...prev,
+            [file.name]: { percent: enableE2EE ? 25 : 10, status: "uploading" },
+          }));
+
+          // 2. presigned URL로 직접 파일 업로드
+          const uploadResponse = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": fileToUpload.type },
+            body: fileToUpload,
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error("파일 업로드 중 오류가 발생했습니다.");
+          }
+
+          setProgress((prev) => ({
+            ...prev,
+            [file.name]: { percent: 90, status: "uploading" },
+          }));
+
+          // 3. 서버에 업로드 완료 알림
+          const completeResult = await completeFileUpload({ fileId });
+
+          if (completeResult.error) {
+            throw new Error(completeResult.error);
+          }
+
+          setProgress((prev) => ({
+            ...prev,
+            [file.name]: { percent: 100, status: "success" },
+          }));
+
+          // 업로드 결과 저장
+          setUploadResults((prev) => ({
+            ...prev,
+            [file.name]: { status: "success", fileId },
+          }));
+        } catch (fileError) {
+          console.error(`파일 ${file.name} 업로드 실패:`, fileError);
+          hasErrors = true;
+
+          setProgress((prev) => ({
+            ...prev,
+            [file.name]: {
+              percent: 0,
+              status: "error",
+              error: fileError.message,
+            },
+          }));
+
+          // 업로드 결과 저장
+          setUploadResults((prev) => ({
+            ...prev,
+            [file.name]: { status: "error", error: fileError.message },
+          }));
+
+          // 개별 파일 오류는 전체 업로드를 중단하지 않음
+          continue;
         }
-
-        // 1. 업로드 URL 요청
-        console.log("🚀 서버로 전송하는 데이터:", {
-          filename: fileToUpload.name,
-          size: fileToUpload.size,
-          mimetype: fileToUpload.type,
-          directoryId: directoryId,
-          isEncrypted: enableE2EE,
-          originalMetadata: originalMetadata,
-        });
-
-        const uploadResult = await uploadFile({
-          filename: fileToUpload.name,
-          size: fileToUpload.size,
-          mimetype: fileToUpload.type,
-          directoryId: directoryId,
-          isEncrypted: enableE2EE,
-          originalMetadata: originalMetadata,
-          shareHash: shareHash,
-        });
-
-        if (uploadResult.error) {
-          throw new Error(uploadResult.error);
-        }
-
-        const { uploadUrl, fileId } = uploadResult;
-
-        setProgress((prev) => ({
-          ...prev,
-          [file.name]: { percent: enableE2EE ? 25 : 10, status: "uploading" },
-        }));
-
-        // 2. presigned URL로 직접 파일 업로드
-        const uploadResponse = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": fileToUpload.type },
-          body: fileToUpload,
-        });
-
-        if (!uploadResponse.ok) {
-          throw new Error("파일 업로드 중 오류가 발생했습니다.");
-        }
-
-        setProgress((prev) => ({
-          ...prev,
-          [file.name]: { percent: 90, status: "uploading" },
-        }));
-
-        // 3. 서버에 업로드 완료 알림
-        const completeResult = await completeFileUpload({ fileId });
-
-        if (completeResult.error) {
-          throw new Error(completeResult.error);
-        }
-
-        setProgress((prev) => ({
-          ...prev,
-          [file.name]: { percent: 100, status: "success" },
-        }));
       }
 
-      // 모든 파일 업로드 완료
-      onUploadComplete();
-      setFiles([]);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+      // 모든 파일 처리 완료 후
+      if (!hasErrors) {
+        // 모든 파일이 성공한 경우에만 초기화
+        onUploadComplete();
+        setFiles([]);
+        setUploadResults({});
+        setRetryMode(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      } else {
+        // 일부 파일이 실패한 경우
+        setRetryMode(true);
+        setError(
+          "일부 파일 업로드에 실패했습니다. 실패한 파일을 다시 시도할 수 있습니다."
+        );
       }
     } catch (error) {
+      console.error("업로드 중 예상치 못한 오류:", error);
       setError(error.message);
+      hasErrors = true;
     } finally {
       setUploading(false);
     }
   };
 
+  // 재시도 핸들러
+  const handleRetry = () => {
+    handleUpload(true);
+  };
+
   const cancelUpload = () => {
     setFiles([]);
+    setUploadResults({});
+    setRetryMode(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -333,7 +343,10 @@ export default function FileUploader({
                             "📤 업로드 중..."}
                           {progress[file.name].status === "success" &&
                             "✅ 완료"}
-                          {progress[file.name].status === "error" && "❌ 실패"}
+                          {progress[file.name].status === "error" &&
+                            `❌ 실패: ${
+                              progress[file.name].error || "알 수 없는 오류"
+                            }`}
                         </span>
                         <span>{progress[file.name].percent}%</span>
                       </div>
@@ -401,13 +414,27 @@ export default function FileUploader({
           )}
         </div>
 
-        <button
-          className={`btn btn-primary ${uploading ? "loading" : ""}`}
-          onClick={handleUpload}
-          disabled={uploading || files.length === 0}
-        >
-          {uploading ? "업로드 중..." : "업로드"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            className={`btn btn-primary ${uploading ? "loading" : ""}`}
+            onClick={() => handleUpload(false)}
+            disabled={uploading || files.length === 0}
+          >
+            {uploading ? "업로드 중..." : "업로드"}
+          </button>
+
+          {retryMode && !uploading && (
+            <button className="btn btn-warning" onClick={handleRetry}>
+              🔄 실패한 파일 재시도
+            </button>
+          )}
+
+          {retryMode && !uploading && (
+            <button className="btn btn-ghost" onClick={cancelUpload}>
+              모두 취소
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
