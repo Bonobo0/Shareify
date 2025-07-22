@@ -60,6 +60,22 @@ export default function FileList({
   const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10); // 페이지당 아이템 수(디렉토리, 파일 별개 처리)
 
+  // 검색 상태
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFilters, setSearchFilters] = useState({
+    name: "",
+    dateFrom: "",
+    dateTo: "",
+    sizeMin: "",
+    sizeMax: "",
+    fileType: "",
+    permission: "", // "owner", "shared", "all"
+  });
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [fileTypeOptions, setFileTypeOptions] = useState([]);
+  const [filteredFiles, setFilteredFiles] = useState([]);
+  const [filteredDirectories, setFilteredDirectories] = useState([]);
+
   // 모달 상태들
   const [alertModal, setAlertModal] = useState({ show: false, message: "" });
   const [confirmModal, setConfirmModal] = useState({
@@ -258,9 +274,119 @@ export default function FileList({
     onRefresh: fetchData,
     onShowAlert: showAlert,
     onShowConfirm: showConfirm,
-    files,
-    directories,
+    files: filteredFiles,
+    directories: filteredDirectories,
   });
+
+  // 파일 타입 자동완성 옵션 생성
+  const generateFileTypeOptions = useCallback(() => {
+    const types = new Set();
+    files.forEach((file) => {
+      if (file.originalName) {
+        const extension = file.originalName.split(".").pop()?.toLowerCase();
+        if (extension) {
+          types.add(extension);
+        }
+      }
+    });
+    setFileTypeOptions(Array.from(types).sort());
+  }, [files]);
+
+  // 검색 필터 적용 함수
+  const applySearchFilters = useCallback(() => {
+    let filtered_files = [...files];
+    let filtered_directories = [...directories];
+
+    // 이름 필터
+    if (searchFilters.name) {
+      const nameQuery = searchFilters.name.toLowerCase();
+      filtered_files = filtered_files.filter(
+        (file) =>
+          file.originalName?.toLowerCase().includes(nameQuery) ||
+          file.name?.toLowerCase().includes(nameQuery)
+      );
+      filtered_directories = filtered_directories.filter((dir) =>
+        dir.name?.toLowerCase().includes(nameQuery)
+      );
+    }
+
+    // 날짜 필터 (생성일 기준)
+    if (searchFilters.dateFrom) {
+      const fromDate = new Date(searchFilters.dateFrom);
+      filtered_files = filtered_files.filter(
+        (file) => new Date(file.createdAt) >= fromDate
+      );
+      filtered_directories = filtered_directories.filter(
+        (dir) => new Date(dir.createdAt) >= fromDate
+      );
+    }
+
+    if (searchFilters.dateTo) {
+      const toDate = new Date(searchFilters.dateTo);
+      toDate.setHours(23, 59, 59, 999); // 해당 날짜 끝까지
+      filtered_files = filtered_files.filter(
+        (file) => new Date(file.createdAt) <= toDate
+      );
+      filtered_directories = filtered_directories.filter(
+        (dir) => new Date(dir.createdAt) <= toDate
+      );
+    }
+
+    // 파일 크기 필터 (파일만 적용)
+    if (searchFilters.sizeMin) {
+      const minSize = parseFloat(searchFilters.sizeMin) * 1024 * 1024; // MB to bytes
+      filtered_files = filtered_files.filter((file) => file.size >= minSize);
+    }
+
+    if (searchFilters.sizeMax) {
+      const maxSize = parseFloat(searchFilters.sizeMax) * 1024 * 1024; // MB to bytes
+      filtered_files = filtered_files.filter((file) => file.size <= maxSize);
+    }
+
+    // 파일 타입 필터
+    if (searchFilters.fileType) {
+      const typeQuery = searchFilters.fileType.toLowerCase();
+      filtered_files = filtered_files.filter((file) => {
+        const extension = file.originalName?.split(".").pop()?.toLowerCase();
+        return extension === typeQuery;
+      });
+    }
+
+    // 권한 필터
+    if (searchFilters.permission && searchFilters.permission !== "all") {
+      if (searchFilters.permission === "owner") {
+        filtered_files = filtered_files.filter((file) => file.owner);
+        filtered_directories = filtered_directories.filter((dir) => dir.owner);
+      } else if (searchFilters.permission === "shared") {
+        filtered_files = filtered_files.filter((file) => !file.owner);
+        filtered_directories = filtered_directories.filter((dir) => !dir.owner);
+      }
+    }
+
+    setFilteredFiles(filtered_files);
+    setFilteredDirectories(filtered_directories);
+  }, [files, directories, searchFilters]);
+
+  // 검색 초기화 함수
+  const resetSearch = () => {
+    setSearchQuery("");
+    setSearchFilters({
+      name: "",
+      dateFrom: "",
+      dateTo: "",
+      sizeMin: "",
+      sizeMax: "",
+      fileType: "",
+      permission: "",
+    });
+    setShowAdvancedSearch(false);
+  };
+
+  // 간단 검색 함수 (이름만)
+  const handleSimpleSearch = (query) => {
+    setSearchQuery(query);
+    setSearchFilters((prev) => ({ ...prev, name: query }));
+  };
 
   // 선택 관련 핸들러 (BulkActionHandler에서 제공)
 
@@ -327,10 +453,21 @@ export default function FileList({
     fetchData();
   }, [directoryId, refreshTrigger, fetchData]);
 
+  // 파일 타입 옵션 생성
+  useEffect(() => {
+    generateFileTypeOptions();
+  }, [generateFileTypeOptions]);
+
+  // 검색 필터 적용
+  useEffect(() => {
+    applySearchFilters();
+  }, [applySearchFilters]);
+
   // 디렉토리가 변경되면 첫 페이지로 이동 및 선택 초기화
   useEffect(() => {
     setCurrentPage(1);
     setSelectedItems(new Set()); // 디렉토리 변경 시 선택 항목도 초기화
+    resetSearch(); // 디렉토리 변경 시 검색도 초기화
   }, [directoryId]);
 
   // 페이지 변경 핸들러
@@ -617,7 +754,240 @@ export default function FileList({
           </ul>
         </div>
       )}
-      {directories.length === 0 && files.length === 0 ? (
+
+      {/* 검색 필터 */}
+      <div className="mb-6">
+        {/* 간단 검색 */}
+        <div className="flex gap-2 mb-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="파일/폴더 이름으로 검색..."
+              className="input input-bordered w-full"
+              value={searchQuery}
+              onChange={(e) => handleSimpleSearch(e.target.value)}
+            />
+          </div>
+          <button
+            className="btn btn-outline"
+            onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+          >
+            🔍 고급 검색
+          </button>
+          {(searchQuery || Object.values(searchFilters).some((v) => v)) && (
+            <button className="btn btn-ghost" onClick={resetSearch}>
+              ✕ 초기화
+            </button>
+          )}
+        </div>
+
+        {/* 고급 검색 */}
+        {showAdvancedSearch && (
+          <div className="card bg-base-100 border border-base-300">
+            <div className="card-body p-4">
+              <h3 className="card-title text-lg mb-4">고급 검색 옵션</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 이름 검색 */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">이름</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="파일/폴더 이름"
+                    className="input input-bordered input-sm"
+                    value={searchFilters.name}
+                    onChange={(e) =>
+                      setSearchFilters((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {/* 날짜 범위 */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">생성일 시작</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="input input-bordered input-sm"
+                    value={searchFilters.dateFrom}
+                    onChange={(e) =>
+                      setSearchFilters((prev) => ({
+                        ...prev,
+                        dateFrom: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">생성일 끝</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="input input-bordered input-sm"
+                    value={searchFilters.dateTo}
+                    onChange={(e) =>
+                      setSearchFilters((prev) => ({
+                        ...prev,
+                        dateTo: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {/* 파일 크기 */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">최소 크기 (MB)</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    min="0"
+                    step="0.1"
+                    className="input input-bordered input-sm"
+                    value={searchFilters.sizeMin}
+                    onChange={(e) =>
+                      setSearchFilters((prev) => ({
+                        ...prev,
+                        sizeMin: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">최대 크기 (MB)</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="무제한"
+                    min="0"
+                    step="0.1"
+                    className="input input-bordered input-sm"
+                    value={searchFilters.sizeMax}
+                    onChange={(e) =>
+                      setSearchFilters((prev) => ({
+                        ...prev,
+                        sizeMax: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {/* 파일 타입 자동완성 */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">파일 타입</span>
+                  </label>
+                  <div className="dropdown dropdown-bottom">
+                    <input
+                      type="text"
+                      placeholder="확장자 (예: pdf, jpg)"
+                      className="input input-bordered input-sm w-full"
+                      value={searchFilters.fileType}
+                      onChange={(e) =>
+                        setSearchFilters((prev) => ({
+                          ...prev,
+                          fileType: e.target.value,
+                        }))
+                      }
+                      onFocus={() =>
+                        document
+                          .getElementById("fileTypeDropdown")
+                          .classList.add("dropdown-open")
+                      }
+                      onBlur={() =>
+                        setTimeout(
+                          () =>
+                            document
+                              .getElementById("fileTypeDropdown")
+                              .classList.remove("dropdown-open"),
+                          150
+                        )
+                      }
+                    />
+                    <div
+                      id="fileTypeDropdown"
+                      className="dropdown-content menu bg-base-100 rounded-box z-[1] w-full p-2 shadow border border-base-300 max-h-40 overflow-y-auto"
+                    >
+                      {fileTypeOptions
+                        .filter((type) =>
+                          type
+                            .toLowerCase()
+                            .includes(searchFilters.fileType.toLowerCase())
+                        )
+                        .map((type) => (
+                          <li key={type}>
+                            <button
+                              type="button"
+                              className="text-left w-full"
+                              onClick={() => {
+                                setSearchFilters((prev) => ({
+                                  ...prev,
+                                  fileType: type,
+                                }));
+                                document
+                                  .getElementById("fileTypeDropdown")
+                                  .classList.remove("dropdown-open");
+                              }}
+                            >
+                              {type}
+                            </button>
+                          </li>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 권한 필터 */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">권한</span>
+                  </label>
+                  <select
+                    className="select select-bordered select-sm"
+                    value={searchFilters.permission}
+                    onChange={(e) =>
+                      setSearchFilters((prev) => ({
+                        ...prev,
+                        permission: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">모든 항목</option>
+                    <option value="owner">내가 소유한 항목</option>
+                    <option value="shared">공유받은 항목</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 검색 결과 요약 */}
+              {(searchQuery || Object.values(searchFilters).some((v) => v)) && (
+                <div className="mt-4 p-3 bg-base-200 rounded-lg">
+                  <div className="text-sm">
+                    <span className="font-medium">검색 결과:</span>
+                    <span className="ml-2">
+                      폴더 {filteredDirectories.length}개, 파일{" "}
+                      {filteredFiles.length}개
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {filteredDirectories.length === 0 && filteredFiles.length === 0 ? (
         <div className="text-center py-8 bg-base-200 rounded-lg">
           <p className="text-lg">이 디렉토리에 파일이 없습니다.</p>
           <p className="text-gray-500 mt-2">
@@ -630,7 +1000,7 @@ export default function FileList({
           {React.createElement(bulkHandler.BulkActionControls)}
 
           {/* 전체 다운로드 버튼 */}
-          {(directories.length > 0 || files.length > 0) && (
+          {(filteredDirectories.length > 0 || filteredFiles.length > 0) && (
             <div className="flex justify-end mb-4">
               <button
                 onClick={handleBulkDownload}
@@ -704,7 +1074,7 @@ export default function FileList({
               </thead>
               <tbody>
                 {/* 디렉토리 목록 */}
-                {directories.map((directory) => (
+                {filteredDirectories.map((directory) => (
                   <tr
                     key={`dir-${directory.id}`}
                     className="hover cursor-pointer"
@@ -807,7 +1177,7 @@ export default function FileList({
                 ))}
 
                 {/* 파일 목록 */}
-                {files.map((file) => (
+                {filteredFiles.map((file) => (
                   <tr
                     key={`file-${file.id}`}
                     className="hover cursor-pointer"

@@ -210,7 +210,7 @@ export default function DirectoryPage() {
           {directory && directory.owner && (
             <button
               onClick={handleEditDirectory}
-              className="btn btn-secondary gap-2"
+              className="btn btn-primary gap-2"
             >
               ✏️ 수정하기
             </button>

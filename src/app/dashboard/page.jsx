@@ -142,7 +142,7 @@ export default function Dashboard() {
                   onClick={() => router.push("/my-uploads")}
                   className="btn btn-outline gap-2"
                 >
-                  📂 업로드한 모든 파일 보기
+                  📂 모든 파일 보기
                 </button>
                 <CreateDirectory onSuccess={handleDirectoryCreated} />
               </div>
