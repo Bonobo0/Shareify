@@ -410,6 +410,9 @@ export default function FileList({
             setError(result.error);
           } else {
             await fetchData(); // 목록 새로고침
+            
+            // 페이지 유효성 검사: 데이터 새로고침 후 현재 페이지가 유효한지 확인
+            // 이는 useEffect에서 fetchData 완료 후 자동으로 처리됨
           }
           showAlert("디렉토리와 모든 하위 항목이 성공적으로 삭제되었습니다.");
         } catch (error) {
@@ -469,6 +472,13 @@ export default function FileList({
     setSelectedItems(new Set()); // 디렉토리 변경 시 선택 항목도 초기화
     resetSearch(); // 디렉토리 변경 시 검색도 초기화
   }, [directoryId]);
+
+  // 총 페이지 수가 변경되었을 때 현재 페이지 유효성 검사
+  useEffect(() => {
+    if (totalPages > 0 && (currentPage > totalPages || currentPage < 1)) {
+      setCurrentPage(Math.min(Math.max(1, currentPage), totalPages));
+    }
+  }, [totalPages, currentPage]);
 
   // 페이지 변경 핸들러
   const handlePageChange = (newPage) => {
@@ -638,6 +648,22 @@ export default function FileList({
 
         // 파일 목록에서 제거
         setFiles((prev) => prev.filter((file) => file.id !== fileId));
+        
+        // 총 아이템 수 업데이트
+        setTotalItems((prev) => Math.max(0, prev - 1));
+        
+        // 새로운 총 페이지 수 계산
+        const newTotalItems = Math.max(0, totalItems - 1);
+        const newTotalPages = Math.max(1, Math.ceil(newTotalItems / itemsPerPage));
+        setTotalPages(newTotalPages);
+        
+        // 현재 페이지가 새로운 총 페이지 수보다 크거나 작으면 유효한 페이지로 이동
+        if (currentPage > newTotalPages && newTotalPages > 0) {
+          setCurrentPage(newTotalPages);
+        } else if (currentPage < 1) {
+          setCurrentPage(1);
+        }
+        
         showAlert("파일이 성공적으로 삭제되었습니다.");
       } catch (err) {
         setError("파일 삭제 중 오류가 발생했습니다.");
@@ -986,11 +1012,24 @@ export default function FileList({
       </div>
 
       {filteredDirectories.length === 0 && filteredFiles.length === 0 ? (
-        <div className="text-center py-8 bg-base-200 rounded-lg">
-          <p className="text-lg">이 디렉토리에 파일이 없습니다.</p>
-          <p className="text-gray-500 mt-2">
-            파일을 업로드하거나 새 폴더를 만들어보세요.
-          </p>
+        <div className="space-y-4">
+          <div className="text-center py-8 bg-base-200 rounded-lg">
+            <p className="text-lg">이 디렉토리에 파일이 없습니다.</p>
+            <p className="text-gray-500 mt-2">
+              파일을 업로드하거나 새 폴더를 만들어보세요.
+            </p>
+          </div>
+          {/* 페이지가 여러 개인 경우 페이지네이터 표시 */}
+          {totalPages > 1 && (
+            <Paginator
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
+              className="mt-6 mb-20"
+            />
+          )}
         </div>
       ) : (
         <div className="space-y-4">
