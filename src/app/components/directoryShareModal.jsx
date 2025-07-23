@@ -146,7 +146,7 @@ export default function DirectoryShareModal({
     try {
       const result = await shareDirectory({
         directoryId,
-        targetUserEmail: userEmail.trim(),
+        email: userEmail.trim(),
         permission: userPermission,
       });
 

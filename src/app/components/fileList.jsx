@@ -1011,7 +1011,7 @@ export default function FileList({
 
           <div className="overflow-x-auto overflow-y-visible -mx-2 sm:mx-0 relative">
             <p className="text-xs sm:text-sm mb-2">
-              {currentPage} / {Math.ceil(totalPages / 2)} 페이지 ({totalItems}
+              {currentPage} / {totalPages} 페이지 ({totalItems}
               개의 아이템)
             </p>
             <p className="text-xs sm:text-sm mb-2">
@@ -1342,7 +1342,7 @@ export default function FileList({
           {/* 페이지네이터 */}
           <Paginator
             currentPage={currentPage}
-            totalPages={Math.ceil(totalPages / 2)} // 디렉토리와 파일을 합쳐서 페이지네이션
+            totalPages={totalPages}
             totalItems={totalItems}
             itemsPerPage={itemsPerPage}
             onPageChange={handlePageChange}
