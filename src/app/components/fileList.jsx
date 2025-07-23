@@ -475,8 +475,8 @@ export default function FileList({
 
   // 총 페이지 수가 변경되었을 때 현재 페이지 유효성 검사
   useEffect(() => {
-    if (totalPages > 0 && currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (totalPages > 0 && (currentPage > totalPages || currentPage < 1)) {
+      setCurrentPage(Math.min(Math.max(1, currentPage), totalPages));
     }
   }, [totalPages, currentPage]);
 
@@ -657,9 +657,11 @@ export default function FileList({
         const newTotalPages = Math.max(1, Math.ceil(newTotalItems / itemsPerPage));
         setTotalPages(newTotalPages);
         
-        // 현재 페이지가 새로운 총 페이지 수보다 크면 마지막 페이지로 이동
+        // 현재 페이지가 새로운 총 페이지 수보다 크거나 작으면 유효한 페이지로 이동
         if (currentPage > newTotalPages && newTotalPages > 0) {
           setCurrentPage(newTotalPages);
+        } else if (currentPage < 1) {
+          setCurrentPage(1);
         }
         
         showAlert("파일이 성공적으로 삭제되었습니다.");
