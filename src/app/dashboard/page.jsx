@@ -99,7 +99,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
+      <main className="flex min-h-screen flex-col p-6 sm:p-8 md:p-10">
         <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
           스토리지
         </h1>
@@ -132,17 +132,17 @@ export default function Dashboard() {
         )}
 
         {/* 메인 콘텐츠 영역 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* 파일 목록 (왼쪽, 넓은 영역) */}
           <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <h2 className="text-xl font-semibold">내 파일</h2>
-              <div className="flex items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                 <button
                   onClick={() => router.push("/my-uploads")}
-                  className="btn btn-outline gap-2"
+                  className="btn btn-outline gap-2 btn-sm sm:btn-md"
                 >
-                  📂 모든 파일 보기
+                  📂 <span className="hidden sm:inline">모든 파일 보기</span><span className="sm:hidden">모든 파일</span>
                 </button>
                 <CreateDirectory onSuccess={handleDirectoryCreated} />
               </div>

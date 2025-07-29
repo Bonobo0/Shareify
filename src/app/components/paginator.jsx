@@ -37,8 +37,8 @@ export default function Paginator({
   };
 
   const pageNumbers = getPageNumbers();
-  const startItem = (currentPage - 1) * 2 * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage * 2, totalItems);
+  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
     <div className={`flex flex-col gap-4 ${className}`}>

@@ -98,15 +98,15 @@ export default function SharedPage() {
   return (
     <>
       <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
-        <h1 className="text-3xl font-bold mb-6">나와 공유된 항목</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-6">나와 공유된 항목</h1>
 
         {error && <div className="alert alert-error mb-6">{error}</div>}
 
         {/* 공유된 디렉토리 섹션 */}
         {sharedDirectories.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">📁 공유된 디렉토리</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <h2 className="text-xl sm:text-2xl font-semibold mb-4">📁 공유된 디렉토리</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {sharedDirectories.map((directory) => (
                 <div
                   key={directory.id}
@@ -115,10 +115,10 @@ export default function SharedPage() {
                 >
                   <div className="card-body p-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-3xl">📁</span>
-                      <div className="flex-1">
-                        <h3 className="font-medium">{directory.name}</h3>
-                        <p className="text-sm text-gray-600">
+                      <span className="text-3xl flex-shrink-0">📁</span>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium break-words">{directory.name}</h3>
+                        <p className="text-sm text-gray-600 break-words">
                           {directory.ownerName}님이 공유
                         </p>
                         <div className="flex gap-2 mt-2">
@@ -152,7 +152,7 @@ export default function SharedPage() {
 
         {/* 공유된 파일 섹션 */}
         <div>
-          <h2 className="text-2xl font-semibold mb-4">📄 공유된 파일</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold mb-4">📄 공유된 파일</h2>
           {sharedFiles.length === 0 ? (
             <div className="text-center p-6 bg-base-200 rounded-lg">
               <p>공유된 파일이 없습니다.</p>
@@ -163,10 +163,10 @@ export default function SharedPage() {
                 <thead>
                   <tr>
                     <th>이름</th>
-                    <th>크기</th>
-                    <th>유형</th>
-                    <th>공유자</th>
-                    <th>날짜</th>
+                    <th className="hidden sm:table-cell">크기</th>
+                    <th className="hidden md:table-cell">유형</th>
+                    <th className="hidden lg:table-cell">공유자</th>
+                    <th className="hidden sm:table-cell">날짜</th>
                     <th>권한</th>
                   </tr>
                 </thead>
@@ -177,16 +177,16 @@ export default function SharedPage() {
                       className="hover cursor-pointer"
                       onClick={() => navigateToFile(file.hash)}
                     >
-                      <td className="flex items-center gap-2">
-                        <span className="text-xl">
+                      <td className="flex items-center gap-2 min-w-0">
+                        <span className="text-xl flex-shrink-0">
                           {getFileTypeIcon(file.mimetype)}
                         </span>
-                        {file.originalName}
+                        <span className="break-words">{file.originalName}</span>
                       </td>
-                      <td>{formatBytes(file.size)}</td>
-                      <td>{file.mimetype?.split("/")[1] || file.mimetype}</td>
-                      <td>{file.ownerName || "Unknown"}</td>
-                      <td>{formatDate(file.createdAt)}</td>
+                      <td className="hidden sm:table-cell break-words">{formatBytes(file.size)}</td>
+                      <td className="hidden md:table-cell break-words">{file.mimetype?.split("/")[1] || file.mimetype}</td>
+                      <td className="hidden lg:table-cell break-words">{file.ownerName || "Unknown"}</td>
+                      <td className="hidden sm:table-cell break-words">{formatDate(file.createdAt)}</td>
                       <td>
                         <span
                           className={`badge ${

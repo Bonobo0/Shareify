@@ -383,7 +383,7 @@ export default function SharedDirectoryPage() {
     <div className="min-h-screen bg-base-100">
       {/* Header */}
       <div className="bg-base-200 py-6">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-6 sm:px-8 md:px-10">
           {/* 브레드크럼 네비게이션 */}
           {breadcrumbs.length > 0 && (
             <div className="breadcrumbs text-sm mb-4">
@@ -406,38 +406,40 @@ export default function SharedDirectoryPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="mb-2">
+                <h1 className="text-2xl sm:text-3xl font-bold break-words">
                   {breadcrumbs.length > 1
                     ? breadcrumbs[breadcrumbs.length - 1].name
                     : directoryInfo?.name}
                 </h1>
-                <div className="btn btn-accent btn-xs gap-2">
-                  <span>👤</span>
-                  <span className="text-sm">
-                    {directoryInfo?.owner?.name || directoryInfo?.owner?.email}
-                    님이 공유
-                  </span>
-                </div>
               </div>
               {/* 현재 디렉토리의 설명 표시 */}
               {(breadcrumbs.length > 1
                 ? breadcrumbs[breadcrumbs.length - 1].description
                 : directoryInfo?.description) && (
-                <p className="text-sm   mt-2">
+                <p className="text-sm text-gray-600 mt-2 break-words">
                   {breadcrumbs.length > 1
                     ? breadcrumbs[breadcrumbs.length - 1].description
                     : directoryInfo?.description}
                 </p>
               )}
             </div>
-            <div className="text-right">
-              <div className="badge badge-primary">
-                {permission === "read" ? "읽기 전용" : "읽기/쓰기"}
+            <div className="flex flex-col lg:text-right gap-2">
+              <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">
+                <div className="btn btn-accent btn-xs gap-2 flex-shrink-0">
+                  <span>👤</span>
+                  <span className="text-sm truncate max-w-32">
+                    {directoryInfo?.owner?.name || directoryInfo?.owner?.email}
+                    님이 공유
+                  </span>
+                </div>
+                <div className="badge badge-primary flex-shrink-0">
+                  {permission === "read" ? "읽기 전용" : "읽기/쓰기"}
+                </div>
               </div>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-gray-600">
                 생성일: {formatDate(directoryInfo?.createdAt)}
               </p>
             </div>
@@ -446,7 +448,7 @@ export default function SharedDirectoryPage() {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto p-6 sm:p-8 md:p-10">
         {/* Subdirectories */}
         {subdirectories.length > 0 && (
           <div className="mb-8">
@@ -455,14 +457,14 @@ export default function SharedDirectoryPage() {
               {subdirectories.map((directory) => (
                 <div
                   key={directory.id}
-                  className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer min-w-0"
                   onClick={() => handleDirectoryClick(directory.name)}
                 >
                   <div className="card-body p-4">
                     <div className="flex items-center">
-                      <span className="text-2xl mr-3">📁</span>
-                      <div className="flex-1">
-                        <h3 className="font-medium hover:text-blue-600">
+                      <span className="text-2xl mr-3 flex-shrink-0">📁</span>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium hover:text-blue-600 break-words word-break-all leading-tight">
                           {directory.name}
                         </h3>
                         <p className="text-sm text-gray-600">
@@ -556,13 +558,13 @@ export default function SharedDirectoryPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                 {files.map((file) => {
                   const isSelected = selectedFiles.includes(file.id);
                   return (
                     <div
                       key={file.id}
-                      className={`card shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
+                      className={`card shadow-sm hover:shadow-md transition-shadow cursor-pointer min-w-0 ${
                         isSelected
                           ? "bg-primary/20 border-2 border-primary"
                           : "bg-base-200"
@@ -590,7 +592,7 @@ export default function SharedDirectoryPage() {
                               }}
                             />
                           )}
-                          <span className="text-2xl mr-3">
+                          <span className="text-2xl mr-3 flex-shrink-0">
                             {(
                               file.originalMimetype || file.mimeType
                             )?.startsWith("image/")
@@ -617,8 +619,8 @@ export default function SharedDirectoryPage() {
                               ? "📊"
                               : "📄"}
                           </span>
-                          <div className="flex-1">
-                            <h3 className="font-medium hover:text-blue-600 truncate">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium hover:text-blue-600 break-words word-break-all leading-tight">
                               {file.name}
                               {file.isEncrypted && (
                                 <span className="ml-2">
@@ -646,7 +648,7 @@ export default function SharedDirectoryPage() {
 
       {/* Footer */}
       <div className="bg-base-200 py-4 mt-12">
-        <div className="container mx-auto px-4 text-center">
+        <div className="container mx-auto px-6 sm:px-8 md:px-10 text-center">
           <p className="text-sm text-gray-600">
             Powered by{" "}
             <Link href="/" className="link link-primary">

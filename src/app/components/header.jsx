@@ -44,9 +44,24 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 left-0 w-full bg-base-100 shadow-md z-50">
-      <div className="container mx-auto navbar px-4 sm:px-6">
+      <div className="container mx-auto navbar px-4 sm:px-6 md:px-8">
         <div className="navbar-start">
-          <Link href="/" className="text-lg sm:text-xl font-bold">
+          {/* Mobile menu for authenticated users */}
+          {isAuthenticated && (
+            <div className="dropdown lg:hidden">
+              <label tabIndex={0} className="btn btn-ghost btn-sm">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </label>
+              <ul tabIndex={0} className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                <li><Link href="/dashboard">대시보드</Link></li>
+                <li><Link href="/shared">공유된 파일</Link></li>
+                <li><Link href="/my-uploads">내 업로드</Link></li>
+              </ul>
+            </div>
+          )}
+          <Link href="/" className="text-lg sm:text-xl font-bold ml-2 lg:ml-0">
             Shareify
           </Link>
         </div>
