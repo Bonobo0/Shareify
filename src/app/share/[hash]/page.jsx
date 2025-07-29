@@ -223,7 +223,7 @@ export default function SharePage() {
   if (error) {
     return (
       <>
-        <main className="flex min-h-screen flex-col items-center p-8">
+        <main className="flex min-h-screen flex-col items-center p-6 sm:p-8 md:p-10">
           <div className="alert alert-error max-w-md">{error}</div>
           <p className="mt-4">
             이 파일은 존재하지 않거나, 접근 권한이 없거나, 공개 상태가
@@ -245,7 +245,7 @@ export default function SharePage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col items-center p-2 sm:p-4 md:p-8">
+      <main className="flex min-h-screen flex-col items-center p-6 sm:p-8 md:p-10">
         <div className="card bg-base-200 p-4 sm:p-6 max-w-xl w-full">
           <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
             공유된 파일

@@ -383,7 +383,7 @@ export default function SharedDirectoryPage() {
     <div className="min-h-screen bg-base-100">
       {/* Header */}
       <div className="bg-base-200 py-6">
-        <div className="container mx-auto px-4 sm:px-6 md:px-8">
+        <div className="container mx-auto px-6 sm:px-8 md:px-10">
           {/* 브레드크럼 네비게이션 */}
           {breadcrumbs.length > 0 && (
             <div className="breadcrumbs text-sm mb-4">
@@ -448,7 +448,7 @@ export default function SharedDirectoryPage() {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto p-4 sm:p-6 md:p-8">
+      <div className="container mx-auto p-6 sm:p-8 md:p-10">
         {/* Subdirectories */}
         {subdirectories.length > 0 && (
           <div className="mb-8">
@@ -648,7 +648,7 @@ export default function SharedDirectoryPage() {
 
       {/* Footer */}
       <div className="bg-base-200 py-4 mt-12">
-        <div className="container mx-auto px-4 sm:px-6 md:px-8 text-center">
+        <div className="container mx-auto px-6 sm:px-8 md:px-10 text-center">
           <p className="text-sm text-gray-600">
             Powered by{" "}
             <Link href="/" className="link link-primary">
