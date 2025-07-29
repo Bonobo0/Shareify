@@ -99,7 +99,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
+      <main className="flex min-h-screen flex-col p-6 sm:p-8 md:p-10">
         <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
           스토리지
         </h1>

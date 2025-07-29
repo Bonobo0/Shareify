@@ -171,14 +171,22 @@ export default function FileList({
           }
           setDirectories(dirResult.directories || []);
           const dirCount = dirResult.pagination?.totalDirectories || 0;
+          const fileCount = fileResult.pagination?.totalFiles || 0;
 
           // 파일과 디렉토리 총 개수를 한 번에 설정
-          setTotalItems((fileResult.pagination.totalFiles || 0) + dirCount);
-          setTotalPages(
-            Math.ceil(
-              (fileResult.pagination.totalFiles + dirCount) / itemsPerPage
-            ) || 1
-          );
+          const totalCombinedItems = fileCount + dirCount;
+          setTotalItems(totalCombinedItems);
+          
+          // 페이지 계산: 실제 화면에 표시되는 아이템 수를 기준으로 계산
+          // 현재 페이지에 표시되는 실제 아이템 수
+          const currentPageItems = (fileResult.files?.length || 0) + (dirResult.directories?.length || 0);
+          
+          // 만약 현재 페이지에 아이템이 itemsPerPage보다 적고, 이것이 마지막 페이지라면
+          if (currentPageItems < itemsPerPage && totalCombinedItems <= currentPage * itemsPerPage) {
+            setTotalPages(currentPage);
+          } else {
+            setTotalPages(Math.ceil(totalCombinedItems / itemsPerPage) || 1);
+          }
         } else {
           setDirectories([]);
           setTotalItems(fileResult.pagination.totalFiles || 0);
