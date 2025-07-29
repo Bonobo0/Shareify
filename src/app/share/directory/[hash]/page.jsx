@@ -408,19 +408,12 @@ export default function SharedDirectoryPage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-3 mb-2">
+              <div className="mb-2">
                 <h1 className="text-3xl font-bold">
                   {breadcrumbs.length > 1
                     ? breadcrumbs[breadcrumbs.length - 1].name
                     : directoryInfo?.name}
                 </h1>
-                <div className="btn btn-accent btn-xs gap-2">
-                  <span>👤</span>
-                  <span className="text-sm">
-                    {directoryInfo?.owner?.name || directoryInfo?.owner?.email}
-                    님이 공유
-                  </span>
-                </div>
               </div>
               {/* 현재 디렉토리의 설명 표시 */}
               {(breadcrumbs.length > 1
@@ -434,8 +427,17 @@ export default function SharedDirectoryPage() {
               )}
             </div>
             <div className="text-right">
-              <div className="badge badge-primary">
-                {permission === "read" ? "읽기 전용" : "읽기/쓰기"}
+              <div className="flex items-center gap-2 justify-end mb-1">
+                <div className="btn btn-accent btn-xs gap-2">
+                  <span>👤</span>
+                  <span className="text-sm">
+                    {directoryInfo?.owner?.name || directoryInfo?.owner?.email}
+                    님이 공유
+                  </span>
+                </div>
+                <div className="badge badge-primary">
+                  {permission === "read" ? "읽기 전용" : "읽기/쓰기"}
+                </div>
               </div>
               <p className="text-sm text-gray-600 mt-1">
                 생성일: {formatDate(directoryInfo?.createdAt)}
