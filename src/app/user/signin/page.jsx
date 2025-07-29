@@ -95,10 +95,9 @@ function SigninContent() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center">
-      <h1 className="text-4xl font-bold mt-8 mb-8">로그인</h1>
-      <div className="flex flex-col w-full max-w-md px-4">
-        {error && (
+    <div className="flex min-h-screen flex-col items-center p-4 sm:p-6 md:p-8">
+      <h1 className="text-3xl sm:text-4xl font-bold mt-8 mb-8 text-center">로그인</h1>
+      <div className="flex flex-col w-full max-w-md">{error && (
           <div className="alert alert-error mb-4">
             <span>{error}</span>
           </div>

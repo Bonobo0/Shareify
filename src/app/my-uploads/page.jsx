@@ -33,15 +33,15 @@ export default function MyUploadsPage() {
   return (
     <>
       <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold">내가 업로드한 파일들</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">내가 업로드한 파일들</h1>
             <p className="text-gray-600 mt-2">
               업로드한 모든 파일을 확인할 수 있습니다.
             </p>
           </div>
 
-          <button onClick={() => router.back()} className="btn btn-outline">
+          <button onClick={() => router.back()} className="btn btn-outline btn-sm sm:btn-md self-start">
             ← 뒤로가기
           </button>
         </div>

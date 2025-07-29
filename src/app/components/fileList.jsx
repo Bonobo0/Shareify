@@ -1132,10 +1132,10 @@ export default function FileList({
                       id: directory.id,
                       onClick: (e) => e.stopPropagation(),
                     })}
-                    <td className="flex items-center gap-2">
-                      <span className="text-xl">📁</span>
-                      <div>
-                        <div className="font-medium">{directory.name}</div>
+                    <td className="flex items-center gap-2 min-w-0">
+                      <span className="text-xl flex-shrink-0">📁</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium break-words">{directory.name}</div>
                         {!directory.owner && directory.ownerInfo && (
                           <div className="flex items-center gap-1 mt-1">
                             <div className="badge badge-accent badge-xs sm:badge-sm gap-1 text-xs whitespace-nowrap">
@@ -1233,10 +1233,10 @@ export default function FileList({
                       onClick: (e) => e.stopPropagation(),
                     })}
                     <td>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{getFileIcon(file)}</span>
-                        <div>
-                          <div className="font-medium">{file.originalName}</div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xl flex-shrink-0">{getFileIcon(file)}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium break-words">{file.originalName}</div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             {file.isEncrypted && (
                               <div className="badge badge-primary badge-xs sm:badge-sm whitespace-nowrap">

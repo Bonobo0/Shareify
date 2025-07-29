@@ -383,7 +383,7 @@ export default function SharedDirectoryPage() {
     <div className="min-h-screen bg-base-100">
       {/* Header */}
       <div className="bg-base-200 py-6">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8">
           {/* 브레드크럼 네비게이션 */}
           {breadcrumbs.length > 0 && (
             <div className="breadcrumbs text-sm mb-4">
@@ -448,7 +448,7 @@ export default function SharedDirectoryPage() {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto p-4 sm:p-6 md:p-8">
         {/* Subdirectories */}
         {subdirectories.length > 0 && (
           <div className="mb-8">
@@ -558,7 +558,7 @@ export default function SharedDirectoryPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                 {files.map((file) => {
                   const isSelected = selectedFiles.includes(file.id);
                   return (
@@ -648,7 +648,7 @@ export default function SharedDirectoryPage() {
 
       {/* Footer */}
       <div className="bg-base-200 py-4 mt-12">
-        <div className="container mx-auto px-4 text-center">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8 text-center">
           <p className="text-sm text-gray-600">
             Powered by{" "}
             <Link href="/" className="link link-primary">
