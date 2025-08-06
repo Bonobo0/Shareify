@@ -9,6 +9,7 @@ const PROTECTED_ROUTES = [
   "/shared", // 공유된 파일 목록 페이지
   "/directory", // 디렉토리 페이지
   "/file", // 파일 상세 페이지
+  "/admin", // 관리자 페이지
   "/api/share", // 공유 관련 API
   // 인증이 필요한 다른 경로들 추가
 ];

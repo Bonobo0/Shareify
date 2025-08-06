@@ -291,7 +291,7 @@ export async function uploadFile({
     if (directoryId) {
       let hasAccess = false;
 
-      // 1. 일반 사용자 권한 확인 (소유자이거나 관리자 권한으로 공유받은 경우)
+      // 1. 일반 사용자 권한 확인 (소유자이거나 쓰기/관리자 권한으로 공유받은 경우)
       const directory = await Directory.findOne({
         _id: directoryId,
         $or: [
@@ -300,7 +300,7 @@ export async function uploadFile({
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
-                "permission": "admin",
+                "permission": { $in: ["write", "admin"] },
               },
             },
           },
