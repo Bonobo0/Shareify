@@ -40,7 +40,7 @@ export async function getDirectoryList({
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -178,7 +178,7 @@ export async function createDirectory({ name, parentId, description }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     if (!name || name.trim() === "") {
@@ -262,7 +262,7 @@ export async function updateDirectory({ directoryId, name, description }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     if (!name || name.trim() === "") {
@@ -336,7 +336,7 @@ export async function deleteDirectory({ directoryId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -430,7 +430,7 @@ export async function shareDirectory({
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -499,7 +499,7 @@ export async function unshareDirectory({ directoryId, targetUserId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -547,7 +547,7 @@ export async function getDirectorySharedUsers({ directoryId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -594,7 +594,7 @@ export async function getDirectoryDetails({ directoryId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -676,7 +676,7 @@ export async function getDirectoryByHash({ hash }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -803,7 +803,7 @@ export async function deleteDirectoryRecursive({ directoryId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -891,7 +891,7 @@ export async function createDirectoryShareLink({
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -953,7 +953,7 @@ export async function getDirectoryShareLinks({ directoryId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -1000,7 +1000,7 @@ export async function deleteDirectoryShareLink({ directoryId, shareHash }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -1189,7 +1189,7 @@ export async function removeDirectoryShare({ directoryId, shareId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -1230,7 +1230,7 @@ export async function getDirectoryBreadcrumbs({ directoryId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();

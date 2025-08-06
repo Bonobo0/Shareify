@@ -1021,6 +1021,12 @@ export async function createSharedSubdirectory({
   subPath = "",
 }) {
   try {
+    // 인증 확인 - 비로그인 사용자는 디렉토리 생성 불가
+    const userId = await getAuthenticatedUser();
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
     if (!name || name.trim() === "") {
       return { error: "디렉토리 이름을 입력해주세요." };
     }
