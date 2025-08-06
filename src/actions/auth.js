@@ -112,6 +112,7 @@ export async function signIn(formData) {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        role: user.role,
       },
     };
   } catch (error) {
@@ -213,6 +214,7 @@ export async function signUp(formData) {
         email: user.email,
         name: user.name,
         isVerified: user.isVerified,
+        role: user.role,
       },
       emailSent: !emailResult.error,
     };
@@ -273,6 +275,7 @@ export async function verifyAuth() {
         name: user.name,
         isVerified: user.isVerified,
         twoFactorEnabled: user.twoFactorEnabled,
+        role: user.role,
       },
     };
   } catch (error) {
