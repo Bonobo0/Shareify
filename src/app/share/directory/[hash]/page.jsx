@@ -55,6 +55,7 @@ export default function SharedDirectoryPage() {
   // 검색 상태 (SearchComponent로 관리)
   const [filteredFiles, setFilteredFiles] = useState([]);
   const [filteredSubdirectories, setFilteredSubdirectories] = useState([]);
+  const [hasActiveSearch, setHasActiveSearch] = useState(false);
 
   // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,6 +205,9 @@ export default function SharedDirectoryPage() {
   const handleSearchChange = (searchState) => {
     // 검색 상태가 변경될 때 첫 페이지로 이동
     setCurrentPage(1);
+    // 검색이 활성화되어 있는지 확인
+    const hasSearch = searchState.searchQuery || Object.values(searchState.searchFilters).some((v) => v);
+    setHasActiveSearch(hasSearch);
   };
 
   const handleFilteredResultsChange = ({ filteredFiles: newFilteredFiles, filteredDirectories: newFilteredDirectories }) => {
@@ -630,12 +634,12 @@ export default function SharedDirectoryPage() {
             </div>
           )}
 
-          {filteredFiles.length === 0 && filteredSubdirectories.length === 0 && searchQuery.trim() === "" ? (
+          {filteredFiles.length === 0 && filteredSubdirectories.length === 0 && !hasActiveSearch ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📂</div>
               <p className="text-gray-600">이 폴더에는 파일이 없습니다.</p>
             </div>
-          ) : filteredFiles.length === 0 && filteredSubdirectories.length === 0 && searchQuery.trim() !== "" ? (
+          ) : filteredFiles.length === 0 && filteredSubdirectories.length === 0 && hasActiveSearch ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">🔍</div>
               <p className="text-gray-600">검색 결과가 없습니다.</p>
