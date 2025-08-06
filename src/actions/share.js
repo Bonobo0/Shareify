@@ -1012,3 +1012,109 @@ export async function downloadSharedDirectoryFile({ shareHash, fileId }) {
     return { error: "파일 다운로드 중 오류가 발생했습니다." };
   }
 }
+
+// 공유 디렉토리 내에서 하위 디렉토리 생성
+export async function createSharedSubdirectory({
+  shareHash,
+  name,
+  description = "",
+  subPath = "",
+}) {
+  try {
+    if (!name || name.trim() === "") {
+      return { error: "디렉토리 이름을 입력해주세요." };
+    }
+
+    await connectToDatabase();
+
+    // 공유 디렉토리 정보 확인
+    const sharedDirectory = await Directory.findOne({
+      "shareLinks.hash": shareHash,
+      deleted: { $ne: true },
+    });
+
+    if (!sharedDirectory) {
+      return { error: "공유 링크를 찾을 수 없습니다." };
+    }
+
+    const shareLink = sharedDirectory.shareLinks.find(
+      (link) => link.hash === shareHash
+    );
+
+    if (!shareLink || new Date() > shareLink.expiresAt) {
+      return { error: "공유 링크가 만료되었거나 유효하지 않습니다." };
+    }
+
+    // 쓰기 권한 확인
+    if (shareLink.permission !== "write") {
+      return { error: "디렉토리 생성 권한이 없습니다." };
+    }
+
+    // 현재 위치의 부모 디렉토리 결정
+    let parentDirectoryId = sharedDirectory._id;
+
+    // subPath가 있는 경우 해당 경로의 디렉토리를 찾음
+    if (subPath) {
+      const pathParts = subPath.split("/").filter((p) => p);
+      let currentParent = sharedDirectory._id;
+
+      for (const part of pathParts) {
+        const subDir = await Directory.findOne({
+          parent: currentParent,
+          name: part,
+          deleted: { $ne: true },
+        });
+
+        if (!subDir) {
+          return { error: "요청한 경로를 찾을 수 없습니다." };
+        }
+
+        currentParent = subDir._id;
+      }
+      
+      parentDirectoryId = currentParent;
+    }
+
+    // 같은 위치에 같은 이름의 디렉토리가 있는지 확인
+    const existingDirectory = await Directory.findOne({
+      name: name.trim(),
+      parent: parentDirectoryId,
+      deleted: { $ne: true },
+    });
+
+    if (existingDirectory) {
+      return { error: "같은 이름의 디렉토리가 이미 존재합니다." };
+    }
+
+    // 새 디렉토리 생성
+    const crypto = await import("crypto");
+    const directoryHash = crypto.randomBytes(16).toString("hex");
+    const directoryPath = `/${name.trim()}`;
+
+    const directory = new Directory({
+      name: name.trim(),
+      description: description?.trim() || "",
+      owner: sharedDirectory.owner, // 원본 디렉토리 소유자와 동일
+      parent: parentDirectoryId,
+      hash: directoryHash,
+      path: directoryPath,
+    });
+
+    await directory.save();
+
+    return {
+      success: true,
+      message: "디렉토리가 생성되었습니다.",
+      directory: {
+        id: directory._id.toString(),
+        name: directory.name,
+        description: directory.description,
+        hash: directory.hash,
+        createdAt: directory.createdAt.toISOString(),
+      },
+    };
+  } catch (error) {
+    console.error("공유 디렉토리 생성 오류:", error);
+    return { error: "디렉토리를 생성하는 중 오류가 발생했습니다." };
+  }
+}

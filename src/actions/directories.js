@@ -708,7 +708,11 @@ export async function getDirectoryByHash({ hash }) {
     // 디렉토리 접근 권한 확인
     const isOwner = directory.owner._id.toString() === userId;
     const isDirectlyShared = directory.shared?.some(
-      (share) => share.userId.toString() === userId
+      (share) => {
+        // Handle both populated and non-populated userId
+        const shareUserId = share.userId._id ? share.userId._id.toString() : share.userId.toString();
+        return shareUserId === userId;
+      }
     );
 
     // 상위 디렉토리 권한 확인
