@@ -10,6 +10,7 @@ import BulkDownloadModal from "@/app/components/bulkDownloadModal";
 import CreateDirectory from "@/app/components/createDirectory";
 import CreateSharedDirectory from "@/app/components/createSharedDirectory";
 import Paginator from "@/app/components/paginator";
+import SearchComponent from "@/app/components/searchComponent";
 import { getSharedDirectoryInfo } from "@/actions/share";
 import {
   downloadSharedFile,
@@ -51,10 +52,10 @@ export default function SharedDirectoryPage() {
     useState(false);
   const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false);
 
-  // 검색 상태
-  const [searchQuery, setSearchQuery] = useState("");
+  // 검색 상태 (SearchComponent로 관리)
   const [filteredFiles, setFilteredFiles] = useState([]);
   const [filteredSubdirectories, setFilteredSubdirectories] = useState([]);
+  const [hasActiveSearch, setHasActiveSearch] = useState(false);
 
   // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
@@ -194,29 +195,25 @@ export default function SharedDirectoryPage() {
     }
   }, [hash, fetchDirectoryDetails]);
 
-  // 검색 필터링 로직
+  // 초기 필터링 설정
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredFiles(files);
-      setFilteredSubdirectories(subdirectories);
-    } else {
-      const query = searchQuery.toLowerCase();
-      
-      const filteredF = files.filter((file) =>
-        file.name.toLowerCase().includes(query)
-      );
-      
-      const filteredD = subdirectories.filter((dir) =>
-        dir.name.toLowerCase().includes(query)
-      );
-      
-      setFilteredFiles(filteredF);
-      setFilteredSubdirectories(filteredD);
-    }
-    
-    // 검색어가 변경되면 첫 페이지로 이동
+    setFilteredFiles(files);
+    setFilteredSubdirectories(subdirectories);
+  }, [files, subdirectories]);
+
+  // SearchComponent 핸들러
+  const handleSearchChange = (searchState) => {
+    // 검색 상태가 변경될 때 첫 페이지로 이동
     setCurrentPage(1);
-  }, [searchQuery, files, subdirectories]);
+    // 검색이 활성화되어 있는지 확인
+    const hasSearch = searchState.searchQuery || Object.values(searchState.searchFilters).some((v) => v);
+    setHasActiveSearch(hasSearch);
+  };
+
+  const handleFilteredResultsChange = ({ filteredFiles: newFilteredFiles, filteredDirectories: newFilteredDirectories }) => {
+    setFilteredFiles(newFilteredFiles);
+    setFilteredSubdirectories(newFilteredDirectories);
+  };
 
   // 페이지네이션 로직
   useEffect(() => {
@@ -534,33 +531,20 @@ export default function SharedDirectoryPage() {
       {/* Content */}
       <div className="container mx-auto p-6 sm:p-8 md:p-10">
         
-        {/* 검색 및 액션 바 */}
+        {/* SearchComponent */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           {/* 검색창 */}
           <div className="flex-1 max-w-md">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="파일 및 폴더 검색..."
-                className="input input-bordered w-full pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
+            <SearchComponent
+              enableAdvancedSearch={true}
+              showPermissionFilter={false}
+              files={files}
+              directories={subdirectories}
+              onSearchChange={handleSearchChange}
+              onFilteredResultsChange={handleFilteredResultsChange}
+              placeholder="파일 및 폴더 검색..."
+              className="mb-0"
+            />
           </div>
 
           {/* 액션 버튼들 */}
@@ -650,12 +634,12 @@ export default function SharedDirectoryPage() {
             </div>
           )}
 
-          {filteredFiles.length === 0 && filteredSubdirectories.length === 0 && searchQuery.trim() === "" ? (
+          {filteredFiles.length === 0 && filteredSubdirectories.length === 0 && !hasActiveSearch ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📂</div>
               <p className="text-gray-600">이 폴더에는 파일이 없습니다.</p>
             </div>
-          ) : filteredFiles.length === 0 && filteredSubdirectories.length === 0 && searchQuery.trim() !== "" ? (
+          ) : filteredFiles.length === 0 && filteredSubdirectories.length === 0 && hasActiveSearch ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">🔍</div>
               <p className="text-gray-600">검색 결과가 없습니다.</p>
