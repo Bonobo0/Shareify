@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -33,7 +33,7 @@ export default function AdminPage() {
     }
 
     fetchUsers();
-  }, [isAuthenticated, authLoading, user, router]);
+  }, [isAuthenticated, authLoading, user, router, fetchUsers]);
 
   // Filter users based on search query
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function AdminPage() {
     }
   }, [searchQuery, users]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const result = await getAllUsers();
@@ -65,7 +65,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const formatBytes = (bytes) => {
     if (bytes === 0) return "0 Bytes";
