@@ -59,6 +59,13 @@ export async function signIn(formData) {
       };
     }
 
+    // 계정 정지 상태 확인 (suspended 필드가 없는 기존 사용자는 false로 처리)
+    if (user.suspended === true) {
+      return {
+        error: "계정이 정지되었습니다. 관리자에게 문의하세요.",
+      };
+    }
+
     // 2FA가 활성화된 경우
     if (user.twoFactorEnabled) {
       if (!twoFactorCode) {
@@ -112,6 +119,7 @@ export async function signIn(formData) {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        role: user.role,
       },
     };
   } catch (error) {
@@ -213,6 +221,7 @@ export async function signUp(formData) {
         email: user.email,
         name: user.name,
         isVerified: user.isVerified,
+        role: user.role,
       },
       emailSent: !emailResult.error,
     };
@@ -265,6 +274,11 @@ export async function verifyAuth() {
       return { authenticated: false };
     }
 
+    // 계정 정지 상태 확인 (suspended 필드가 없는 기존 사용자는 false로 처리)
+    if (user.suspended === true) {
+      return { authenticated: false };
+    }
+
     return {
       authenticated: true,
       user: {
@@ -273,6 +287,7 @@ export async function verifyAuth() {
         name: user.name,
         isVerified: user.isVerified,
         twoFactorEnabled: user.twoFactorEnabled,
+        role: user.role,
       },
     };
   } catch (error) {

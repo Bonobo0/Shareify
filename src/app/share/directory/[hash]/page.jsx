@@ -6,6 +6,9 @@ import Link from "next/link";
 import FileUploader from "@/app/components/fileUploader";
 import SelectedDownloadModal from "@/app/components/selectedDownloadModal";
 import BulkDownloadModal from "@/app/components/bulkDownloadModal";
+import CreateDirectory from "@/app/components/createDirectory";
+import CreateSharedDirectory from "@/app/components/createSharedDirectory";
+import Paginator from "@/app/components/paginator";
 import { getSharedDirectoryInfo } from "@/actions/share";
 import {
   downloadSharedFile,
@@ -46,6 +49,19 @@ export default function SharedDirectoryPage() {
     useState(false);
   const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false);
 
+  // 검색 상태
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredFiles, setFilteredFiles] = useState([]);
+  const [filteredSubdirectories, setFilteredSubdirectories] = useState([]);
+
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(12); // 페이지당 표시할 아이템 수
+  const [paginatedFiles, setPaginatedFiles] = useState([]);
+  const [paginatedSubdirectories, setPaginatedSubdirectories] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   // 파일 선택 토글 함수
   const toggleFileSelection = (fileId) => {
     const isSelected = selectedFiles.includes(fileId);
@@ -64,6 +80,12 @@ export default function SharedDirectoryPage() {
   const handleUploadComplete = () => {
     setRefreshTrigger((prev) => prev + 1);
     // 파일 목록 새로고침
+    fetchDirectoryDetails(hash, currentPath);
+  };
+
+  const handleDirectoryCreated = () => {
+    setRefreshTrigger((prev) => prev + 1);
+    // 디렉토리 목록 새로고침
     fetchDirectoryDetails(hash, currentPath);
   };
 
@@ -169,6 +191,66 @@ export default function SharedDirectoryPage() {
       fetchDirectoryDetails(hash);
     }
   }, [hash, fetchDirectoryDetails]);
+
+  // 검색 필터링 로직
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredFiles(files);
+      setFilteredSubdirectories(subdirectories);
+    } else {
+      const query = searchQuery.toLowerCase();
+      
+      const filteredF = files.filter((file) =>
+        file.name.toLowerCase().includes(query)
+      );
+      
+      const filteredD = subdirectories.filter((dir) =>
+        dir.name.toLowerCase().includes(query)
+      );
+      
+      setFilteredFiles(filteredF);
+      setFilteredSubdirectories(filteredD);
+    }
+    
+    // 검색어가 변경되면 첫 페이지로 이동
+    setCurrentPage(1);
+  }, [searchQuery, files, subdirectories]);
+
+  // 페이지네이션 로직
+  useEffect(() => {
+    const totalFilteredItems = filteredFiles.length + filteredSubdirectories.length;
+    const pages = Math.ceil(totalFilteredItems / itemsPerPage) || 1;
+    
+    setTotalPages(pages);
+    setTotalItems(totalFilteredItems);
+    
+    // 현재 페이지가 총 페이지를 넘으면 첫 번째 페이지로 이동
+    if (currentPage > pages) {
+      setCurrentPage(1);
+      return;
+    }
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    
+    // 먼저 디렉토리를 배치하고 남은 공간에 파일을 배치
+    const combinedItems = [...filteredSubdirectories, ...filteredFiles];
+    const paginatedItems = combinedItems.slice(startIndex, endIndex);
+    
+    // 디렉토리와 파일을 분리하여 설정
+    const paginatedDirs = paginatedItems.filter(item => !item.size && !item.mimeType);
+    const paginatedFileItems = paginatedItems.filter(item => item.size || item.mimeType);
+    
+    setPaginatedSubdirectories(paginatedDirs);
+    setPaginatedFiles(paginatedFileItems);
+  }, [filteredFiles, filteredSubdirectories, currentPage, itemsPerPage]);
+
+  // 페이지 변경 핸들러
+  const handlePageChange = useCallback((page) => {
+    setCurrentPage(page);
+    // 스크롤을 상단으로 이동
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return "0 Bytes";
@@ -449,12 +531,54 @@ export default function SharedDirectoryPage() {
 
       {/* Content */}
       <div className="container mx-auto p-6 sm:p-8 md:p-10">
+        
+        {/* 검색 및 액션 바 */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          {/* 검색창 */}
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="파일 및 폴더 검색..."
+                className="input input-bordered w-full pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+          </div>
+
+          {/* 액션 버튼들 */}
+          <div className="flex gap-2">
+            {permission === "write" && (
+              <CreateSharedDirectory
+                shareHash={hash}
+                subPath={currentPath}
+                onSuccess={handleDirectoryCreated}
+              />
+            )}
+          </div>
+        </div>
+
         {/* Subdirectories */}
-        {subdirectories.length > 0 && (
+        {paginatedSubdirectories.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">📁 하위 폴더</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subdirectories.map((directory) => (
+              {paginatedSubdirectories.map((directory) => (
                 <div
                   key={directory.id}
                   className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer min-w-0"
@@ -493,10 +617,15 @@ export default function SharedDirectoryPage() {
             </div>
           )}
 
-          {files.length === 0 ? (
+          {filteredFiles.length === 0 && filteredSubdirectories.length === 0 && searchQuery.trim() === "" ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📂</div>
               <p className="text-gray-600">이 폴더에는 파일이 없습니다.</p>
+            </div>
+          ) : filteredFiles.length === 0 && filteredSubdirectories.length === 0 && searchQuery.trim() !== "" ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🔍</div>
+              <p className="text-gray-600">검색 결과가 없습니다.</p>
             </div>
           ) : (
             <>
@@ -515,14 +644,14 @@ export default function SharedDirectoryPage() {
                       <button
                         className="btn btn-sm btn-outline"
                         onClick={() => {
-                          if (selectedFiles.length === files.length) {
+                          if (selectedFiles.length === paginatedFiles.length) {
                             setSelectedFiles([]);
                           } else {
-                            setSelectedFiles(files.map((file) => file.id));
+                            setSelectedFiles(paginatedFiles.map((file) => file.id));
                           }
                         }}
                       >
-                        {selectedFiles.length === files.length
+                        {selectedFiles.length === paginatedFiles.length
                           ? "전체 해제"
                           : "전체 선택"}
                       </button>
@@ -547,7 +676,7 @@ export default function SharedDirectoryPage() {
                   )}
                 </div>
 
-                {files.length > 0 && (
+                {paginatedFiles.length > 0 && (
                   <button
                     className="btn btn-sm btn-outline"
                     onClick={() => setShowBulkDownloadModal(true)}
@@ -559,7 +688,7 @@ export default function SharedDirectoryPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                {files.map((file) => {
+                {paginatedFiles.map((file) => {
                   const isSelected = selectedFiles.includes(file.id);
                   return (
                     <div
@@ -641,6 +770,21 @@ export default function SharedDirectoryPage() {
                   );
                 })}
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-8">
+                  <Paginator
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalItems}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={handlePageChange}
+                    showInfo={true}
+                    className="pagination-container"
+                  />
+                </div>
+              )}
             </>
           )}
         </div>

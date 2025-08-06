@@ -24,6 +24,7 @@ export default function DirectoryPage() {
   const [error, setError] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
+  const [userPermission, setUserPermission] = useState(null);
 
   // 디렉토리 공유 모달 상태
   const [directoryShareModal, setDirectoryShareModal] = useState({
@@ -59,13 +60,26 @@ export default function DirectoryPage() {
         setDirectory(result.directory);
         setDirectoryId(result.directory.id);
         setBreadcrumbs([]); // 해시로 접근하는 디렉토리는 breadcrumbs가 제한적
+        
+        // 사용자 권한 확인
+        if (result.directory.owner) {
+          setUserPermission("owner");
+        } else if (result.directory.sharedWith && result.directory.sharedWith.length > 0) {
+          // 공유받은 디렉토리인 경우 권한 확인
+          const currentUserShare = result.directory.sharedWith.find(
+            share => share.userId === user?.id
+          );
+          setUserPermission(currentUserShare?.permission || "read");
+        } else {
+          setUserPermission("read");
+        }
       }
     } catch (error) {
       setError(error.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -155,9 +169,9 @@ export default function DirectoryPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="breadcrumbs mb-4">
-        <ul>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul className="flex-wrap">
           <li>
             <Link href="/dashboard">내 파일</Link>
           </li>
@@ -173,13 +187,13 @@ export default function DirectoryPage() {
         </ul>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold">{directory?.name}</h1>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4">
+        <div className="flex flex-col gap-2 min-w-0 flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold break-words">{directory?.name}</h1>
           {directory && !directory.owner && directory.ownerInfo && (
-            <div className="badge badge-accent gap-2">
+            <div className="badge badge-accent gap-2 w-fit">
               <span>👤</span>
-              <span className="text-sm">
+              <span className="text-xs sm:text-sm">
                 {directory.ownerInfo.name || directory.ownerInfo.email}님이 공유
               </span>
             </div>
@@ -187,9 +201,10 @@ export default function DirectoryPage() {
         </div>
 
         {directory && (
-          <div className="flex items-center gap-2">
-            <button onClick={() => router.back()} className="btn btn-ghost">
-              ← 뒤로가기
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={() => router.back()} className="btn btn-ghost btn-sm sm:btn-md">
+              <span className="hidden sm:inline">← 뒤로가기</span>
+              <span className="sm:hidden">←</span>
             </button>
           </div>
         )}
@@ -201,41 +216,58 @@ export default function DirectoryPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-4 mb-8 justify-between">
-        <CreateDirectory
-          parentId={directoryId}
-          onSuccess={handleDirectoryCreated}
-        />
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-4 mb-8 justify-between">
+        {/* Directory creation - show only if user has write/admin permissions */}
+        {(userPermission === "owner" || userPermission === "write" || userPermission === "admin") && (
+          <div className="flex-shrink-0">
+            <CreateDirectory
+              parentId={directoryId}
+              onSuccess={handleDirectoryCreated}
+            />
+          </div>
+        )}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
           {directory && directory.owner && (
             <button
               onClick={handleEditDirectory}
-              className="btn btn-primary gap-2"
+              className="btn btn-primary gap-2 text-sm sm:text-base px-3 sm:px-4"
             >
-              ✏️ 수정하기
+              <span className="hidden sm:inline">✏️</span>
+              <span className="sm:hidden">✏️</span>
+              <span className="hidden sm:inline">수정하기</span>
+              <span className="sm:hidden">수정</span>
             </button>
           )}
           <button
             onClick={handleBulkDownload}
-            className="btn btn-outline gap-2"
+            className="btn btn-outline gap-2 text-sm sm:text-base px-3 sm:px-4"
           >
-            📦 전체 다운로드
+            <span className="hidden sm:inline">📦</span>
+            <span className="sm:hidden">📦</span>
+            <span className="hidden sm:inline">전체 다운로드</span>
+            <span className="sm:hidden">다운로드</span>
           </button>
           <button
             onClick={handleShareDirectory}
-            className="btn btn-outline gap-2"
+            className="btn btn-outline gap-2 text-sm sm:text-base px-3 sm:px-4"
           >
-            📤 디렉토리 공유
+            <span className="hidden sm:inline">📤</span>
+            <span className="sm:hidden">📤</span>
+            <span className="hidden sm:inline">디렉토리 공유</span>
+            <span className="sm:hidden">공유</span>
           </button>
         </div>
       </div>
 
-      <div className="mb-8">
-        <FileUploader
-          directoryId={directoryId}
-          onUploadComplete={handleUploadComplete}
-        />
-      </div>
+      {/* File uploader - show only if user has write/admin permissions */}
+      {(userPermission === "owner" || userPermission === "write" || userPermission === "admin") && (
+        <div className="mb-8">
+          <FileUploader
+            directoryId={directoryId}
+            onUploadComplete={handleUploadComplete}
+          />
+        </div>
+      )}
 
       <div>
         <FileList directoryId={directoryId} refreshTrigger={refreshTrigger} />
