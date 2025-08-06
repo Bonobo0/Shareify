@@ -536,7 +536,7 @@ export default function SharedDirectoryPage() {
           {/* 검색창 */}
           <div className="flex-1 max-w-md">
             <SearchComponent
-              enableAdvancedSearch={false}
+              enableAdvancedSearch={true}
               showPermissionFilter={false}
               files={files}
               directories={subdirectories}
