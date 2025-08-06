@@ -573,7 +573,7 @@ export default function SharedDirectoryPage() {
               />
             )}
             {permission === "write" && !isAuthenticated && (
-              <div className="tooltip tooltip-left" data-tip="로그인이 필요합니다">
+              <div className="tooltip tooltip-right md:tooltip-left" data-tip="로그인이 필요합니다">
                 <button className="btn btn-disabled btn-sm">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -642,7 +642,7 @@ export default function SharedDirectoryPage() {
 
           {permission === "write" && directoryId && !isAuthenticated && (
             <div className="w-auto mb-4">
-              <div className="tooltip tooltip-right" data-tip="로그인이 필요합니다">
+              <div className="tooltip tooltip-right md:tooltip-left" data-tip="로그인이 필요합니다">
                 <button className="btn btn-disabled btn-sm">
                   📁 파일 업로드
                 </button>
