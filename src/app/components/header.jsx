@@ -58,6 +58,9 @@ export default function Header() {
                 <li><Link href="/dashboard">대시보드</Link></li>
                 <li><Link href="/shared">공유된 파일</Link></li>
                 <li><Link href="/my-uploads">내 업로드</Link></li>
+                {user?.role === "admin" && (
+                  <li><Link href="/admin">관리자 페이지</Link></li>
+                )}
               </ul>
             </div>
           )}
@@ -83,6 +86,14 @@ export default function Header() {
               >
                 내 업로드
               </Link>
+              {user?.role === "admin" && (
+                <Link
+                  href="/admin"
+                  className="btn btn-ghost btn-sm lg:btn-md"
+                >
+                  관리자
+                </Link>
+              )}
             </>
           )}
         </div>
@@ -113,6 +124,11 @@ export default function Header() {
                   <li>
                     <Link href="/profile">프로필</Link>
                   </li>
+                  {user?.role === "admin" && (
+                    <li>
+                      <Link href="/admin">관리자 페이지</Link>
+                    </li>
+                  )}
                   <li>
                     <button onClick={logout}>로그아웃</button>
                   </li>
