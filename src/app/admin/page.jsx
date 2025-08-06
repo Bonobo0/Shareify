@@ -233,7 +233,7 @@ export default function AdminPage() {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="stat bg-base-200 rounded-lg">
           <div className="stat-title">총 사용자</div>
           <div className="stat-value text-primary">{users.length}</div>
@@ -248,6 +248,12 @@ export default function AdminPage() {
           <div className="stat-title">인증된 사용자</div>
           <div className="stat-value text-accent">
             {users.filter((u) => u.isVerified).length}
+          </div>
+        </div>
+        <div className="stat bg-base-200 rounded-lg">
+          <div className="stat-title">정지된 사용자</div>
+          <div className="stat-value text-error">
+            {users.filter((u) => u.suspended).length}
           </div>
         </div>
       </div>
@@ -265,14 +271,14 @@ export default function AdminPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="table table-zebra w-full">
+              <table className="table table-zebra w-full table-compact lg:table-normal">
                 <thead>
                   <tr>
                     <th>사용자</th>
                     <th>역할</th>
                     <th>저장소 사용량</th>
-                    <th>인증 상태</th>
-                    <th>가입일</th>
+                    <th>상태</th>
+                    <th className="hidden sm:table-cell">가입일</th>
                     <th>작업</th>
                   </tr>
                 </thead>
@@ -280,18 +286,18 @@ export default function AdminPage() {
                   {filteredUsers.map((user) => (
                     <tr key={user.id}>
                       <td>
-                        <div>
-                          <div className="font-medium">{user.name || "이름 없음"}</div>
-                          <div className="text-sm text-gray-600">{user.email}</div>
+                        <div className="max-w-48 sm:max-w-none">
+                          <div className="font-medium truncate">{user.name || "이름 없음"}</div>
+                          <div className="text-sm text-gray-600 truncate">{user.email}</div>
                         </div>
                       </td>
                       <td>
-                        <div className={`badge ${user.role === "admin" ? "badge-primary" : "badge-ghost"}`}>
-                          {user.role === "admin" ? "관리자" : "사용자"}
+                        <div className={`badge badge-sm ${user.role === "admin" ? "badge-primary" : "badge-ghost"}`}>
+                          <span className="text-xs">{user.role === "admin" ? "관리자" : "사용자"}</span>
                         </div>
                       </td>
                       <td>
-                        <div>
+                        <div className="min-w-24">
                           <div className="text-sm">
                             {formatBytes(user.storageUsed)} / {formatBytes(user.storageLimit)}
                           </div>
@@ -309,28 +315,39 @@ export default function AdminPage() {
                         </div>
                       </td>
                       <td>
-                        <div className={`badge ${user.isVerified ? "badge-success" : "badge-warning"}`}>
-                          {user.isVerified ? "인증됨" : "미인증"}
+                        <div className="flex flex-col gap-1">
+                          <div className={`badge badge-sm ${user.isVerified ? "badge-success" : "badge-warning"}`}>
+                            <span className="text-xs">{user.isVerified ? "인증됨" : "미인증"}</span>
+                          </div>
+                          {user.suspended && (
+                            <div className="badge badge-sm badge-error">
+                              <span className="text-xs">정지됨</span>
+                            </div>
+                          )}
                         </div>
                       </td>
-                      <td className="text-sm">{formatDate(user.createdAt)}</td>
+                      <td className="hidden sm:table-cell text-sm">{formatDate(user.createdAt)}</td>
                       <td>
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                           <button
                             onClick={() => openQuotaModal(user)}
                             className="btn btn-xs btn-outline"
+                            title="할당량 변경"
                           >
-                            할당량
+                            <span className="hidden sm:inline">할당량</span>
+                            <span className="sm:hidden">할당</span>
                           </button>
                           <button
                             onClick={() => openRoleModal(user)}
                             className="btn btn-xs btn-outline"
+                            title="역할 변경"
                           >
                             역할
                           </button>
                           <button
                             onClick={() => openSuspendModal(user)}
                             className={`btn btn-xs ${user.suspended ? "btn-warning" : "btn-error"}`}
+                            title={user.suspended ? "계정 활성화" : "계정 정지"}
                           >
                             {user.suspended ? "해제" : "정지"}
                           </button>

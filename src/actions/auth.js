@@ -35,7 +35,7 @@ export async function signIn(formData) {
     }
 
     const user = await User.findOne({ email }).select(
-      "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes"
+      "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes +suspended"
     );
 
     if (!user) {
@@ -56,6 +56,13 @@ export async function signIn(formData) {
     if (!isMatch) {
       return {
         error: "이메일 또는 비밀번호가 일치하지 않습니다.",
+      };
+    }
+
+    // 계정 정지 상태 확인
+    if (user.suspended) {
+      return {
+        error: "계정이 정지되었습니다. 관리자에게 문의하세요.",
       };
     }
 
@@ -261,9 +268,14 @@ export async function verifyAuth() {
     }
 
     await connectToDatabase();
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findById(decoded.userId).select("-password +suspended");
 
     if (!user) {
+      return { authenticated: false };
+    }
+
+    // 계정 정지 상태 확인
+    if (user.suspended) {
       return { authenticated: false };
     }
 
