@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import FileUploader from "@/app/components/fileUploader";
 import SelectedDownloadModal from "@/app/components/selectedDownloadModal";
 import BulkDownloadModal from "@/app/components/bulkDownloadModal";
@@ -20,6 +21,7 @@ export default function SharedDirectoryPage() {
   const params = useParams();
   const router = useRouter();
   const { hash } = params;
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
   const [directoryInfo, setDirectoryInfo] = useState(null);
   const [files, setFiles] = useState([]);
@@ -563,12 +565,33 @@ export default function SharedDirectoryPage() {
 
           {/* 액션 버튼들 */}
           <div className="flex gap-2">
-            {permission === "write" && (
+            {permission === "write" && isAuthenticated && (
               <CreateSharedDirectory
                 shareHash={hash}
                 subPath={currentPath}
                 onSuccess={handleDirectoryCreated}
               />
+            )}
+            {permission === "write" && !isAuthenticated && (
+              <div className="tooltip tooltip-right md:tooltip-left" data-tip="로그인이 필요합니다">
+                <button className="btn btn-disabled btn-sm">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                  새 폴더
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -605,7 +628,7 @@ export default function SharedDirectoryPage() {
 
         {/* Files */}
         <div>
-          {permission === "write" && directoryId && (
+          {permission === "write" && directoryId && isAuthenticated && (
             <div className="w-auto mb-4">
               <FileUploader
                 directoryId={directoryId}
@@ -614,6 +637,16 @@ export default function SharedDirectoryPage() {
                 buttonText="파일 업로드"
                 className="btn btn-primary btn-sm"
               />
+            </div>
+          )}
+
+          {permission === "write" && directoryId && !isAuthenticated && (
+            <div className="w-auto mb-4">
+              <div className="tooltip tooltip-right md:tooltip-left" data-tip="로그인이 필요합니다">
+                <button className="btn btn-disabled btn-sm">
+                  📁 파일 업로드
+                </button>
+              </div>
             </div>
           )}
 

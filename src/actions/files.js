@@ -42,7 +42,7 @@ export async function getFileList({
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -260,7 +260,7 @@ export async function uploadFile({
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     if (!filename || !size || !mimetype) {
@@ -433,7 +433,7 @@ export async function completeFileUpload({ fileId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -482,7 +482,7 @@ export async function deleteFile({ fileId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -568,7 +568,7 @@ export async function getFileDownloadUrl({ fileId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -669,7 +669,7 @@ export async function shareFile({ fileId, email, permission = "read" }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -763,7 +763,7 @@ export async function getFileDetails({ hash, fileId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     if (!hash && !fileId) {
@@ -957,7 +957,7 @@ export async function getMyUploadedFiles({
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -1066,7 +1066,7 @@ export async function removeFileShare({ fileId, shareId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -1107,7 +1107,7 @@ export async function getAllFilesForDownload({ directoryId }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     await connectToDatabase();
@@ -1223,7 +1223,7 @@ export async function getSelectedFilesForDownload({ fileIds }) {
     const userId = await getAuthenticatedUser();
 
     if (!userId) {
-      return { error: "인증이 필요합니다." };
+      return { error: "로그인이 필요합니다." };
     }
 
     if (!fileIds || fileIds.length === 0) {
