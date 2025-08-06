@@ -418,7 +418,8 @@ function ProfileSettings({
 // 저장소 설정 컴포넌트
 function StorageSettings({ storageInfo, updating }) {
   const formatBytes = (bytes) => {
-    if (bytes === 0) return "0 Bytes";
+    // Handle null, undefined, or other falsy values
+    if (!bytes || bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));

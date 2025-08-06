@@ -68,7 +68,8 @@ export default function AdminPage() {
   }, [searchQuery, users]);
 
   const formatBytes = (bytes) => {
-    if (bytes === 0) return "0 Bytes";
+    // Handle null, undefined, or other falsy values
+    if (!bytes || bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -306,7 +307,7 @@ export default function AdminPage() {
                               className="bg-primary h-2 rounded-full"
                               style={{
                                 width: `${Math.min(
-                                  (user.storageUsed / user.storageLimit) * 100,
+                                  ((user.storageUsed || 0) / (user.storageLimit || 1)) * 100,
                                   100
                                 )}%`,
                               }}

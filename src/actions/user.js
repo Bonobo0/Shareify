@@ -53,8 +53,8 @@ export async function getUserInfo() {
         email: user.email,
         name: user.name,
         createdAt: user.createdAt ? user.createdAt.toISOString() : null,
-        storageLimit: user.storageLimit,
-        storageUsed: user.storageUsed,
+        storageLimit: user.storageLimit || 5368709120, // Default 5GB if null/undefined
+        storageUsed: user.storageUsed || 0, // Default 0 if null/undefined
       },
     };
   } catch (error) {

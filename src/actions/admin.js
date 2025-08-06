@@ -64,8 +64,8 @@ export async function getAllUsers({ page = 1, limit = 50, sortBy = "createdAt", 
         name: user.name,
         email: user.email,
         role: user.role,
-        storageLimit: user.storageLimit,
-        storageUsed: user.storageUsed,
+        storageLimit: user.storageLimit || 5368709120, // Default 5GB if null/undefined
+        storageUsed: user.storageUsed || 0, // Default 0 if null/undefined
         isVerified: user.isVerified,
         suspended: user.suspended || false,
         createdAt: user.createdAt ? user.createdAt.toISOString() : null,
@@ -215,8 +215,8 @@ export async function getUserStats() {
       {
         $group: {
           _id: null,
-          totalUsed: { $sum: "$storageUsed" },
-          totalLimit: { $sum: "$storageLimit" },
+          totalUsed: { $sum: { $ifNull: ["$storageUsed", 0] } },
+          totalLimit: { $sum: { $ifNull: ["$storageLimit", 5368709120] } },
         },
       },
     ]);
@@ -273,8 +273,8 @@ export async function searchUsers({ query, limit = 20 }) {
         name: user.name,
         email: user.email,
         role: user.role,
-        storageLimit: user.storageLimit,
-        storageUsed: user.storageUsed,
+        storageLimit: user.storageLimit || 5368709120, // Default 5GB if null/undefined
+        storageUsed: user.storageUsed || 0, // Default 0 if null/undefined
         isVerified: user.isVerified,
         suspended: user.suspended || false,
         createdAt: user.createdAt ? user.createdAt.toISOString() : null,
