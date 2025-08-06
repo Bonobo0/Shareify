@@ -18,6 +18,23 @@ export default function AdminPage() {
   const [modalType, setModalType] = useState(""); // 'quota', 'role', 'suspend'
   const [modalData, setModalData] = useState({});
 
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await getAllUsers();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setUsers(result.users || []);
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Check if user is admin
   useEffect(() => {
     if (authLoading) return;
@@ -49,23 +66,6 @@ export default function AdminPage() {
       setFilteredUsers(filtered);
     }
   }, [searchQuery, users]);
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      setLoading(true);
-      const result = await getAllUsers();
-
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      setUsers(result.users || []);
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   const formatBytes = (bytes) => {
     if (bytes === 0) return "0 Bytes";
