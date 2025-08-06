@@ -24,6 +24,7 @@ export default function DirectoryPage() {
   const [error, setError] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
+  const [userPermission, setUserPermission] = useState(null);
 
   // 디렉토리 공유 모달 상태
   const [directoryShareModal, setDirectoryShareModal] = useState({
@@ -59,13 +60,26 @@ export default function DirectoryPage() {
         setDirectory(result.directory);
         setDirectoryId(result.directory.id);
         setBreadcrumbs([]); // 해시로 접근하는 디렉토리는 breadcrumbs가 제한적
+        
+        // 사용자 권한 확인
+        if (result.directory.owner) {
+          setUserPermission("owner");
+        } else if (result.directory.sharedWith && result.directory.sharedWith.length > 0) {
+          // 공유받은 디렉토리인 경우 권한 확인
+          const currentUserShare = result.directory.sharedWith.find(
+            share => share.userId === user?.id
+          );
+          setUserPermission(currentUserShare?.permission || "read");
+        } else {
+          setUserPermission("read");
+        }
       }
     } catch (error) {
       setError(error.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -173,11 +187,11 @@ export default function DirectoryPage() {
         </ul>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0 flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4">
+        <div className="flex flex-col gap-2 min-w-0 flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold break-words">{directory?.name}</h1>
           {directory && !directory.owner && directory.ownerInfo && (
-            <div className="badge badge-accent gap-2 flex-shrink-0">
+            <div className="badge badge-accent gap-2 w-fit">
               <span>👤</span>
               <span className="text-xs sm:text-sm">
                 {directory.ownerInfo.name || directory.ownerInfo.email}님이 공유
@@ -203,12 +217,15 @@ export default function DirectoryPage() {
       )}
 
       <div className="flex flex-col sm:flex-row gap-4 mb-8 justify-between">
-        <div className="flex-shrink-0">
-          <CreateDirectory
-            parentId={directoryId}
-            onSuccess={handleDirectoryCreated}
-          />
-        </div>
+        {/* Directory creation - show only if user has write/admin permissions */}
+        {(userPermission === "owner" || userPermission === "write" || userPermission === "admin") && (
+          <div className="flex-shrink-0">
+            <CreateDirectory
+              parentId={directoryId}
+              onSuccess={handleDirectoryCreated}
+            />
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
           {directory && directory.owner && (
             <button
@@ -242,12 +259,15 @@ export default function DirectoryPage() {
         </div>
       </div>
 
-      <div className="mb-8">
-        <FileUploader
-          directoryId={directoryId}
-          onUploadComplete={handleUploadComplete}
-        />
-      </div>
+      {/* File uploader - show only if user has write/admin permissions */}
+      {(userPermission === "owner" || userPermission === "write" || userPermission === "admin") && (
+        <div className="mb-8">
+          <FileUploader
+            directoryId={directoryId}
+            onUploadComplete={handleUploadComplete}
+          />
+        </div>
+      )}
 
       <div>
         <FileList directoryId={directoryId} refreshTrigger={refreshTrigger} />

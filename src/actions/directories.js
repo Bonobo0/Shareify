@@ -197,7 +197,7 @@ export async function createDirectory({ name, parentId, description }) {
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
-                "permission": "admin",
+                "permission": { $in: ["write", "admin"] },
               },
             },
           },
