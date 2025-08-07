@@ -39,6 +39,7 @@ export default function SharedDirectoryPage() {
   const [previewPassword, setPreviewPassword] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [preparingPreview, setPreparingPreview] = useState(null); // 미리보기 준비 중인 파일 ID
+  const [previewContentLoaded, setPreviewContentLoaded] = useState(false); // 미리보기 콘텐츠 로딩 상태
   const [errorModal, setErrorModal] = useState({ show: false, message: "" });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -327,6 +328,9 @@ export default function SharedDirectoryPage() {
               mimeType: mimeType,
               type: mimeType.split("/")[0], // image, video, audio 등
             });
+            
+            // 미리보기 콘텐츠 로딩 상태 리셋
+            setPreviewContentLoaded(false);
           } else {
             // 미리보기 실패시 파일 상세페이지로 이동
             router.push(`/share/${file.hash}`);
@@ -339,8 +343,7 @@ export default function SharedDirectoryPage() {
         console.error("미리보기 실패:", error);
         router.push(`/share/${file.hash}`);
       } finally {
-        // 미리보기 준비 완료
-        setPreparingPreview(null);
+        // preparingPreview는 실제 콘텐츠가 로드될 때까지 유지 - 여기서는 제거하지 않음
       }
     } else {
       // 미리보기 불가능한 파일은 파일 상세페이지로 이동
@@ -426,12 +429,15 @@ export default function SharedDirectoryPage() {
         type: mimeType.split("/")[0],
         isDecrypted: file.isEncrypted && password,
       });
+      
+      // 미리보기 콘텐츠 로딩 상태 리셋 - 실제 콘텐츠 로드 시 업데이트됨
+      setPreviewContentLoaded(false);
     } catch (error) {
       console.error("미리보기 오류:", error);
       showError(error.message);
     } finally {
       setPreviewLoading(false);
-      setPreparingPreview(null); // 미리보기 준비 완료
+      // preparingPreview는 실제 콘텐츠가 로드될 때까지 유지
     }
   };
 
@@ -910,6 +916,8 @@ export default function SharedDirectoryPage() {
                     URL.revokeObjectURL(previewModal.url);
                   }
                   setPreviewModal(null);
+                  setPreparingPreview(null); // 모달 닫을 때 로딩 상태도 초기화
+                  setPreviewContentLoaded(false);
                 }}
               >
                 ✕
@@ -922,6 +930,13 @@ export default function SharedDirectoryPage() {
                   src={previewModal.url}
                   alt={previewModal.file.name}
                   className="max-w-full max-h-[70vh] object-contain"
+                  onLoad={() => {
+                    setPreviewContentLoaded(true);
+                    setPreparingPreview(null); // 이미지 로드 완료 시 로딩 상태 해제
+                  }}
+                  onError={() => {
+                    setPreparingPreview(null); // 에러 발생 시도 로딩 상태 해제
+                  }}
                 />
               )}
               {previewModal.type === "video" && (
@@ -929,13 +944,31 @@ export default function SharedDirectoryPage() {
                   src={previewModal.url}
                   controls
                   className="max-w-full max-h-[70vh]"
+                  onLoadedData={() => {
+                    setPreviewContentLoaded(true);
+                    setPreparingPreview(null); // 비디오 로드 완료 시 로딩 상태 해제
+                  }}
+                  onError={() => {
+                    setPreparingPreview(null); // 에러 발생 시도 로딩 상태 해제
+                  }}
                 >
                   브라우저가 비디오를 지원하지 않습니다.
                 </video>
               )}
               {previewModal.type === "audio" && (
                 <div className="w-full">
-                  <audio src={previewModal.url} controls className="w-full">
+                  <audio 
+                    src={previewModal.url} 
+                    controls 
+                    className="w-full"
+                    onLoadedData={() => {
+                      setPreviewContentLoaded(true);
+                      setPreparingPreview(null); // 오디오 로드 완료 시 로딩 상태 해제
+                    }}
+                    onError={() => {
+                      setPreparingPreview(null); // 에러 발생 시도 로딩 상태 해제
+                    }}
+                  >
                     브라우저가 오디오를 지원하지 않습니다.
                   </audio>
                 </div>
@@ -946,6 +979,10 @@ export default function SharedDirectoryPage() {
                   src={previewModal.url}
                   className="w-full h-[70vh]"
                   title={previewModal.file.name}
+                  onLoad={() => {
+                    setPreviewContentLoaded(true);
+                    setPreparingPreview(null); // PDF 로드 완료 시 로딩 상태 해제
+                  }}
                 >
                   PDF를 표시할 수 없습니다.
                 </iframe>
@@ -955,6 +992,10 @@ export default function SharedDirectoryPage() {
                   src={previewModal.url}
                   className="w-full h-[70vh]"
                   title={previewModal.file.name}
+                  onLoad={() => {
+                    setPreviewContentLoaded(true);
+                    setPreparingPreview(null); // 텍스트 로드 완료 시 로딩 상태 해제
+                  }}
                 >
                   텍스트를 표시할 수 없습니다.
                 </iframe>

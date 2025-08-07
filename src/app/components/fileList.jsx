@@ -65,6 +65,9 @@ export default function FileList({
   const [filteredFiles, setFilteredFiles] = useState([]);
   const [filteredDirectories, setFilteredDirectories] = useState([]);
 
+  // 새로고침 트리거 (성능 최적화) - 내부용
+  const [internalRefreshTrigger, setInternalRefreshTrigger] = useState(0);
+
   // 모달 상태들
   const [alertModal, setAlertModal] = useState({ show: false, message: "" });
   const [confirmModal, setConfirmModal] = useState({
@@ -236,11 +239,11 @@ export default function FileList({
         }
       } catch (error) {
         console.error("파일 업데이트 에러:", error);
-        // fetchData를 직접 호출하지 말고 refreshTrigger를 변경
-        setRefreshTrigger((prev) => prev + 1);
+        // 내부 새로고침 트리거 사용
+        setInternalRefreshTrigger((prev) => prev + 1);
       }
     },
-    [] // fetchData 의존성 제거
+    [] // 의존성 없음
   );
 
   // 개별 디렉토리 업데이트 함수 (깜빡임 방지)
@@ -257,17 +260,17 @@ export default function FileList({
         }
       } catch (error) {
         console.error("디렉토리 업데이트 에러:", error);
-        // fetchData를 직접 호출하지 말고 refreshTrigger를 변경
-        setRefreshTrigger((prev) => prev + 1);
+        // 내부 새로고침 트리거 사용
+        setInternalRefreshTrigger((prev) => prev + 1);
       }
     },
-    [] // fetchData 의존성 제거
+    [] // 의존성 없음
   );
 
   // 안정적인 새로고침 함수 (BulkActionHandler용)
   const handleRefresh = useCallback(() => {
-    fetchData();
-  }, [fetchData]);
+    setInternalRefreshTrigger((prev) => prev + 1);
+  }, []);
 
   // BulkActionHandler 초기화 (메모이제이션으로 성능 최적화)
   const bulkHandler = useMemo(() => BulkActionHandler({
@@ -311,7 +314,7 @@ export default function FileList({
           if (result.error) {
             setError(result.error);
           } else {
-            await fetchData(); // 목록 새로고침
+            setInternalRefreshTrigger((prev) => prev + 1); // 목록 새로고침
             
             // 페이지 유효성 검사: 데이터 새로고침 후 현재 페이지가 유효한지 확인
             // 이는 useEffect에서 fetchData 완료 후 자동으로 처리됨
@@ -356,7 +359,7 @@ export default function FileList({
 
   useEffect(() => {
     fetchData();
-  }, [directoryId, refreshTrigger, fetchData]);
+  }, [directoryId, refreshTrigger, internalRefreshTrigger, fetchData]);
 
   // 초기 필터링 설정
   useEffect(() => {
@@ -1178,7 +1181,7 @@ export default function FileList({
         isOpen={shareModal.isOpen}
         onClose={() => setShareModal({ isOpen: false, fileId: null })}
         onUpdate={() =>
-          shareModal.fileId ? updateSingleFile(shareModal.fileId) : fetchData()
+          shareModal.fileId ? updateSingleFile(shareModal.fileId) : setInternalRefreshTrigger((prev) => prev + 1)
         }
       />
       {/* Alert Modal */}
@@ -1243,7 +1246,7 @@ export default function FileList({
         onUpdate={() =>
           directoryShareModal.directoryId
             ? updateSingleDirectory(directoryShareModal.directoryId)
-            : fetchData()
+            : setInternalRefreshTrigger((prev) => prev + 1)
         }
       />
 
@@ -1273,7 +1276,7 @@ export default function FileList({
             );
           } else {
             // fallback: 전체 새로고침
-            fetchData();
+            setInternalRefreshTrigger((prev) => prev + 1);
           }
         }}
       />

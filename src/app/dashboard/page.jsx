@@ -23,41 +23,12 @@ export default function Dashboard() {
   const [storageInfo, setStorageInfo] = useState({ used: 0, total: 0 });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [userRefreshed, setUserRefreshed] = useState(false);
+  const [error, setError] = useState(null); // 에러 상태 추가
 
-  useEffect(() => {
-    // 인증 상태가 로딩 중이면 기다림
-    if (authLoading) return;
-
-    // 로그인되지 않았다면 로그인 페이지로 이동
-    if (!isAuthenticated) {
-      router.push("/user/signin");
-      return;
-    }
-
-    // 로그인되었지만 user 정보가 없거나 불완전한 경우 새로고침
-    if (!userRefreshed && (!user || user.isVerified === undefined)) {
-      const refreshUserInfo = async () => {
-        await refreshUser();
-        setUserRefreshed(true);
-      };
-      refreshUserInfo();
-      return;
-    }
-
-    // 모든 조건이 만족되면 스토리지 정보 가져오기
-    fetchStorageInfo();
-  }, [
-    isAuthenticated,
-    authLoading,
-    router,
-    refreshTrigger,
-    user,
-    userRefreshed,
-    refreshUser, // 이제 메모이제이션되었으므로 안전하게 포함 가능
-  ]);
-
-  const fetchStorageInfo = async () => {
+  // fetchStorageInfo를 useCallback으로 메모이제이션
+  const fetchStorageInfo = useCallback(async () => {
     try {
+      setError(null); // 에러 상태 초기화
       const result = await getStorageInfo();
 
       if (result.success) {
@@ -68,15 +39,70 @@ export default function Dashboard() {
           percentage: result.usagePercentage || 0,
         });
       } else {
-        console.error("스토리지 정보 조회 실패:", result.error);
+        const errorMessage = result.error || "스토리지 정보 조회에 실패했습니다.";
+        console.error("스토리지 정보 조회 실패:", errorMessage);
+        setError(errorMessage);
       }
 
       setLoading(false);
     } catch (error) {
+      const errorMessage = error.message || "스토리지 정보 가져오기에 실패했습니다.";
       console.error("스토리지 정보 가져오기 실패:", error);
+      setError(errorMessage);
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true; // 컴포넌트 마운트 상태 추적
+    
+    const initializeDashboard = async () => {
+      try {
+        // 인증 상태가 로딩 중이면 기다림
+        if (authLoading) return;
+
+        // 로그인되지 않았다면 로그인 페이지로 이동
+        if (!isAuthenticated) {
+          router.push("/user/signin");
+          return;
+        }
+
+        // 로그인되었지만 user 정보가 없거나 불완전한 경우 새로고침
+        if (!userRefreshed && (!user || user.isVerified === undefined)) {
+          if (isMounted) {
+            await refreshUser();
+            setUserRefreshed(true);
+          }
+          return;
+        }
+
+        // 모든 조건이 만족되면 스토리지 정보 가져오기
+        if (isMounted) {
+          await fetchStorageInfo();
+        }
+      } catch (error) {
+        console.error("Dashboard initialization error:", error);
+        if (isMounted) {
+          setError(error.message || "대시보드 로딩 중 오류가 발생했습니다.");
+        }
+      }
+    };
+
+    initializeDashboard();
+    
+    return () => {
+      isMounted = false; // cleanup function
+    };
+  }, [
+    isAuthenticated,
+    authLoading,
+    router,
+    refreshTrigger,
+    user,
+    userRefreshed,
+    refreshUser,
+    fetchStorageInfo,
+  ]);
 
   const handleUploadComplete = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -90,6 +116,27 @@ export default function Dashboard() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center">
         <div className="loading loading-spinner loading-lg"></div>
+        <p className="mt-4 text-lg">대시보드 로딩 중...</p>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-6">
+        <div className="alert alert-error max-w-md mb-4">
+          <span>{error}</span>
+        </div>
+        <button 
+          className="btn btn-primary"
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+            fetchStorageInfo();
+          }}
+        >
+          다시 시도
+        </button>
       </main>
     );
   }
