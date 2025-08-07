@@ -28,12 +28,14 @@ export default function Dashboard() {
     // 인증 상태가 로딩 중이면 기다림
     if (authLoading) return;
 
+    // 로그인되지 않았다면 로그인 페이지로 이동
+    if (!isAuthenticated) {
+      router.push("/user/signin");
+      return;
+    }
+
     // 로그인되었지만 user 정보가 없거나 불완전한 경우 새로고침
-    if (
-      isAuthenticated &&
-      !userRefreshed &&
-      (!user || user.isVerified === undefined)
-    ) {
+    if (!userRefreshed && (!user || user.isVerified === undefined)) {
       const refreshUserInfo = async () => {
         await refreshUser();
         setUserRefreshed(true);
@@ -42,12 +44,7 @@ export default function Dashboard() {
       return;
     }
 
-    // 로그인되지 않았다면 로그인 페이지로 이동
-    if (!isAuthenticated) {
-      router.push("/user/signin");
-      return;
-    }
-
+    // 모든 조건이 만족되면 스토리지 정보 가져오기
     fetchStorageInfo();
   }, [
     isAuthenticated,
@@ -56,7 +53,7 @@ export default function Dashboard() {
     refreshTrigger,
     user,
     userRefreshed,
-    refreshUser,
+    refreshUser, // 이제 메모이제이션되었으므로 안전하게 포함 가능
   ]);
 
   const fetchStorageInfo = async () => {

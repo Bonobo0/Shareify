@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useState, useEffect, useContext } from "react";
+import { createContext, useState, useEffect, useContext, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, signUp, signOut, verifyAuth } from "@/actions/auth";
 import { getUserInfo } from "@/actions/user";
@@ -34,8 +34,8 @@ export function AuthProvider({ children }) {
     fetchUser();
   }, []);
 
-  // 로그인 함수 (2FA 지원)
-  const login = async (...args) => {
+  // 로그인 함수 (2FA 지원) - 메모이제이션으로 성능 최적화
+  const login = useCallback(async (...args) => {
     try {
       let formData;
 
@@ -80,10 +80,10 @@ export function AuthProvider({ children }) {
         error: error.message,
       };
     }
-  };
+  }, []); // 의존성 없음
 
-  // 회원가입 함수
-  const signup = async (email, password, name) => {
+  // 회원가입 함수 - 메모이제이션으로 성능 최적화
+  const signup = useCallback(async (email, password, name) => {
     try {
       const formData = new FormData();
       formData.append("email", email);
@@ -110,10 +110,10 @@ export function AuthProvider({ children }) {
     } catch (error) {
       return { success: false, error: error.message };
     }
-  };
+  }, []); // 의존성 없음
 
-  // 사용자 정보 새로고침 함수
-  const refreshUser = async () => {
+  // 사용자 정보 새로고침 함수 (메모이제이션으로 성능 최적화)
+  const refreshUser = useCallback(async () => {
     try {
       const result = await verifyAuth();
       if (result.authenticated) {
@@ -128,10 +128,10 @@ export function AuthProvider({ children }) {
       setUser(null);
       return { success: false, error: error.message };
     }
-  };
+  }, []); // 의존성 없음 - 함수가 매 렌더링마다 재생성되지 않음
 
-  // 로그아웃 함수
-  const logout = async () => {
+  // 로그아웃 함수 - 메모이제이션으로 성능 최적화
+  const logout = useCallback(async () => {
     try {
       await signOut();
       setUser(null);
@@ -147,7 +147,7 @@ export function AuthProvider({ children }) {
       }
       return { success: false, error: error.message };
     }
-  };
+  }, [router]); // router 의존성 추가
 
   return (
     <AuthContext.Provider
