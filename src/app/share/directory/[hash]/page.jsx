@@ -38,6 +38,7 @@ export default function SharedDirectoryPage() {
   const [previewPasswordModal, setPreviewPasswordModal] = useState(false);
   const [previewPassword, setPreviewPassword] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [preparingPreview, setPreparingPreview] = useState(null); // 미리보기 준비 중인 파일 ID
   const [errorModal, setErrorModal] = useState({ show: false, message: "" });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -303,7 +304,9 @@ export default function SharedDirectoryPage() {
 
     // 암호화되지 않은 파일 처리
     if (isPreviewableFile) {
-      // 미리보기 모달 열기
+      // 미리보기 준비 중 상태 표시
+      setPreparingPreview(file.id);
+      
       try {
         const result = await downloadSharedDirectoryFile({
           shareHash: hash,
@@ -335,6 +338,9 @@ export default function SharedDirectoryPage() {
       } catch (error) {
         console.error("미리보기 실패:", error);
         router.push(`/share/${file.hash}`);
+      } finally {
+        // 미리보기 준비 완료
+        setPreparingPreview(null);
       }
     } else {
       // 미리보기 불가능한 파일은 파일 상세페이지로 이동
@@ -344,6 +350,8 @@ export default function SharedDirectoryPage() {
 
   const performPreview = async (file, password = null) => {
     setPreviewLoading(true);
+    // 미리보기 준비 중 상태도 설정
+    setPreparingPreview(file.id);
 
     try {
       const result = await downloadSharedDirectoryFile({
@@ -423,6 +431,7 @@ export default function SharedDirectoryPage() {
       showError(error.message);
     } finally {
       setPreviewLoading(false);
+      setPreparingPreview(null); // 미리보기 준비 완료
     }
   };
 
@@ -707,14 +716,15 @@ export default function SharedDirectoryPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                 {paginatedFiles.map((file) => {
                   const isSelected = selectedFiles.includes(file.id);
+                  const isPreparingThisFile = preparingPreview === file.id;
                   return (
                     <div
                       key={file.id}
-                      className={`card shadow-sm hover:shadow-md transition-shadow cursor-pointer min-w-0 ${
+                      className={`card shadow-sm hover:shadow-md transition-shadow cursor-pointer min-w-0 relative ${
                         isSelected
                           ? "bg-primary/20 border-2 border-primary"
                           : "bg-base-200"
-                      }`}
+                      } ${isPreparingThisFile ? "opacity-75" : ""}`}
                       onClick={(e) => {
                         if (isSelectionMode) {
                           // 선택 모드에서는 파일 선택/해제만
@@ -725,6 +735,16 @@ export default function SharedDirectoryPage() {
                         }
                       }}
                     >
+                      {/* 미리보기 준비 중 로딩 오버레이 */}
+                      {isPreparingThisFile && (
+                        <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded-lg z-10">
+                          <div className="bg-white bg-opacity-90 rounded-lg p-3 flex items-center gap-2">
+                            <div className="loading loading-spinner loading-sm"></div>
+                            <span className="text-sm font-medium">미리보기 준비 중...</span>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="card-body p-4">
                         <div className="flex items-center">
                           {isSelectionMode && (

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -236,11 +236,11 @@ export default function FileList({
         }
       } catch (error) {
         console.error("파일 업데이트 에러:", error);
-        // 실패 시 전체 새로고침으로 폴백
-        await fetchData();
+        // fetchData를 직접 호출하지 말고 refreshTrigger를 변경
+        setRefreshTrigger((prev) => prev + 1);
       }
     },
-    [fetchData]
+    [] // fetchData 의존성 제거
   );
 
   // 개별 디렉토리 업데이트 함수 (깜빡임 방지)
@@ -257,23 +257,28 @@ export default function FileList({
         }
       } catch (error) {
         console.error("디렉토리 업데이트 에러:", error);
-        // 실패 시 전체 새로고침으로 폴백
-        await fetchData();
+        // fetchData를 직접 호출하지 말고 refreshTrigger를 변경
+        setRefreshTrigger((prev) => prev + 1);
       }
     },
-    [fetchData]
+    [] // fetchData 의존성 제거
   );
 
-  // BulkActionHandler 초기화
-  const bulkHandler = BulkActionHandler({
+  // 안정적인 새로고침 함수 (BulkActionHandler용)
+  const handleRefresh = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // BulkActionHandler 초기화 (메모이제이션으로 성능 최적화)
+  const bulkHandler = useMemo(() => BulkActionHandler({
     selectedItems,
     onSelectionChange: setSelectedItems,
-    onRefresh: fetchData,
+    onRefresh: handleRefresh,
     onShowAlert: showAlert,
     onShowConfirm: showConfirm,
     files: filteredFiles,
     directories: filteredDirectories,
-  });
+  }), [selectedItems, handleRefresh, filteredFiles, filteredDirectories]);
 
   // SearchComponent 핸들러
   const handleSearchChange = (searchState) => {
