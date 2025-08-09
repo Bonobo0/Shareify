@@ -6,7 +6,6 @@ export default function Paginator({
   currentPage = 1,
   totalPages = 1,
   onPageChange,
-  showInfo = true,
   totalItems = 0,
   itemsPerPage = 20,
   className = "",
@@ -37,19 +36,9 @@ export default function Paginator({
   };
 
   const pageNumbers = getPageNumbers();
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
-      {/* 아이템 정보 */}
-      {showInfo && totalItems > 0 && (
-        <div className="text-sm text-gray-600 text-center">
-          전체 {totalItems.toLocaleString()}개 중 {startItem.toLocaleString()}-
-          {endItem.toLocaleString()}개 표시
-        </div>
-      )}
-
       {/* 페이지네이션 버튼 */}
       <div className="flex justify-center">
         <div className="join">

@@ -98,14 +98,18 @@ export default function SharedPage() {
   return (
     <>
       <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-6">나와 공유된 항목</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-6">
+          나와 공유된 항목
+        </h1>
 
         {error && <div className="alert alert-error mb-6">{error}</div>}
 
         {/* 공유된 디렉토리 섹션 */}
         {sharedDirectories.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl sm:text-2xl font-semibold mb-4">📁 공유된 디렉토리</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold mb-4">
+              📁 공유된 디렉토리
+            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {sharedDirectories.map((directory) => (
                 <div
@@ -117,7 +121,9 @@ export default function SharedPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-3xl flex-shrink-0">📁</span>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium break-words">{directory.name}</h3>
+                        <h3 className="font-medium break-words">
+                          {directory.name}
+                        </h3>
                         <p className="text-sm text-gray-600 break-words">
                           {directory.ownerName}님이 공유
                         </p>
@@ -138,7 +144,7 @@ export default function SharedPage() {
                               : "읽기"}
                           </span>
                           <span className="text-xs text-gray-500">
-                            {formatDate(directory.sharedAt)}
+                            {formatDate(directory.createdAt)}
                           </span>
                         </div>
                       </div>
@@ -152,7 +158,9 @@ export default function SharedPage() {
 
         {/* 공유된 파일 섹션 */}
         <div>
-          <h2 className="text-xl sm:text-2xl font-semibold mb-4">📄 공유된 파일</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold mb-4">
+            📄 공유된 파일
+          </h2>
           {sharedFiles.length === 0 ? (
             <div className="text-center p-6 bg-base-200 rounded-lg">
               <p>공유된 파일이 없습니다.</p>
@@ -183,10 +191,18 @@ export default function SharedPage() {
                         </span>
                         <span className="break-words">{file.originalName}</span>
                       </td>
-                      <td className="hidden sm:table-cell break-words">{formatBytes(file.size)}</td>
-                      <td className="hidden md:table-cell break-words">{file.mimetype?.split("/")[1] || file.mimetype}</td>
-                      <td className="hidden lg:table-cell break-words">{file.ownerName || "Unknown"}</td>
-                      <td className="hidden sm:table-cell break-words">{formatDate(file.createdAt)}</td>
+                      <td className="hidden sm:table-cell break-words">
+                        {formatBytes(file.size)}
+                      </td>
+                      <td className="hidden md:table-cell break-words">
+                        {file.mimetype?.split("/")[1] || file.mimetype}
+                      </td>
+                      <td className="hidden lg:table-cell break-words">
+                        {file.ownerName || "Unknown"}
+                      </td>
+                      <td className="hidden sm:table-cell break-words">
+                        {formatDate(file.createdAt)}
+                      </td>
                       <td>
                         <span
                           className={`badge ${

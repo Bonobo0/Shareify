@@ -35,6 +35,7 @@ export async function getDirectoryList({
   limit = 20,
   sortBy = "name",
   sortOrder = "asc",
+  shareLinkHash = null,
 }) {
   try {
     const userId = await getAuthenticatedUser();
@@ -60,6 +61,8 @@ export async function getDirectoryList({
               },
             },
           },
+          // 공유 링크 접근 권한 확인
+          { shareLinks: { $elemMatch: { hash: shareLinkHash } } },
         ],
         deleted: { $ne: true },
       });
@@ -91,6 +94,8 @@ export async function getDirectoryList({
               },
             },
           },
+          // 공유 링크 접근 권한 확인
+          { shareLinks: { $elemMatch: { hash: shareLinkHash } } },
         ],
         parent: new mongoose.Types.ObjectId(parentId),
         deleted: { $ne: true },
@@ -107,6 +112,8 @@ export async function getDirectoryList({
               },
             },
           },
+          // 공유 링크 접근 권한 확인
+          { shareLinks: { $elemMatch: { hash: shareLinkHash } } },
         ],
         parent: null,
         deleted: { $ne: true },
@@ -707,13 +714,13 @@ export async function getDirectoryByHash({ hash }) {
 
     // 디렉토리 접근 권한 확인
     const isOwner = directory.owner._id.toString() === userId;
-    const isDirectlyShared = directory.shared?.some(
-      (share) => {
-        // Handle both populated and non-populated userId
-        const shareUserId = share.userId._id ? share.userId._id.toString() : share.userId.toString();
-        return shareUserId === userId;
-      }
-    );
+    const isDirectlyShared = directory.shared?.some((share) => {
+      // Handle both populated and non-populated userId
+      const shareUserId = share.userId._id
+        ? share.userId._id.toString()
+        : share.userId.toString();
+      return shareUserId === userId;
+    });
 
     // 상위 디렉토리 권한 확인
     let hasParentAccess = false;

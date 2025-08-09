@@ -318,9 +318,6 @@ export async function getSharedItems() {
           ownerName:
             dir.owner?.name || dir.owner?.email.split("@")[0] || "알 수 없음",
           permission: userShare?.permission || "read",
-          sharedAt: userShare?.sharedAt
-            ? userShare.sharedAt.toISOString()
-            : null,
         };
       }),
     };
@@ -1077,7 +1074,7 @@ export async function createSharedSubdirectory({
 
         currentParent = subDir._id;
       }
-      
+
       parentDirectoryId = currentParent;
     }
 

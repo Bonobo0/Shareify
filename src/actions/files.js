@@ -37,6 +37,7 @@ export async function getFileList({
   limit = 50,
   sortBy = "createdAt",
   sortOrder = "desc",
+  shareLinkHash = "null",
 }) {
   try {
     const userId = await getAuthenticatedUser();
@@ -66,9 +67,11 @@ export async function getFileList({
               },
             },
           },
+          { shareLinks: { $elemMatch: { hash: shareLinkHash } } },
         ],
         deleted: { $ne: true },
       });
+      console.log("디렉토리 조회 결과:", directory);
 
       if (!directory) {
         return { error: "디렉토리에 접근할 권한이 없습니다." };
@@ -563,7 +566,7 @@ export async function deleteFile({ fileId }) {
   }
 }
 
-export async function getFileDownloadUrl({ fileId }) {
+export async function getFileDownloadUrl({ fileId, shareLinkHash = null }) {
   try {
     const userId = await getAuthenticatedUser();
 
@@ -603,10 +606,11 @@ export async function getFileDownloadUrl({ fileId }) {
               },
             },
           },
+          { shareLinks: { $elemMatch: { hash: shareLinkHash } } },
         ],
         deleted: { $ne: true },
       });
-
+      console.log("상위 디렉토리 조회 결과:", parentDirectory);
       if (parentDirectory) {
         hasParentAccess = true;
       }

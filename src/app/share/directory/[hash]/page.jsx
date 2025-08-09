@@ -3,14 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
 import FileUploader from "@/app/components/fileUploader";
 import SelectedDownloadModal from "@/app/components/selectedDownloadModal";
 import BulkDownloadModal from "@/app/components/bulkDownloadModal";
-import CreateDirectory from "@/app/components/createDirectory";
-import CreateSharedDirectory from "@/app/components/createSharedDirectory";
-import Paginator from "@/app/components/paginator";
-import SearchComponent from "@/app/components/searchComponent";
 import { getSharedDirectoryInfo } from "@/actions/share";
 import {
   downloadSharedFile,
@@ -22,7 +17,6 @@ export default function SharedDirectoryPage() {
   const params = useParams();
   const router = useRouter();
   const { hash } = params;
-  const { isAuthenticated, loading: authLoading } = useAuth();
 
   const [directoryInfo, setDirectoryInfo] = useState(null);
   const [files, setFiles] = useState([]);
@@ -30,6 +24,7 @@ export default function SharedDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [permission, setPermission] = useState("read");
+  const [expiresAt, setExpiresAt] = useState(null);
   const [directoryId, setDirectoryId] = useState(null);
   const [currentPath, setCurrentPath] = useState(""); // 현재 경로 추적
   const [breadcrumbs, setBreadcrumbs] = useState([]); // 브레드크럼 추적
@@ -52,19 +47,6 @@ export default function SharedDirectoryPage() {
     useState(false);
   const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false);
 
-  // 검색 상태 (SearchComponent로 관리)
-  const [filteredFiles, setFilteredFiles] = useState([]);
-  const [filteredSubdirectories, setFilteredSubdirectories] = useState([]);
-  const [hasActiveSearch, setHasActiveSearch] = useState(false);
-
-  // 페이지네이션 상태
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(12); // 페이지당 표시할 아이템 수
-  const [paginatedFiles, setPaginatedFiles] = useState([]);
-  const [paginatedSubdirectories, setPaginatedSubdirectories] = useState([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-
   // 파일 선택 토글 함수
   const toggleFileSelection = (fileId) => {
     const isSelected = selectedFiles.includes(fileId);
@@ -83,12 +65,6 @@ export default function SharedDirectoryPage() {
   const handleUploadComplete = () => {
     setRefreshTrigger((prev) => prev + 1);
     // 파일 목록 새로고침
-    fetchDirectoryDetails(hash, currentPath);
-  };
-
-  const handleDirectoryCreated = () => {
-    setRefreshTrigger((prev) => prev + 1);
-    // 디렉토리 목록 새로고침
     fetchDirectoryDetails(hash, currentPath);
   };
 
@@ -158,6 +134,7 @@ export default function SharedDirectoryPage() {
 
       if (result.success) {
         setDirectoryInfo(result.directory);
+        setExpiresAt(result.expiresAt || null);
         setDirectoryId(result.directory.id);
         setFiles(result.files || []);
         setSubdirectories(result.subdirectories || []);
@@ -194,62 +171,6 @@ export default function SharedDirectoryPage() {
       fetchDirectoryDetails(hash);
     }
   }, [hash, fetchDirectoryDetails]);
-
-  // 초기 필터링 설정
-  useEffect(() => {
-    setFilteredFiles(files);
-    setFilteredSubdirectories(subdirectories);
-  }, [files, subdirectories]);
-
-  // SearchComponent 핸들러
-  const handleSearchChange = (searchState) => {
-    // 검색 상태가 변경될 때 첫 페이지로 이동
-    setCurrentPage(1);
-    // 검색이 활성화되어 있는지 확인
-    const hasSearch = searchState.searchQuery || Object.values(searchState.searchFilters).some((v) => v);
-    setHasActiveSearch(hasSearch);
-  };
-
-  const handleFilteredResultsChange = ({ filteredFiles: newFilteredFiles, filteredDirectories: newFilteredDirectories }) => {
-    setFilteredFiles(newFilteredFiles);
-    setFilteredSubdirectories(newFilteredDirectories);
-  };
-
-  // 페이지네이션 로직
-  useEffect(() => {
-    const totalFilteredItems = filteredFiles.length + filteredSubdirectories.length;
-    const pages = Math.ceil(totalFilteredItems / itemsPerPage) || 1;
-    
-    setTotalPages(pages);
-    setTotalItems(totalFilteredItems);
-    
-    // 현재 페이지가 총 페이지를 넘으면 첫 번째 페이지로 이동
-    if (currentPage > pages) {
-      setCurrentPage(1);
-      return;
-    }
-    
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    
-    // 먼저 디렉토리를 배치하고 남은 공간에 파일을 배치
-    const combinedItems = [...filteredSubdirectories, ...filteredFiles];
-    const paginatedItems = combinedItems.slice(startIndex, endIndex);
-    
-    // 디렉토리와 파일을 분리하여 설정
-    const paginatedDirs = paginatedItems.filter(item => !item.size && !item.mimeType);
-    const paginatedFileItems = paginatedItems.filter(item => item.size || item.mimeType);
-    
-    setPaginatedSubdirectories(paginatedDirs);
-    setPaginatedFiles(paginatedFileItems);
-  }, [filteredFiles, filteredSubdirectories, currentPage, itemsPerPage]);
-
-  // 페이지 변경 핸들러
-  const handlePageChange = useCallback((page) => {
-    setCurrentPage(page);
-    // 스크롤을 상단으로 이동
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return "0 Bytes";
@@ -464,7 +385,7 @@ export default function SharedDirectoryPage() {
     <div className="min-h-screen bg-base-100">
       {/* Header */}
       <div className="bg-base-200 py-6">
-        <div className="container mx-auto px-6 sm:px-8 md:px-10">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8">
           {/* 브레드크럼 네비게이션 */}
           {breadcrumbs.length > 0 && (
             <div className="breadcrumbs text-sm mb-4">
@@ -529,63 +450,50 @@ export default function SharedDirectoryPage() {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto p-6 sm:p-8 md:p-10">
-        
-        {/* SearchComponent */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          {/* 검색창 */}
-          <div className="flex-1 max-w-md">
-            <SearchComponent
-              enableAdvancedSearch={true}
-              showPermissionFilter={false}
-              files={files}
-              directories={subdirectories}
-              onSearchChange={handleSearchChange}
-              onFilteredResultsChange={handleFilteredResultsChange}
-              placeholder="파일 및 폴더 검색..."
-              className="mb-0"
-            />
-          </div>
-
-          {/* 액션 버튼들 */}
-          <div className="flex gap-2">
-            {permission === "write" && isAuthenticated && (
-              <CreateSharedDirectory
-                shareHash={hash}
-                subPath={currentPath}
-                onSuccess={handleDirectoryCreated}
-              />
-            )}
-            {permission === "write" && !isAuthenticated && (
-              <div className="tooltip tooltip-right md:tooltip-left" data-tip="로그인이 필요합니다">
-                <button className="btn btn-disabled btn-sm">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-2"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                    />
-                  </svg>
-                  새 폴더
-                </button>
-              </div>
-            )}
+      <div className="container mx-auto p-4 sm:p-6 md:p-8">
+        <div className="mb-6">
+          {/* Information */}
+          <h2 className="text-xl font-semibold mb-4">📄 정보</h2>
+          <div className="bg-base-200 p-4 rounded-md">
+            <p className="text-sm text-gray-600">
+              {directoryInfo?.description || "사용자가 설정한 설명이 없습니다."}
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              공유 링크:{" "}
+              <Link
+                href={`/share/${hash}`}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                {window.location.origin}/share/{hash}
+              </Link>
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              디렉토리 ID: <span className="font-mono">{directoryId}</span>
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              파일 수: {files.length}개, 하위 폴더 수: {subdirectories.length}개
+            </p>
+            <p className="alert alert-info mt-2">
+              ℹ️ 상위 디렉토리로의 이동은 디렉토리 명 위의 브레드크럼을 클릭하여
+              가능합니다.
+            </p>
+            <p className="alert alert-warning mt-2">
+              ⚠️ 이 디렉토리는 공유 링크로 공개되어 있습니다. 링크를 아는 사람은{" "}
+              {new Date(expiresAt).toLocaleString()}까지 누구나 접근할 수
+              있습니다.
+            </p>
+            <p className="alert alert-info mt-2">
+              ℹ️ 공유 디렉토리에서의 파일 검색 기능은 추후 추가될 예정입니다.
+            </p>
           </div>
         </div>
 
         {/* Subdirectories */}
-        {paginatedSubdirectories.length > 0 && (
+        {subdirectories.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">📁 하위 폴더</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedSubdirectories.map((directory) => (
+              {subdirectories.map((directory) => (
                 <div
                   key={directory.id}
                   className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer min-w-0"
@@ -612,7 +520,7 @@ export default function SharedDirectoryPage() {
 
         {/* Files */}
         <div>
-          {permission === "write" && directoryId && isAuthenticated && (
+          {permission === "write" && directoryId && (
             <div className="w-auto mb-4">
               <FileUploader
                 directoryId={directoryId}
@@ -623,26 +531,11 @@ export default function SharedDirectoryPage() {
               />
             </div>
           )}
-
-          {permission === "write" && directoryId && !isAuthenticated && (
-            <div className="w-auto mb-4">
-              <div className="tooltip tooltip-right md:tooltip-left" data-tip="로그인이 필요합니다">
-                <button className="btn btn-disabled btn-sm">
-                  📁 파일 업로드
-                </button>
-              </div>
-            </div>
-          )}
-
-          {filteredFiles.length === 0 && filteredSubdirectories.length === 0 && !hasActiveSearch ? (
+          <h2 className="text-xl font-semibold mb-4">📂 파일 목록</h2>
+          {files.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📂</div>
               <p className="text-gray-600">이 폴더에는 파일이 없습니다.</p>
-            </div>
-          ) : filteredFiles.length === 0 && filteredSubdirectories.length === 0 && hasActiveSearch ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔍</div>
-              <p className="text-gray-600">검색 결과가 없습니다.</p>
             </div>
           ) : (
             <>
@@ -661,14 +554,14 @@ export default function SharedDirectoryPage() {
                       <button
                         className="btn btn-sm btn-outline"
                         onClick={() => {
-                          if (selectedFiles.length === paginatedFiles.length) {
+                          if (selectedFiles.length === files.length) {
                             setSelectedFiles([]);
                           } else {
-                            setSelectedFiles(paginatedFiles.map((file) => file.id));
+                            setSelectedFiles(files.map((file) => file.id));
                           }
                         }}
                       >
-                        {selectedFiles.length === paginatedFiles.length
+                        {selectedFiles.length === files.length
                           ? "전체 해제"
                           : "전체 선택"}
                       </button>
@@ -693,7 +586,7 @@ export default function SharedDirectoryPage() {
                   )}
                 </div>
 
-                {paginatedFiles.length > 0 && (
+                {files.length > 0 && (
                   <button
                     className="btn btn-sm btn-outline"
                     onClick={() => setShowBulkDownloadModal(true)}
@@ -705,7 +598,7 @@ export default function SharedDirectoryPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                {paginatedFiles.map((file) => {
+                {files.map((file) => {
                   const isSelected = selectedFiles.includes(file.id);
                   return (
                     <div
@@ -787,21 +680,6 @@ export default function SharedDirectoryPage() {
                   );
                 })}
               </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-8">
-                  <Paginator
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    totalItems={totalItems}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={handlePageChange}
-                    showInfo={true}
-                    className="pagination-container"
-                  />
-                </div>
-              )}
             </>
           )}
         </div>
@@ -809,7 +687,7 @@ export default function SharedDirectoryPage() {
 
       {/* Footer */}
       <div className="bg-base-200 py-4 mt-12">
-        <div className="container mx-auto px-6 sm:px-8 md:px-10 text-center">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8 text-center">
           <p className="text-sm text-gray-600">
             Powered by{" "}
             <Link href="/" className="link link-primary">
@@ -898,6 +776,7 @@ export default function SharedDirectoryPage() {
 
             <div className="flex justify-center">
               {previewModal.type === "image" && (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={previewModal.url}
                   alt={previewModal.file.name}

@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
-
 import ShareModal from "@/app/components/shareModal";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -480,13 +478,14 @@ export default function FilePage() {
                 👁️ 미리보기
               </button>
             )}
-
-            <button
-              className="btn btn-secondary btn-sm sm:btn-md"
-              onClick={() => setIsShareModalOpen(true)}
-            >
-              📤 공유하기
-            </button>
+            {isOwner && (
+              <button
+                className="btn btn-secondary btn-sm sm:btn-md"
+                onClick={() => setIsShareModalOpen(true)}
+              >
+                📤 공유하기
+              </button>
+            )}
 
             {isOwner && (
               <button
