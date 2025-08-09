@@ -316,13 +316,14 @@ export default function FileList({
     // 이름 필터
     if (searchFilters.name) {
       const nameQuery = searchFilters.name.toLowerCase();
+      const nameQueryRegex = new RegExp(nameQuery, "i");
       filtered_files = filtered_files.filter(
         (file) =>
-          file.originalName?.toLowerCase().includes(nameQuery) ||
-          file.name?.toLowerCase().includes(nameQuery)
+          nameQueryRegex.test(file.originalName?.toLowerCase()) ||
+          nameQueryRegex.test(file.name?.toLowerCase())
       );
       filtered_directories = filtered_directories.filter((dir) =>
-        dir.name?.toLowerCase().includes(nameQuery)
+        nameQueryRegex.test(dir.name?.toLowerCase())
       );
     }
 
@@ -416,7 +417,7 @@ export default function FileList({
       async () => {
         setActionLoading((prev) => ({ ...prev, [directoryId]: true }));
         try {
-          const result = await deleteDirectoryRecursive({ directoryId });
+          const result = await deleteDirectoryRecursive(directoryId);
 
           if (result.error) {
             setError(result.error);

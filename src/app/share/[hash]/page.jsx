@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { getSharedFileInfo, downloadSharedFile } from "@/actions/share";
 import { downloadAndDecrypt, decryptForPreview } from "@/lib/crypto/encryption";
+import PreviewModal from "@/app/components/previewModal";
 
 export default function SharePage() {
   const params = useParams();
@@ -31,10 +32,12 @@ export default function SharePage() {
 
   const isPreviewable = (mimetype) => {
     return (
-      mimetype?.startsWith("image/") ||
-      mimetype?.startsWith("video/") ||
-      mimetype?.startsWith("audio/") ||
-      mimetype === "application/pdf"
+      (mimetype?.startsWith("image/") ||
+        mimetype?.startsWith("video/") ||
+        mimetype?.startsWith("audio/") ||
+        mimetype === "application/pdf" ||
+        mimetype === "text/plain") &&
+      file.size < 100 * 1024 * 1024 // 100MB 이하
     );
   };
 

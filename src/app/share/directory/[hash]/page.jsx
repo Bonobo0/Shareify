@@ -14,6 +14,7 @@ import {
 } from "@/actions/share";
 import { decryptForPreview } from "@/lib/crypto/encryption";
 import DeleteSharedDirectory from "@/app/components/deleteDirectory";
+import PreviewModal from "@/app/components/previewModal";
 
 export default function SharedDirectoryPage() {
   const params = useParams();
@@ -192,24 +193,16 @@ export default function SharedDirectoryPage() {
     });
   };
 
-  const isPreviewable = (mimetype) => {
-    return (
-      mimetype?.startsWith("image/") ||
-      mimetype?.startsWith("video/") ||
-      mimetype?.startsWith("audio/") ||
-      mimetype === "application/pdf"
-    );
-  };
-
   const handleFileClick = async (file, event) => {
     // 미리보기 가능한 파일인지 확인
     const mimeType = file.originalMimetype || file.mimeType || "";
     const isPreviewableFile =
-      mimeType.startsWith("image/") ||
-      mimeType.startsWith("video/") ||
-      mimeType.startsWith("audio/") ||
-      mimeType === "application/pdf" ||
-      mimeType.startsWith("text/");
+      (mimeType.startsWith("image/") ||
+        mimeType.startsWith("video/") ||
+        mimeType.startsWith("audio/") ||
+        mimeType === "application/pdf" ||
+        mimeType.startsWith("text/")) &&
+      file.size < 100 * 1024 * 1024; // 100MB 이하
 
     // 암호화된 파일이고 미리보기 가능한 경우 비밀번호 모달 표시
     if (file.isEncrypted && isPreviewableFile) {
@@ -228,11 +221,11 @@ export default function SharedDirectoryPage() {
     if (isPreviewableFile) {
       // 미리보기 모달 열기
       try {
+        setPreviewLoading(true);
         const result = await downloadSharedDirectoryFile({
           shareHash: hash,
           fileId: file.id,
         });
-
         if (result.success) {
           const response = await fetch(result.downloadUrl);
 
@@ -247,6 +240,7 @@ export default function SharedDirectoryPage() {
               mimeType: mimeType,
               type: mimeType.split("/")[0], // image, video, audio 등
             });
+            setPreviewLoading(false);
           } else {
             // 미리보기 실패시 파일 상세페이지로 이동
             router.push(`/share/${file.hash}`);
@@ -463,10 +457,10 @@ export default function SharedDirectoryPage() {
             <p className="text-sm text-gray-600 mt-2">
               공유 링크:{" "}
               <Link
-                href={`/share/${hash}`}
+                href={`/share/directory/${hash}`}
                 className="text-blue-600 hover:text-blue-800"
               >
-                {window.location.origin}/share/{hash}
+                {window.location.origin}/share/directory/{hash}
               </Link>
             </p>
             <p className="text-sm text-gray-600 mt-2">
@@ -487,6 +481,15 @@ export default function SharedDirectoryPage() {
             </p>
             <p className="alert alert-info mt-2">
               ℹ️ 공유 디렉토리에서의 파일 검색 기능은 추후 추가될 예정입니다.
+            </p>
+            <p className="alert alert-info mt-2">
+              ℹ️ 자신이 업로드한 파일을 관리하려면{" "}
+              <Link
+                href="/my-uploads"
+                className="text-red-600 hover:text-blue-800"
+              >
+                내 업로드
+              </Link>
             </p>
           </div>
         </div>
@@ -525,7 +528,7 @@ export default function SharedDirectoryPage() {
         <div>
           {permission === "write" && directoryId && (
             <div className="w-auto mb-4">
-              <div className="w-auto mb-4">
+              <div className="w-auto mb-4 flex gap-2">
                 <CreateSharedDirectory
                   parentId={directoryId}
                   shareHash={hash}
@@ -767,91 +770,14 @@ export default function SharedDirectoryPage() {
       )}
 
       {/* 미리보기 모달 */}
-      {previewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
-          <div className="bg-base-100 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">{previewModal.file.name}</h2>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  // 복호화된 URL인 경우 메모리 해제
-                  if (
-                    previewModal.isDecrypted &&
-                    previewModal.url.startsWith("blob:")
-                  ) {
-                    URL.revokeObjectURL(previewModal.url);
-                  }
-                  setPreviewModal(null);
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flex justify-center">
-              {previewModal.type === "image" && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={previewModal.url}
-                  alt={previewModal.file.name}
-                  className="max-w-full max-h-[70vh] object-contain"
-                />
-              )}
-              {previewModal.type === "video" && (
-                <video
-                  src={previewModal.url}
-                  controls
-                  className="max-w-full max-h-[70vh]"
-                >
-                  브라우저가 비디오를 지원하지 않습니다.
-                </video>
-              )}
-              {previewModal.type === "audio" && (
-                <div className="w-full">
-                  <audio src={previewModal.url} controls className="w-full">
-                    브라우저가 오디오를 지원하지 않습니다.
-                  </audio>
-                </div>
-              )}
-              {(previewModal.mimeType === "application/pdf" ||
-                previewModal.type === "application") && (
-                <iframe
-                  src={previewModal.url}
-                  className="w-full h-[70vh]"
-                  title={previewModal.file.name}
-                >
-                  PDF를 표시할 수 없습니다.
-                </iframe>
-              )}
-              {previewModal.type === "text" && (
-                <iframe
-                  src={previewModal.url}
-                  className="w-full h-[70vh]"
-                  title={previewModal.file.name}
-                >
-                  텍스트를 표시할 수 없습니다.
-                </iframe>
-              )}
-            </div>
-
-            <div className="mt-4 text-center">
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  // 다운로드 링크로 이동
-                  const link = document.createElement("a");
-                  link.href = previewModal.url;
-                  link.download = previewModal.file.name;
-                  link.click();
-                }}
-              >
-                파일 다운로드
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PreviewModal
+        isOpen={!!previewModal}
+        onClose={() => setPreviewModal(null)}
+        file={previewModal?.file}
+        url={previewModal?.url}
+        mimeType={previewModal?.mimeType}
+        isDecrypted={previewModal?.isDecrypted}
+      />
 
       {/* 로딩 모달 */}
       {previewLoading && (

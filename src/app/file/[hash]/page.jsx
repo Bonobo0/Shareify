@@ -305,7 +305,7 @@ export default function FilePage() {
         if (result.success) {
           showAlert(result.message || "파일이 삭제되었습니다.");
           setTimeout(() => {
-            router.push("/dashboard");
+            router.back();
           }, 1500);
         }
       } catch (error) {

@@ -356,16 +356,19 @@ export async function toggleFilePublic({ fileId }) {
 
     // 상위 디렉토리 권한 확인
     let hasParentAdminAccess = false;
-    if (file.parentDirectory) {
+    let currentDirectory = await Directory.findById(
+      file.parentDirectory
+    ).lean();
+    while (currentDirectory && !hasParentAdminAccess) {
       const parentDirectory = await Directory.findOne({
-        _id: file.parentDirectory,
+        _id: currentDirectory,
         $or: [
           { owner: new mongoose.Types.ObjectId(userId) },
           {
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
-                "permission": "admin",
+                "permission": { $in: ["admin"] },
               },
             },
           },
@@ -375,6 +378,8 @@ export async function toggleFilePublic({ fileId }) {
 
       if (parentDirectory) {
         hasParentAdminAccess = true;
+      } else {
+        currentDirectory = currentDirectory.parent; // 상위 디렉토리로 이동
       }
     }
 
@@ -399,143 +404,6 @@ export async function toggleFilePublic({ fileId }) {
     console.error("파일 공개 상태 변경 오류:", error);
     return {
       error: "파일 공개 상태를 변경하는 중 오류가 발생했습니다.",
-    };
-  }
-}
-
-export async function removeShareAccess({
-  fileId,
-  directoryId,
-  userId: targetUserId,
-}) {
-  try {
-    const userId = await getAuthenticatedUser();
-
-    if (!userId) {
-      return { error: "인증이 필요합니다." };
-    }
-
-    await connectToDatabase();
-
-    if (fileId) {
-      // 파일 공유 해제
-      const file = await File.findOne({
-        _id: fileId,
-      });
-
-      if (!file) {
-        return { error: "파일을 찾을 수 없습니다." };
-      }
-
-      // 파일 공유 해제 권한 확인
-      const isOwner = file.owner.toString() === userId;
-      const hasDirectAdminAccess = file.shared?.some(
-        (share) =>
-          share.userId.toString() === userId && share.permission === "admin"
-      );
-
-      // 상위 디렉토리 권한 확인
-      let hasParentAdminAccess = false;
-      if (file.parentDirectory) {
-        const parentDirectory = await Directory.findOne({
-          _id: file.parentDirectory,
-          $or: [
-            { owner: new mongoose.Types.ObjectId(userId) },
-            {
-              "shared": {
-                $elemMatch: {
-                  "userId": new mongoose.Types.ObjectId(userId),
-                  "permission": "admin",
-                },
-              },
-            },
-          ],
-          deleted: { $ne: true },
-        });
-
-        if (parentDirectory) {
-          hasParentAdminAccess = true;
-        }
-      }
-
-      // 공유 해제 권한 검증
-      if (!isOwner && !hasDirectAdminAccess && !hasParentAdminAccess) {
-        return { error: "파일 공유를 해제할 권한이 없습니다." };
-      }
-
-      file.shared = file.shared.filter(
-        (share) => share.userId.toString() !== targetUserId
-      );
-      await file.save();
-
-      return {
-        success: true,
-        message: "파일 공유가 해제되었습니다.",
-      };
-    }
-
-    if (directoryId) {
-      // 디렉토리 공유 해제
-      const directory = await Directory.findOne({
-        _id: directoryId,
-      });
-
-      if (!directory) {
-        return { error: "디렉토리를 찾을 수 없습니다." };
-      }
-
-      // 디렉토리 공유 해제 권한 확인
-      const isOwner = directory.owner.toString() === userId;
-      const hasDirectAdminAccess = directory.shared?.some(
-        (share) =>
-          share.userId.toString() === userId && share.permission === "admin"
-      );
-
-      // 상위 디렉토리 권한 확인
-      let hasParentAdminAccess = false;
-      if (directory.parent) {
-        const parentDirectory = await Directory.findOne({
-          _id: directory.parent,
-          $or: [
-            { owner: new mongoose.Types.ObjectId(userId) },
-            {
-              "shared": {
-                $elemMatch: {
-                  "userId": new mongoose.Types.ObjectId(userId),
-                  "permission": "admin",
-                },
-              },
-            },
-          ],
-          deleted: { $ne: true },
-        });
-
-        if (parentDirectory) {
-          hasParentAdminAccess = true;
-        }
-      }
-
-      // 공유 해제 권한 검증
-      if (!isOwner && !hasDirectAdminAccess && !hasParentAdminAccess) {
-        return { error: "디렉토리 공유를 해제할 권한이 없습니다." };
-      }
-
-      directory.shared = directory.shared.filter(
-        (share) => share.userId.toString() !== targetUserId
-      );
-      await directory.save();
-
-      return {
-        success: true,
-        message: "디렉토리 공유가 해제되었습니다.",
-      };
-    }
-
-    return { error: "파일 ID 또는 디렉토리 ID가 필요합니다." };
-  } catch (error) {
-    console.error("공유 해제 오류:", error);
-    return {
-      error: "공유를 해제하는 중 오류가 발생했습니다.",
     };
   }
 }

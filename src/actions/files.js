@@ -574,16 +574,19 @@ export async function deleteFile({ fileId }) {
 
     // 상위 디렉토리 권한 확인
     let hasParentAdminAccess = false;
-    if (file.parentDirectory) {
+    let currentDirectory = await Directory.findById(
+      file.parentDirectory
+    ).lean();
+    while (currentDirectory && !hasParentAdminAccess) {
       const parentDirectory = await Directory.findOne({
-        _id: file.parentDirectory,
+        _id: currentDirectory,
         $or: [
           { owner: new mongoose.Types.ObjectId(userId) },
           {
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
-                "permission": "admin",
+                "permission": { $in: ["admin"] },
               },
             },
           },
@@ -593,6 +596,8 @@ export async function deleteFile({ fileId }) {
 
       if (parentDirectory) {
         hasParentAdminAccess = true;
+      } else {
+        currentDirectory = currentDirectory.parent; // 상위 디렉토리로 이동
       }
     }
 
@@ -660,9 +665,12 @@ export async function getFileDownloadUrl({ fileId, shareLinkHash = null }) {
 
     // 상위 디렉토리 권한 확인
     let hasParentAccess = false;
-    if (file.parentDirectory) {
+    let currentDirectory = await Directory.findById(
+      file.parentDirectory
+    ).lean();
+    while (currentDirectory && !hasParentAccess) {
       const parentDirectory = await Directory.findOne({
-        _id: file.parentDirectory,
+        _id: currentDirectory.parent,
         $or: [
           { owner: new mongoose.Types.ObjectId(userId) },
           {
@@ -672,13 +680,14 @@ export async function getFileDownloadUrl({ fileId, shareLinkHash = null }) {
               },
             },
           },
-          { shareLinks: { $elemMatch: { hash: shareLinkHash } } },
         ],
         deleted: { $ne: true },
       });
-      console.log("상위 디렉토리 조회 결과:", parentDirectory);
+
       if (parentDirectory) {
         hasParentAccess = true;
+      } else {
+        currentDirectory = parentDirectory; // 상위 디렉토리로 이동
       }
     }
 
@@ -762,16 +771,19 @@ export async function shareFile({ fileId, email, permission = "read" }) {
 
     // 상위 디렉토리 권한 확인
     let hasParentAdminAccess = false;
-    if (file.parentDirectory) {
+    let currentDirectory = await Directory.findById(
+      file.parentDirectory
+    ).lean();
+    while (currentDirectory && !hasParentAdminAccess) {
       const parentDirectory = await Directory.findOne({
-        _id: file.parentDirectory,
+        _id: currentDirectory,
         $or: [
           { owner: new mongoose.Types.ObjectId(userId) },
           {
             "shared": {
               $elemMatch: {
                 "userId": new mongoose.Types.ObjectId(userId),
-                "permission": "admin",
+                "permission": { $in: ["admin"] },
               },
             },
           },
@@ -781,6 +793,8 @@ export async function shareFile({ fileId, email, permission = "read" }) {
 
       if (parentDirectory) {
         hasParentAdminAccess = true;
+      } else {
+        currentDirectory = currentDirectory.parent; // 상위 디렉토리로 이동
       }
     }
 
@@ -893,7 +907,7 @@ export async function getFileDetails({ hash, fileId }) {
         break; // 상위 디렉토리에 접근 권한이 있으면 중단
       }
       // 상위 디렉토리로 이동
-      file.parentDirectory = parentDirectory._id; // 상위 디렉토리로 이동
+      file.parentDirectory = parentDirectory.parent; // 상위 디렉토리로 이동
     }
 
     if (!isOwner && !isShared && !file.isPublic && !hasParentAccess) {
@@ -1160,7 +1174,36 @@ export async function removeFileShare({ fileId, shareId }) {
         share.userId.toString() === userId && share.permission === "admin"
     );
 
-    if (!isOwner && !hasAdminPermission) {
+    // 상위 디렉토리 권한 확인
+    let hasParentAdminAccess = false;
+    let currentDirectory = await Directory.findById(
+      file.parentDirectory
+    ).lean();
+    while (currentDirectory && !hasParentAdminAccess) {
+      const parentDirectory = await Directory.findOne({
+        _id: currentDirectory,
+        $or: [
+          { owner: new mongoose.Types.ObjectId(userId) },
+          {
+            "shared": {
+              $elemMatch: {
+                "userId": new mongoose.Types.ObjectId(userId),
+                "permission": { $in: ["admin"] },
+              },
+            },
+          },
+        ],
+        deleted: { $ne: true },
+      });
+
+      if (parentDirectory) {
+        hasParentAdminAccess = true;
+      } else {
+        currentDirectory = currentDirectory.parent; // 상위 디렉토리로 이동
+      }
+    }
+
+    if (!isOwner && !hasAdminPermission && !hasParentAdminAccess) {
       return { error: "공유를 해제할 권한이 없습니다." };
     }
 

@@ -30,7 +30,11 @@ export default function DeleteDirectory({ directoryId }) {
         return;
       }
       closeModal();
-      router.back();
+      if (window.location.pathname.includes("/share/directory/")) {
+        location.reload(); // 새로고침하여 변경 사항 반영
+      } else {
+        router.back();
+      }
     } catch (err) {
       setError("디렉토리 삭제 중 오류가 발생했습니다.");
     } finally {
