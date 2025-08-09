@@ -553,7 +553,6 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
     if (!directory) {
       return { error: "공유 링크를 찾을 수 없습니다." };
     }
-
     // 해당 공유 링크 찾기
     const shareLink = directory.shareLinks.find(
       (link) => link.hash === shareHash
@@ -567,6 +566,7 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
     if (new Date() > shareLink.expiresAt) {
       return { error: "만료된 공유 링크입니다." };
     }
+    const userId = await getAuthenticatedUser();
 
     // 현재 탐색할 디렉토리 결정
     let currentDirectory = directory;
@@ -623,6 +623,7 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
         id: currentDirectory._id.toString(),
         name: currentDirectory.name,
         description: currentDirectory.description,
+        isOwner: userId === currentDirectory.owner.toString(),
         owner: {
           name: directory.owner?.name, // 루트 디렉토리의 소유자 정보 사용
           email: directory.owner?.email,
@@ -1097,7 +1098,7 @@ export async function createSharedSubdirectory({
     const directory = new Directory({
       name: name.trim(),
       description: description?.trim() || "",
-      owner: sharedDirectory.owner, // 원본 디렉토리 소유자와 동일
+      owner: userId,
       parent: parentDirectoryId,
       hash: directoryHash,
       path: directoryPath,

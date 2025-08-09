@@ -104,7 +104,7 @@ export default function ShareModal({
       }
 
       setSuccessWithTimer(
-        `${email}에게 ${isFile ? "파일" : "폴더"}이 공유되었습니다.`
+        `${email}에게 ${isFile ? "파일" : "디렉토리"}이 공유되었습니다.`
       );
       setEmail("");
 
@@ -253,7 +253,7 @@ export default function ShareModal({
         <div className="modal-box max-w-4xl">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-lg">
-              {isFile ? "파일" : "폴더"} 공유
+              {isFile ? "파일" : "디렉토리"} 공유
             </h3>
             <button className="btn btn-sm btn-circle" onClick={onClose}>
               ✕
@@ -265,7 +265,7 @@ export default function ShareModal({
               <span className="font-medium">
                 {item?.originalName || item?.name}
               </span>{" "}
-              {isFile ? "파일을" : "폴더를"} 공유합니다.
+              {isFile ? "파일을" : "디렉토리를"} 공유합니다.
             </p>
           </div>
 

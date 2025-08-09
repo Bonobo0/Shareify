@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import CreateSharedDirectory from "@/app/components/createSharedDirectory";
 import FileUploader from "@/app/components/fileUploader";
 import SelectedDownloadModal from "@/app/components/selectedDownloadModal";
 import BulkDownloadModal from "@/app/components/bulkDownloadModal";
@@ -12,6 +13,7 @@ import {
   downloadSharedDirectoryFile,
 } from "@/actions/share";
 import { decryptForPreview } from "@/lib/crypto/encryption";
+import DeleteSharedDirectory from "@/app/components/deleteSharedDirectory";
 
 export default function SharedDirectoryPage() {
   const params = useParams();
@@ -471,7 +473,8 @@ export default function SharedDirectoryPage() {
               디렉토리 ID: <span className="font-mono">{directoryId}</span>
             </p>
             <p className="text-sm text-gray-600 mt-2">
-              파일 수: {files.length}개, 하위 폴더 수: {subdirectories.length}개
+              파일 수: {files.length}개, 하위 디렉토리 수:{" "}
+              {subdirectories.length}개
             </p>
             <p className="alert alert-info mt-2">
               ℹ️ 상위 디렉토리로의 이동은 디렉토리 명 위의 브레드크럼을 클릭하여
@@ -491,7 +494,7 @@ export default function SharedDirectoryPage() {
         {/* Subdirectories */}
         {subdirectories.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">📁 하위 폴더</h2>
+            <h2 className="text-xl font-semibold mb-4">📁 하위 디렉토리</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {subdirectories.map((directory) => (
                 <div
@@ -522,20 +525,32 @@ export default function SharedDirectoryPage() {
         <div>
           {permission === "write" && directoryId && (
             <div className="w-auto mb-4">
-              <FileUploader
-                directoryId={directoryId}
-                shareHash={hash}
-                onUploadComplete={handleUploadComplete}
-                buttonText="파일 업로드"
-                className="btn btn-primary btn-sm"
-              />
+              <div className="w-auto mb-4">
+                <CreateSharedDirectory
+                  parentId={directoryId}
+                  shareHash={hash}
+                  onSuccess={handleUploadComplete}
+                />
+                {directoryInfo.isOwner && (
+                  <DeleteSharedDirectory directoryId={directoryId} />
+                )}
+              </div>
+              <div className="w-auto mb-4">
+                <FileUploader
+                  directoryId={directoryId}
+                  shareHash={hash}
+                  onUploadComplete={handleUploadComplete}
+                  buttonText="파일 업로드"
+                  className="btn btn-primary btn-sm"
+                />
+              </div>
             </div>
           )}
           <h2 className="text-xl font-semibold mb-4">📂 파일 목록</h2>
           {files.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📂</div>
-              <p className="text-gray-600">이 폴더에는 파일이 없습니다.</p>
+              <p className="text-gray-600">이 디렉토리에는 파일이 없습니다.</p>
             </div>
           ) : (
             <>
@@ -902,7 +917,7 @@ export default function SharedDirectoryPage() {
         isOpen={showBulkDownloadModal}
         onClose={() => setShowBulkDownloadModal(false)}
         directoryId={directoryId}
-        directoryName={directoryInfo?.name || "공유 폴더"}
+        directoryName={directoryInfo?.name || "공유 디렉토리"}
         // 공유 파일용 커스텀 액션 함수 전달
         getFilesAction={async (dirId) => {
           const { getSharedAllFilesForDownload } = await import(

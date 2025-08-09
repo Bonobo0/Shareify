@@ -90,7 +90,7 @@ export default function BulkActionHandler({
               itemName = file ? file.originalName : `파일 ${id}`;
             } else if (type === "directory") {
               const directory = directories.find((d) => d.id === id);
-              itemName = directory ? directory.name : `폴더 ${id}`;
+              itemName = directory ? directory.name : `디렉토리 ${id}`;
             }
 
             setDeleteProgress((prev) => ({
@@ -167,7 +167,9 @@ export default function BulkActionHandler({
 
     if (selectedFiles.length === 0) {
       console.log("다운로드할 파일이 없음");
-      onShowAlert("다운로드할 파일을 선택해주세요. (폴더는 지원되지 않습니다)");
+      onShowAlert(
+        "다운로드할 파일을 선택해주세요. (디렉토리는 지원되지 않습니다)"
+      );
       return;
     }
 

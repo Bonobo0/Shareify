@@ -14,7 +14,7 @@ export default function BulkDownloadModal({
   isOpen,
   onClose,
   directoryId,
-  directoryName = "폴더",
+  directoryName = "디렉토리",
   getFilesAction, // 커스텀 파일 조회 액션 (공유 파일용)
 }) {
   const [loading, setLoading] = useState(false);
@@ -182,7 +182,7 @@ export default function BulkDownloadModal({
                 <span className="text-xl">📁</span>
                 <h4 className="text-lg font-semibold mt-2">{directoryName}</h4>
                 <p className="text-gray-500 mt-2">
-                  이 폴더의 모든 파일을 ZIP으로 다운로드합니다.
+                  이 디렉토리의 모든 파일을 ZIP으로 다운로드합니다.
                 </p>
               </div>
 

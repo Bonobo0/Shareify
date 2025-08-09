@@ -159,7 +159,7 @@ export async function downloadFilesAsZip(
           }
         }
 
-        // 폴더 구조를 유지하면서 파일을 ZIP에 추가
+        // 디렉토리 구조를 유지하면서 파일을 ZIP에 추가
         // Blob을 ArrayBuffer로 변환하여 JSZip 호환성 확보
         let fileData;
         if (blob instanceof Blob) {
@@ -172,7 +172,7 @@ export async function downloadFilesAsZip(
           fileData = await newBlob.arrayBuffer();
         }
 
-        // 파일명은 originalName을 우선 사용, path는 폴더 구조가 있을 때만 사용
+        // 파일명은 originalName을 우선 사용, path는 디렉토리 구조가 있을 때만 사용
         const fileName = file.originalName || file.name || file.path;
         console.log(
           `ZIP에 추가할 파일명: ${fileName} (원본: ${file.originalName})`

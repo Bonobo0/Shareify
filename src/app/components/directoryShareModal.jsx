@@ -220,7 +220,7 @@ export default function DirectoryShareModal({
 
         <div className="mb-4">
           <p className="text-sm text-gray-600">
-            <span className="font-medium">{directoryName}</span> 폴더를
+            <span className="font-medium">{directoryName}</span> 디렉토리를
             공유합니다.
           </p>
         </div>

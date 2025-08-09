@@ -9,6 +9,7 @@ import mongoose from "mongoose";
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import { deleteObject as deleteFileFromR2 } from "@/lib/r2/r2Client";
+import { dir } from "console";
 
 function generateDirectoryHash() {
   return crypto.randomBytes(16).toString("hex");
@@ -338,7 +339,7 @@ export async function updateDirectory({ directoryId, name, description }) {
   }
 }
 
-export async function deleteDirectory({ directoryId }) {
+export async function deleteDirectory(directoryId) {
   try {
     const userId = await getAuthenticatedUser();
 
@@ -352,6 +353,7 @@ export async function deleteDirectory({ directoryId }) {
     const directory = await Directory.findOne({
       _id: directoryId,
     });
+    console.log("디렉토리 삭제 대상 ID:", directoryId);
 
     if (!directory) {
       return { error: "디렉토리를 찾을 수 없습니다." };
@@ -817,10 +819,48 @@ export async function deleteDirectoryRecursive({ directoryId }) {
 
     const directory = await Directory.findOne({
       _id: directoryId,
-      owner: userId, // 재귀 삭제는 소유자만 가능
     });
+    let permissionCheck = false;
+    if (directory) {
+      if (
+        directory.owner.toString() === userId ||
+        directory.shared.some(
+          (share) =>
+            share.userId.toString() === userId &&
+            (share.permission === "admin" || share.permission === "write")
+        )
+      ) {
+        permissionCheck = true;
+      }
+      // 최상위 부모 디렉토리 삭제 권한 확인
+      // 상위 디렉토리로 올라가며 parent가 null이 될 때까지 확인
+      if (directory && directory.parent) {
+        let currentDirectory = directory;
+        while (currentDirectory.parent) {
+          const parentDirectory = await Directory.findById(
+            currentDirectory.parent
+          );
+          if (!parentDirectory) {
+            return { error: "상위 디렉토리를 찾을 수 없습니다." };
+          }
+          if (
+            parentDirectory.parent === null &&
+            (parentDirectory.owner.toString() === userId ||
+              parentDirectory.shared.some(
+                (share) =>
+                  share.userId.toString() === userId &&
+                  (share.permission === "admin" || share.permission === "write")
+              ))
+          ) {
+            permissionCheck = true;
+            break;
+          }
+          currentDirectory = parentDirectory;
+        }
+      }
+    }
 
-    if (!directory) {
+    if (!permissionCheck) {
       return { error: "디렉토리를 찾을 수 없거나 삭제 권한이 없습니다." };
     }
 

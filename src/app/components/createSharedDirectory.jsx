@@ -62,7 +62,7 @@ export default function CreateSharedDirectory({
 
   return (
     <>
-      <button onClick={openModal} className="btn btn-primary btn-sm">
+      <button onClick={openModal} className="btn btn-primary btn-md">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           className="h-4 w-4 mr-2"
@@ -77,13 +77,13 @@ export default function CreateSharedDirectory({
             d="M12 6v6m0 0v6m0-6h6m-6 0H6"
           />
         </svg>
-        새 폴더
+        새 디렉토리
       </button>
 
       {isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-base-100 p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">새 폴더 만들기</h3>
+            <h3 className="text-lg font-bold mb-4">새 디렉토리 만들기</h3>
 
             {error && (
               <div className="alert alert-error mb-4">
@@ -94,11 +94,11 @@ export default function CreateSharedDirectory({
             <form onSubmit={handleSubmit}>
               <div className="form-control mb-4">
                 <label className="label">
-                  <span className="label-text">폴더 이름</span>
+                  <span className="label-text">디렉토리 이름</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="새 폴더 이름"
+                  placeholder="새 디렉토리 이름"
                   className="input input-bordered"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -112,7 +112,7 @@ export default function CreateSharedDirectory({
                   <span className="label-text">설명 (선택사항)</span>
                 </label>
                 <textarea
-                  placeholder="폴더 설명"
+                  placeholder="디렉토리 설명"
                   className="textarea textarea-bordered"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}

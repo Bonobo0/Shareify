@@ -410,10 +410,6 @@ export default function FileList({
   const handleRecursiveDelete = async (directoryId) => {
     // 디렉토리 소유자 확인
     const directory = directories.find((dir) => dir.id === directoryId);
-    if (!directory || !directory.owner) {
-      setError("이 디렉토리를 삭제할 권한이 없습니다. (소유자만 가능)");
-      return;
-    }
 
     showConfirm(
       "이 디렉토리와 모든 하위 항목을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
@@ -464,7 +460,7 @@ export default function FileList({
     setBulkDownloadModal({
       isOpen: true,
       directoryId: directoryId,
-      directoryName: currentDirectory?.name || "루트 폴더",
+      directoryName: currentDirectory?.name || "루트 디렉토리",
     });
   };
 
@@ -817,7 +813,7 @@ export default function FileList({
           <div className="flex-1">
             <input
               type="text"
-              placeholder="파일/폴더 이름으로 검색..."
+              placeholder="파일/디렉토리 이름으로 검색..."
               className="input input-bordered w-full"
               value={searchQuery}
               onChange={(e) => handleSimpleSearch(e.target.value)}
@@ -850,7 +846,7 @@ export default function FileList({
                   </label>
                   <input
                     type="text"
-                    placeholder="파일/폴더 이름"
+                    placeholder="파일/디렉토리 이름"
                     className="input input-bordered input-sm"
                     value={searchFilters.name}
                     onChange={(e) =>
@@ -1031,7 +1027,7 @@ export default function FileList({
                   <div className="text-sm">
                     <span className="font-medium">검색 결과:</span>
                     <span className="ml-2">
-                      폴더 {filteredDirectories.length}개, 파일{" "}
+                      디렉토리 {filteredDirectories.length}개, 파일{" "}
                       {filteredFiles.length}개
                     </span>
                   </div>
@@ -1047,7 +1043,7 @@ export default function FileList({
           <div className="text-center py-8 bg-base-200 rounded-lg">
             <p className="text-lg">이 디렉토리에 파일이 없습니다.</p>
             <p className="text-gray-500 mt-2">
-              파일을 업로드하거나 새 폴더를 만들어보세요.
+              파일을 업로드하거나 새 디렉토리를 만들어보세요.
             </p>
           </div>
           {/* 페이지가 여러 개인 경우 페이지네이터 표시 */}
