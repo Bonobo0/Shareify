@@ -68,11 +68,9 @@ export async function getDirectoryList({
         deleted: { $ne: true },
       });
 
-      if (!parentDirectory) {
-        return { error: "상위 디렉토리에 접근할 권한이 없습니다." };
+      if (parentDirectory) {
+        hasParentAccess = true;
       }
-
-      hasParentAccess = true;
     }
 
     // 필터 조건 설정 (부모 디렉토리 접근 권한이 있으면 하위 디렉토리 모두 조회)
@@ -192,8 +190,21 @@ export async function createDirectory({ name, parentId, description }) {
     if (!name || name.trim() === "") {
       return { error: "디렉토리 이름을 입력해주세요." };
     }
+    if (name.length > 100) {
+      return { error: "디렉토리 이름은 100자 이내로 입력해주세요." };
+    }
+    if (description && description.length > 500) {
+      return { error: "디렉토리 설명은 500자 이내로 입력해주세요." };
+    }
 
     await connectToDatabase();
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
 
     // 부모 디렉토리 검증 (parentId가 있는 경우)
     if (parentId) {
@@ -279,6 +290,14 @@ export async function updateDirectory({ directoryId, name, description }) {
 
     await connectToDatabase();
 
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
+
     const directory = await Directory.findOne({
       _id: directoryId,
       $or: [
@@ -348,6 +367,14 @@ export async function deleteDirectory(directoryId) {
     }
 
     await connectToDatabase();
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
 
     // 디렉토리 조회
     const directory = await Directory.findOne({
@@ -444,6 +471,14 @@ export async function shareDirectory({
 
     await connectToDatabase();
 
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
+
     const directory = await Directory.findOne({
       _id: directoryId,
       $or: [
@@ -512,6 +547,14 @@ export async function unshareDirectory({ directoryId, targetUserId }) {
     }
 
     await connectToDatabase();
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
 
     const directory = await Directory.findOne({
       _id: directoryId,
@@ -723,12 +766,14 @@ export async function getDirectoryByHash({ hash }) {
         : share.userId.toString();
       return shareUserId === userId;
     });
-
-    // 상위 디렉토리 권한 확인
+    // 최상위 디렉토리 권한 확인
     let hasParentAccess = false;
-    if (directory.parent) {
+    let hasParentAdminAccess = false;
+    let currentDirectory = directory;
+    // 상위 디렉토리로 올라가며 권한 확인
+    while (currentDirectory && currentDirectory.parent) {
       const parentDirectory = await Directory.findOne({
-        _id: directory.parent,
+        _id: currentDirectory.parent,
         $or: [
           { owner: new mongoose.Types.ObjectId(userId) },
           {
@@ -741,11 +786,33 @@ export async function getDirectoryByHash({ hash }) {
         ],
         deleted: { $ne: true },
       });
-
-      if (parentDirectory) {
-        hasParentAccess = true;
+      if (!parentDirectory) {
+        break; // 상위 디렉토리가 없으면 중단
       }
+      // 상위 디렉토리 접근 권한 확인
+      if (
+        parentDirectory.owner._id.toString() === userId ||
+        parentDirectory.shared.some(
+          (share) => share.userId._id.toString() === userId
+        )
+      ) {
+        if (
+          parentDirectory.owner._id.toString() === userId ||
+          parentDirectory.shared.some(
+            (share) =>
+              share.userId._id.toString() === userId &&
+              share.permission === "admin"
+          )
+        ) {
+          hasParentAdminAccess = true; // 상위 디렉토리에서 admin 권한이 있는 경우
+        }
+        hasParentAccess = true;
+        break; // 상위 디렉토리에 접근 권한이 있으면 중단
+      }
+      currentDirectory = parentDirectory; // 상위 디렉토리로 이동
     }
+
+    console.log("상위 디렉토리 접근 권한 여부:", hasParentAccess);
 
     // 접근 권한 검증
     if (!isOwner && !isDirectlyShared && !hasParentAccess) {
@@ -781,7 +848,8 @@ export async function getDirectoryByHash({ hash }) {
           ? directory.updatedAt.toISOString()
           : null,
         deleted: directory.deleted,
-        owner: directory.owner._id.toString() === userId,
+        owner:
+          directory.owner._id.toString() === userId || hasParentAdminAccess,
         ownerInfo: {
           id: directory.owner._id.toString(),
           name: directory.owner.name,
@@ -807,7 +875,7 @@ export async function getDirectoryByHash({ hash }) {
   }
 }
 
-export async function deleteDirectoryRecursive({ directoryId }) {
+export async function deleteDirectoryRecursive(directoryId) {
   try {
     const userId = await getAuthenticatedUser();
 
@@ -817,6 +885,13 @@ export async function deleteDirectoryRecursive({ directoryId }) {
 
     await connectToDatabase();
 
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
     const directory = await Directory.findOne({
       _id: directoryId,
     });
@@ -834,7 +909,7 @@ export async function deleteDirectoryRecursive({ directoryId }) {
       }
       // 최상위 부모 디렉토리 삭제 권한 확인
       // 상위 디렉토리로 올라가며 parent가 null이 될 때까지 확인
-      if (directory && directory.parent) {
+      if (!permissionCheck && directory && directory.parent) {
         let currentDirectory = directory;
         while (currentDirectory.parent) {
           const parentDirectory = await Directory.findById(
@@ -942,6 +1017,14 @@ export async function createDirectoryShareLink({
     }
 
     await connectToDatabase();
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
 
     const directory = await Directory.findById(directoryId);
     if (!directory) {
@@ -1051,6 +1134,14 @@ export async function deleteDirectoryShareLink({ directoryId, shareHash }) {
     }
 
     await connectToDatabase();
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
 
     const directory = await Directory.findById(directoryId);
     if (!directory) {
@@ -1240,6 +1331,14 @@ export async function removeDirectoryShare({ directoryId, shareId }) {
     }
 
     await connectToDatabase();
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+    if (user.suspended) {
+      return { error: "정지된 사용자입니다." };
+    }
 
     // 디렉토리 조회 및 권한 확인
     const directory = await Directory.findById(directoryId);

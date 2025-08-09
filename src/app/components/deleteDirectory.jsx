@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { deleteDirectory } from "@/actions/directories";
+import { deleteDirectoryRecursive } from "@/actions/directories";
 
-export default function DeleteSharedDirectory({ directoryId }) {
+export default function DeleteDirectory({ directoryId }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -24,15 +24,13 @@ export default function DeleteSharedDirectory({ directoryId }) {
     try {
       setIsDeleting(true);
       setError("");
-
-      const result = await deleteDirectory(directoryId);
+      const result = await deleteDirectoryRecursive(directoryId);
       if (result.error) {
         setError(result.error);
         return;
       }
-
-      router.refresh();
       closeModal();
+      router.back();
     } catch (err) {
       setError("디렉토리 삭제 중 오류가 발생했습니다.");
     } finally {
@@ -57,7 +55,7 @@ export default function DeleteSharedDirectory({ directoryId }) {
             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
           />
         </svg>{" "}
-        삭제 {directoryId ? `(${directoryId})` : ""}
+        삭제
       </button>
 
       {isOpen && (

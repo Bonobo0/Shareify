@@ -114,6 +114,12 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
   }
 };
 
+// 사용자 정보 업데이트 전 타임스탬프 갱신
+UserSchema.pre("save", function (next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
 // 모델이 이미 존재하는 경우에는 기존 모델을 삭제하고 재생성
 if (mongoose.models.User) {
   delete mongoose.models.User;

@@ -13,7 +13,7 @@ import {
   downloadSharedDirectoryFile,
 } from "@/actions/share";
 import { decryptForPreview } from "@/lib/crypto/encryption";
-import DeleteSharedDirectory from "@/app/components/deleteSharedDirectory";
+import DeleteSharedDirectory from "@/app/components/deleteDirectory";
 
 export default function SharedDirectoryPage() {
   const params = useParams();

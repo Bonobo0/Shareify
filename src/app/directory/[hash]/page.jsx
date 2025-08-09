@@ -6,6 +6,7 @@ import Link from "next/link";
 import FileUploader from "@/app/components/fileUploader";
 import FileList from "@/app/components/fileList";
 import CreateDirectory from "@/app/components/createDirectory";
+import DeleteDirectory from "@/app/components/deleteDirectory";
 import DirectoryShareModal from "@/app/components/directoryShareModal";
 import EditDirectoryModal from "@/app/components/editDirectoryModal";
 import BulkDownloadModal from "@/app/components/bulkDownloadModal";
@@ -229,16 +230,22 @@ export default function DirectoryPage() {
 
       <div className="flex flex-col sm:flex-row gap-4 mb-8 justify-between">
         {/* Directory creation - show only if user has write/admin permissions */}
-        {(userPermission === "owner" ||
-          userPermission === "write" ||
-          userPermission === "admin") && (
-          <div className="flex-shrink-0">
-            <CreateDirectory
-              parentId={directoryId}
-              onSuccess={handleDirectoryCreated}
-            />
+        {
+          <div className="flex gap-2">
+            {(userPermission === "owner" ||
+              userPermission === "write" ||
+              userPermission === "admin") && (
+              <CreateDirectory
+                parentId={directoryId}
+                onSuccess={handleDirectoryCreated}
+              />
+            )}
+            {(userPermission === "owner" || userPermission === "admin") && (
+              <DeleteDirectory directoryId={directoryId} />
+            )}
           </div>
-        )}
+        }
+
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
           {directory && directory.owner && (
             <button
