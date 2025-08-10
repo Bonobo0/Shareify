@@ -407,12 +407,6 @@ export default function FilePage() {
                     {formatDate(file?.createdAt)}
                   </span>
                 </li>
-                {file?.isEncrypted && (
-                  <li>
-                    <strong>암호화:</strong>{" "}
-                    <span className="text-primary">AES-256-GCM</span>
-                  </li>
-                )}
               </ul>
             </div>
 

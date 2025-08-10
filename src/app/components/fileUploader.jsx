@@ -171,11 +171,53 @@ export default function FileUploader({
             [file.name]: { percent: enableE2EE ? 25 : 10, status: "uploading" },
           }));
 
-          // 2. presigned URL로 직접 파일 업로드
-          const uploadResponse = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": fileToUpload.type },
-            body: fileToUpload,
+          // 2. presigned URL로 직접 파일 업로드 (XMLHttpRequest 사용)
+          const uploadResponse = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener("progress", (event) => {
+              if (event.lengthComputable) {
+                // E2EE가 활성화된 경우 25-90%, 비활성화된 경우 10-90% 범위로 진행률 매핑
+                const baseProgress = enableE2EE ? 25 : 10;
+                const progressPercent =
+                  baseProgress +
+                  Math.round(
+                    (event.loaded / event.total) * (90 - baseProgress)
+                  );
+
+                setProgress((prev) => ({
+                  ...prev,
+                  [file.name]: {
+                    percent: progressPercent,
+                    status: "uploading",
+                    loaded: event.loaded,
+                    total: event.total,
+                  },
+                }));
+              }
+            });
+
+            xhr.addEventListener("load", () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve({ ok: true });
+              } else {
+                reject(
+                  new Error(`파일 업로드 실패: ${xhr.status} ${xhr.statusText}`)
+                );
+              }
+            });
+
+            xhr.addEventListener("error", () => {
+              reject(new Error("파일 업로드 중 네트워크 오류가 발생했습니다."));
+            });
+
+            xhr.addEventListener("abort", () => {
+              reject(new Error("파일 업로드가 취소되었습니다."));
+            });
+
+            xhr.open("PUT", uploadUrl);
+            xhr.setRequestHeader("Content-Type", fileToUpload.type);
+            xhr.send(fileToUpload);
           });
 
           if (!uploadResponse.ok) {
