@@ -417,7 +417,7 @@ export default function SharedDirectoryPage() {
               {(breadcrumbs.length > 1
                 ? breadcrumbs[breadcrumbs.length - 1].description
                 : directoryInfo?.description) && (
-                <p className="text-sm text-gray-600 mt-2 break-words">
+                <p className="text-sm text-gray-400 mt-2 break-words">
                   {breadcrumbs.length > 1
                     ? breadcrumbs[breadcrumbs.length - 1].description
                     : directoryInfo?.description}
@@ -437,7 +437,7 @@ export default function SharedDirectoryPage() {
                   {permission === "read" ? "읽기 전용" : "읽기/쓰기"}
                 </div>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-400">
                 생성일: {formatDate(directoryInfo?.createdAt)}
               </p>
             </div>
@@ -451,38 +451,39 @@ export default function SharedDirectoryPage() {
           {/* Information */}
           <h2 className="text-xl font-semibold mb-4">📄 정보</h2>
           <div className="bg-base-200 p-4 rounded-md">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-400">
               {directoryInfo?.description || "사용자가 설정한 설명이 없습니다."}
             </p>
-            <p className="text-sm text-gray-600 mt-2">
-              공유 링크:{" "}
-              <Link
-                href={`/share/directory/${hash}`}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                {window.location.origin}/share/directory/{hash}
-              </Link>
+            <p
+              className="btn btn-sm btn-primary mt-2"
+              onClick={(e) =>
+                window.navigator.clipboard
+                  .writeText(window.location.href)
+                  .then(() => alert("공유 링크가 클립보드에 복사되었습니다."))
+              }
+            >
+              공유 링크 복사
             </p>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-sm text-gray-400 mt-2">
               디렉토리 ID: <span className="font-mono">{directoryId}</span>
             </p>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-sm text-gray-400 mt-2">
               파일 수: {files.length}개, 하위 디렉토리 수:{" "}
               {subdirectories.length}개
-            </p>
-            <p className="alert alert-info mt-2">
-              ℹ️ 상위 디렉토리로의 이동은 디렉토리 명 위의 브레드크럼을 클릭하여
-              가능합니다.
             </p>
             <p className="alert alert-warning mt-2">
               ⚠️ 이 디렉토리는 공유 링크로 공개되어 있습니다. 링크를 아는 사람은{" "}
               {new Date(expiresAt).toLocaleString()}까지 누구나 접근할 수
               있습니다.
             </p>
-            <p className="alert alert-info mt-2">
+            <p className="alert alert-success mt-2">
+              ℹ️ 상위 디렉토리로의 이동은 디렉토리 명 위의 브레드크럼을 클릭하여
+              가능합니다.
+            </p>
+            <p className="alert alert-success mt-2">
               ℹ️ 공유 디렉토리에서의 파일 검색 기능은 추후 추가될 예정입니다.
             </p>
-            <p className="alert alert-info mt-2">
+            <p className="alert alert-success mt-2">
               ℹ️ 자신이 업로드한 파일을 관리하려면{" "}
               <Link
                 href="/my-uploads"

@@ -158,9 +158,8 @@ export default function MultipleDecryptionModal({
             <div className="text-sm">
               <div className="font-semibold">보안 주의사항</div>
               <ul className="list-disc list-inside mt-1 space-y-1">
-                <li>비밀번호는 암호화된 연결을 통해 전송됩니다</li>
-                <li>비밀번호는 브라우저에 저장되지 않습니다</li>
-                <li>잘못된 비밀번호 입력 시 파일이 손상될 수 있습니다</li>
+                <li>비밀번호는 서버로 전송되지 않습니다</li>
+                <li>잘못된 비밀번호 입력 시 파일이 다운로드 되지 않습니다</li>
                 <li>비밀번호를 정확히 입력했는지 확인해주세요</li>
               </ul>
             </div>
