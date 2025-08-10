@@ -1135,7 +1135,7 @@ export default function FileList({
               </thead>
               <tbody>
                 {/* 디렉토리 목록 */}
-                {filteredDirectories.map((directory) => (
+                {filteredDirectories.map((directory, index) => (
                   <tr
                     key={`dir-${directory.id}`}
                     className="hover cursor-pointer"
@@ -1184,7 +1184,11 @@ export default function FileList({
                     <td>디렉토리</td>
                     <td>{formatDate(directory.createdAt)}</td>
                     <td>
-                      <div className="dropdown dropdown-end dropdown-top">
+                      <div
+                        className={`dropdown dropdown-end ${
+                          index === 0 ? "dropdown-bottom" : "dropdown-top"
+                        }`}
+                      >
                         <label
                           tabIndex={0}
                           className="btn btn-ghost btn-xs sm:btn-sm"
@@ -1203,7 +1207,6 @@ export default function FileList({
                                 document.activeElement.blur();
                                 handleEditDirectory(directory);
                               }}
-                              className="text-green-500"
                               disabled={!directory.owner}
                             >
                               ✏️ 수정하기
@@ -1219,7 +1222,6 @@ export default function FileList({
                                   directory.name
                                 );
                               }}
-                              className="text-blue-500"
                             >
                               📤 공유하기
                             </button>
@@ -1244,7 +1246,7 @@ export default function FileList({
                 ))}
 
                 {/* 파일 목록 */}
-                {filteredFiles.map((file) => (
+                {filteredFiles.map((file, index) => (
                   <tr
                     key={`file-${file.id}`}
                     className="hover cursor-pointer"
@@ -1336,7 +1338,13 @@ export default function FileList({
                     </td>
                     <td>{formatDate(file.createdAt)}</td>
                     <td>
-                      <div className="dropdown dropdown-end dropdown-top">
+                      <div
+                        className={`dropdown dropdown-end ${
+                          filteredDirectories.length === 0 && index === 0
+                            ? "dropdown-bottom"
+                            : "dropdown-top"
+                        }`}
+                      >
                         <label
                           tabIndex={0}
                           className="btn btn-ghost btn-xs sm:btn-sm"
