@@ -198,7 +198,26 @@ export class Model {
     let paramIndex = 1;
     
     for (const [key, value] of Object.entries(snakeConditions)) {
-      if (value === null) {
+      // Handle $or operator
+      if (key === '$or') {
+        const orClauses = [];
+        for (const orCondition of value) {
+          const { whereClause: subWhere, values: subValues } = this._buildWhereClause(orCondition);
+          // Extract the WHERE part
+          const clause = subWhere.replace('WHERE ', '');
+          if (clause) {
+            orClauses.push(`(${clause})`);
+            // Adjust param indices and add values
+            for (const v of subValues) {
+              values.push(v);
+              paramIndex++;
+            }
+          }
+        }
+        if (orClauses.length > 0) {
+          clauses.push(`(${orClauses.join(' OR ')})`);
+        }
+      } else if (value === null) {
         clauses.push(`${key} IS NULL`);
       } else if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
         // Handle operators like $ne, $gt, $gte, $lt, $lte, $in
@@ -226,6 +245,13 @@ export class Model {
           } else if (op === '$in') {
             clauses.push(`${key} = ANY($${paramIndex})`);
             values.push(opValue);
+            paramIndex++;
+          } else if (op === '$elemMatch') {
+            // Handle JSONB array element matching
+            // e.g., shared @> [{"userId": "xxx", "permission": "admin"}]
+            const jsonCondition = JSON.stringify([opValue]);
+            clauses.push(`${key} @> $${paramIndex}::jsonb`);
+            values.push(jsonCondition);
             paramIndex++;
           }
         }
@@ -306,3 +332,4 @@ export class Model {
 }
 
 export default Model;
+export { query, withTransaction };

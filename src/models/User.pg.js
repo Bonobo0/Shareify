@@ -6,20 +6,52 @@ class UserModel extends Model {
     super("users");
   }
 
-  // Override findOne to handle select with password
+  // Override findOne to handle select with password and other sensitive fields
   async findOne(conditions, options = {}) {
-    const result = await super.findOne(conditions, options);
-    if (!result) return null;
-
-    // Add methods to the user object
-    return this._addMethods(result);
+    let selectClause = '*';
+    
+    // Handle MongoDB-style select with +field to include normally excluded fields
+    if (options.select) {
+      const selectStr = options.select;
+      // Check if we're including password or other sensitive fields
+      if (selectStr.includes('+password')) {
+        selectClause = '*'; // Include all fields including password
+      } else if (selectStr.startsWith('+')) {
+        selectClause = '*';
+      } else {
+        // Normal field selection
+        selectClause = this._buildSelectClause(selectStr);
+      }
+    }
+    
+    const { whereClause, values } = this._buildWhereClause(conditions);
+    
+    const result = await query(
+      `SELECT ${selectClause} FROM ${this.tableName} ${whereClause} LIMIT 1`,
+      values
+    );
+    
+    if (!result.rows[0]) return null;
+    return this._addMethods(this._transformRow(result.rows[0]));
   }
 
   async findById(id, options = {}) {
-    const result = await super.findById(id, options);
-    if (!result) return null;
-
-    return this._addMethods(result);
+    const uuid = toUUID(id);
+    let selectClause = '*';
+    
+    if (options.select && options.select.includes('+password')) {
+      selectClause = '*';
+    } else if (options.select) {
+      selectClause = this._buildSelectClause(options.select);
+    }
+    
+    const result = await query(
+      `SELECT ${selectClause} FROM ${this.tableName} WHERE id = $1`,
+      [uuid]
+    );
+    
+    if (!result.rows[0]) return null;
+    return this._addMethods(this._transformRow(result.rows[0]));
   }
 
   async create(data) {
@@ -51,6 +83,7 @@ class UserModel extends Model {
       delete updateData._methods;
       delete updateData.comparePassword;
       delete updateData.save;
+      delete updateData.isModified;
       
       await this.updateOne({ id: toUUID(id) }, { $set: updateData });
       return this._addMethods(doc);
