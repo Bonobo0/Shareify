@@ -41,7 +41,9 @@
 **PostgreSQL 17 (권장) 또는 MongoDB를 사용할 수 있습니다.**
 - **PostgreSQL** (권장): Neon 호환, `DATABASE_URL` 설정
 - **MongoDB** (레거시): `MONGODB_URI` 설정
+- **관리자 페이지에서 데이터베이스 선택 가능**: `/admin/db-settings`
 - MongoDB에서 PostgreSQL로 마이그레이션: `MIGRATION.md` 참고
+- 데이터베이스 설정 가이드: `DB_SETTINGS.md` 참고
 <br/>
 
 **Cloudflare R2, SMTP 서버 등을 설정해야 합니다.**

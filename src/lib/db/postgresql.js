@@ -2,29 +2,34 @@ import { Pool } from 'pg';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL이 환경 변수에 설정되어 있지 않습니다.");
-}
-
 let pool = null;
 
 function getPool() {
+  if (!DATABASE_URL) {
+    throw new Error("DATABASE_URL이 환경 변수에 설정되어 있지 않습니다.");
+  }
+
   if (!pool) {
-    pool = new Pool({
-      connectionString: DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false, // Neon requires SSL
-      },
-      max: 20, // Maximum number of clients in the pool
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    });
+    try {
+      pool = new Pool({
+        connectionString: DATABASE_URL,
+        ssl: {
+          rejectUnauthorized: false, // Neon requires SSL
+        },
+        max: 20, // Maximum number of clients in the pool
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      });
 
-    pool.on('error', (err) => {
-      console.error('Unexpected error on idle PostgreSQL client', err);
-    });
+      pool.on('error', (err) => {
+        console.error('Unexpected error on idle PostgreSQL client', err);
+      });
 
-    console.log('PostgreSQL 연결 풀이 생성되었습니다!');
+      console.log('PostgreSQL 연결 풀이 생성되었습니다!');
+    } catch (error) {
+      console.error('PostgreSQL 연결 풀 생성 실패:', error.message);
+      throw error;
+    }
   }
   return pool;
 }
