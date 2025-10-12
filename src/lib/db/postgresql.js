@@ -95,10 +95,17 @@ async function initializeSchema() {
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
     
     // Split by semicolons and execute each statement
+    // Filter out empty statements and comment-only lines
     const statements = schemaSql
       .split(';')
       .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
+      .filter(s => {
+        if (s.length === 0) return false;
+        // Remove pure comment lines but keep statements that have comments before SQL
+        const lines = s.split('\n').filter(l => l.trim().length > 0);
+        const hasSQL = lines.some(l => !l.trim().startsWith('--'));
+        return hasSQL;
+      });
     
     console.log(`📝 Executing ${statements.length} SQL statements...`);
     
