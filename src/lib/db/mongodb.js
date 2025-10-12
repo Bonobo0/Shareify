@@ -2,10 +2,6 @@ import mongoose from "mongoose";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!MONGODB_URI) {
-  throw new Error("MongoDB URI가 환경 변수에 설정되어 있지 않습니다.");
-}
-
 let cached = global.mongoose;
 
 if (!cached) {
@@ -13,6 +9,11 @@ if (!cached) {
 }
 
 export async function connectToDatabase() {
+  // Only check for MONGODB_URI when actually connecting
+  if (!MONGODB_URI) {
+    throw new Error("MongoDB URI가 환경 변수에 설정되어 있지 않습니다.");
+  }
+
   if (cached.conn) {
     return cached.conn;
   }

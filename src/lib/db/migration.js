@@ -3,9 +3,41 @@
 import { connectToDatabase as connectToPostgreSQL, query, withTransaction } from "@/lib/db/postgresql.js";
 import { SCHEMA_SQL } from "@/lib/db/schemaContent.js";
 import mongoose from "mongoose";
+import { getEffectiveDBType } from "@/lib/db/settings.js";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DATABASE_URL = process.env.DATABASE_URL;
+
+// Helper to connect to MongoDB for migration without affecting the main app connection
+async function connectToMongoForMigration() {
+  // Check if mongoose is already connected to avoid creating duplicate connections
+  if (mongoose.connection.readyState === 1) {
+    // Already connected, reuse the connection
+    return { connection: mongoose.connection, shouldDisconnect: false };
+  }
+  
+  // Create new connection
+  const connection = await mongoose.connect(MONGODB_URI);
+  return { connection, shouldDisconnect: true };
+}
+
+// Helper to safely disconnect only if we created the connection
+async function disconnectMongoIfNeeded(shouldDisconnect) {
+  if (shouldDisconnect && mongoose.connection.readyState === 1) {
+    // Check if app is still using MongoDB before disconnecting
+    try {
+      const effectiveDB = await getEffectiveDBType();
+      if (effectiveDB !== 'mongodb') {
+        // Safe to disconnect since app is not using MongoDB
+        await mongoose.disconnect();
+      }
+      // Otherwise, leave it connected for the app to use
+    } catch (error) {
+      console.error("Error checking DB type:", error);
+      // On error, don't disconnect to be safe
+    }
+  }
+}
 
 // Initialize PostgreSQL schema
 export async function initializePostgreSQLSchema() {
@@ -45,15 +77,18 @@ export async function migrateUsers() {
     return { error: "MONGODB_URI가 설정되지 않았습니다." };
   }
 
+  let shouldDisconnect = false;
   try {
     // Connect to MongoDB
-    const mongoConnection = await mongoose.connect(MONGODB_URI);
+    const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
+    shouldDisconnect = needsDisconnect;
     const db = mongoConnection.connection.db;
     
     // Get users collection
     const users = await db.collection("users").find({}).toArray();
     
     if (users.length === 0) {
+      await disconnectMongoIfNeeded(shouldDisconnect);
       return { success: true, message: "마이그레이션할 사용자가 없습니다.", count: 0 };
     }
     
@@ -126,7 +161,7 @@ export async function migrateUsers() {
       }
     }
     
-    await mongoose.disconnect();
+    await disconnectMongoIfNeeded(shouldDisconnect);
     
     return {
       success: true,
@@ -136,6 +171,7 @@ export async function migrateUsers() {
     };
   } catch (error) {
     console.error("User migration error:", error);
+    await disconnectMongoIfNeeded(shouldDisconnect);
     return { error: `사용자 마이그레이션 실패: ${error.message}` };
   }
 }
@@ -146,13 +182,16 @@ export async function migrateDirectories() {
     return { error: "MONGODB_URI가 설정되지 않았습니다." };
   }
 
+  let shouldDisconnect = false;
   try {
-    const mongoConnection = await mongoose.connect(MONGODB_URI);
+    const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
+    shouldDisconnect = needsDisconnect;
     const db = mongoConnection.connection.db;
     
     const directories = await db.collection("directories").find({}).toArray();
     
     if (directories.length === 0) {
+      await disconnectMongoIfNeeded(shouldDisconnect);
       return { success: true, message: "마이그레이션할 디렉토리가 없습니다.", count: 0 };
     }
     
@@ -206,7 +245,7 @@ export async function migrateDirectories() {
       }
     }
     
-    await mongoose.disconnect();
+    await disconnectMongoIfNeeded(shouldDisconnect);
     
     return {
       success: true,
@@ -216,6 +255,7 @@ export async function migrateDirectories() {
     };
   } catch (error) {
     console.error("Directory migration error:", error);
+    await disconnectMongoIfNeeded(shouldDisconnect);
     return { error: `디렉토리 마이그레이션 실패: ${error.message}` };
   }
 }
@@ -226,13 +266,16 @@ export async function migrateFiles() {
     return { error: "MONGODB_URI가 설정되지 않았습니다." };
   }
 
+  let shouldDisconnect = false;
   try {
-    const mongoConnection = await mongoose.connect(MONGODB_URI);
+    const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
+    shouldDisconnect = needsDisconnect;
     const db = mongoConnection.connection.db;
     
     const files = await db.collection("files").find({}).toArray();
     
     if (files.length === 0) {
+      await disconnectMongoIfNeeded(shouldDisconnect);
       return { success: true, message: "마이그레이션할 파일이 없습니다.", count: 0 };
     }
     
@@ -299,7 +342,7 @@ export async function migrateFiles() {
       }
     }
     
-    await mongoose.disconnect();
+    await disconnectMongoIfNeeded(shouldDisconnect);
     
     return {
       success: true,
@@ -309,6 +352,7 @@ export async function migrateFiles() {
     };
   } catch (error) {
     console.error("File migration error:", error);
+    await disconnectMongoIfNeeded(shouldDisconnect);
     return { error: `파일 마이그레이션 실패: ${error.message}` };
   }
 }
@@ -319,13 +363,16 @@ export async function migrateRateLimits() {
     return { error: "MONGODB_URI가 설정되지 않았습니다." };
   }
 
+  let shouldDisconnect = false;
   try {
-    const mongoConnection = await mongoose.connect(MONGODB_URI);
+    const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
+    shouldDisconnect = needsDisconnect;
     const db = mongoConnection.connection.db;
     
     const rateLimits = await db.collection("ratelimits").find({}).toArray();
     
     if (rateLimits.length === 0) {
+      await disconnectMongoIfNeeded(shouldDisconnect);
       return { success: true, message: "마이그레이션할 rate limit이 없습니다.", count: 0 };
     }
     
@@ -368,7 +415,7 @@ export async function migrateRateLimits() {
       }
     }
     
-    await mongoose.disconnect();
+    await disconnectMongoIfNeeded(shouldDisconnect);
     
     return {
       success: true,
@@ -378,6 +425,7 @@ export async function migrateRateLimits() {
     };
   } catch (error) {
     console.error("Rate limit migration error:", error);
+    await disconnectMongoIfNeeded(shouldDisconnect);
     return { error: `Rate limit 마이그레이션 실패: ${error.message}` };
   }
 }
@@ -451,8 +499,10 @@ export async function getMigrationStatus() {
     let mongoError = null;
     
     if (MONGODB_URI) {
+      let shouldDisconnect = false;
       try {
-        const mongoConnection = await mongoose.connect(MONGODB_URI);
+        const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
+        shouldDisconnect = needsDisconnect;
         const db = mongoConnection.connection.db;
         
         mongoStats = {
@@ -462,10 +512,11 @@ export async function getMigrationStatus() {
           rateLimits: await db.collection("ratelimits").countDocuments(),
         };
         
-        await mongoose.disconnect();
+        await disconnectMongoIfNeeded(shouldDisconnect);
       } catch (error) {
         console.error("Error getting MongoDB stats:", error);
         mongoError = error.message;
+        await disconnectMongoIfNeeded(shouldDisconnect);
       }
     }
     
