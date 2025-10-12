@@ -1,6 +1,8 @@
 # Shareify - File Sharing Platform
 
-Shareify is a Next.js full-stack web application for anonymous file sharing with features including 2FA, email verification, file encryption, directory management, and user authentication. Built with Next.js 14.1.4, TailwindCSS, DaisyUI, MongoDB, and Cloudflare R2 storage.
+Shareify is a Next.js full-stack web application for anonymous file sharing with features including 2FA, email verification, file encryption, directory management, and user authentication. Built with Next.js 14.1.4, TailwindCSS, DaisyUI, PostgreSQL/MongoDB, and Cloudflare R2 storage.
+
+**Database**: Supports both PostgreSQL 17 (recommended, Neon-compatible) and MongoDB (legacy). See MIGRATION.md for migration guide.
 
 **Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
 
@@ -23,11 +25,18 @@ The application **REQUIRES** environment variables to run. Copy `.env.example` t
 cp .env.example .env
 # Edit .env with required values:
 # - JWT_SECRET (mandatory - at least 32 characters)
-# - MONGODB_URI (database connection)
+# - DATABASE_URL (PostgreSQL connection string - recommended)
+#   OR MONGODB_URI (MongoDB connection - legacy)
 # - R2_* variables (Cloudflare R2 storage)
 # - EMAIL_* variables (email service)
 # - NEXT_PUBLIC_APP_URL
 ```
+
+**Database Configuration**:
+- **PostgreSQL** (recommended): Set `DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require`
+- **MongoDB** (legacy): Set `MONGODB_URI=mongodb://localhost:27017/shareify`
+- Application auto-detects which database to use based on environment variables
+- See `MIGRATION.md` for migrating from MongoDB to PostgreSQL
 
 **Without .env file, the application will crash with JWT_SECRET error.**
 
@@ -100,7 +109,7 @@ After making changes, **ALWAYS** test these key user flows:
 ### Environment Validation
 - Always verify .env file exists before running dev/build
 - Test both development and production modes when making changes
-- Confirm MongoDB connection settings if modifying database code
+- Confirm DATABASE_URL (PostgreSQL) or MONGODB_URI (MongoDB) connection settings if modifying database code
 
 ## Common Tasks and File Locations
 
@@ -112,14 +121,26 @@ src/
 │   ├── auth/           # Authentication pages
 │   ├── dashboard/      # User dashboard
 │   ├── profile/        # User profile management
+│   ├── admin/          # Admin panel (includes /admin/migration)
 │   └── share/          # File sharing functionality
 ├── lib/                # Utility libraries
 │   ├── auth/           # Authentication utilities (JWT, etc.)
-│   ├── db/             # Database connection and utilities
+│   ├── db/             # Database layer
+│   │   ├── mongodb.js       # MongoDB connection (legacy)
+│   │   ├── postgresql.js    # PostgreSQL connection (recommended)
+│   │   ├── router.js        # Auto-selects DB based on env
+│   │   ├── model.js         # PostgreSQL model abstraction
+│   │   ├── migration.js     # Migration utilities
+│   │   └── schema.sql       # PostgreSQL schema
 │   ├── email/          # Email service integration
 │   ├── crypto/         # Encryption utilities
 │   └── r2/             # Cloudflare R2 storage utilities
-├── models/             # Database models (MongoDB)
+├── models/             # Database models
+│   ├── User.js         # MongoDB User model (legacy)
+│   ├── User.pg.js      # PostgreSQL User model
+│   ├── File.js/File.pg.js       # File models
+│   ├── Directory.js/Directory.pg.js  # Directory models
+│   └── RateLimit.js/RateLimit.pg.js  # Rate limit models
 ├── actions/            # Server actions
 └── context/            # React context providers
 ```
@@ -127,6 +148,7 @@ src/
 ### Important Configuration Files
 - `package.json` - Dependencies and scripts
 - `.env.example` - Environment variable template
+- `MIGRATION.md` - Database migration guide
 - `next.config.mjs` - Next.js configuration (ignores build errors)
 - `tailwind.config.js` - TailwindCSS + DaisyUI configuration
 - `.eslintrc.json` - ESLint configuration
@@ -134,7 +156,7 @@ src/
 ### Dependencies and Technology Stack
 - **Framework:** Next.js 14.1.4
 - **Styling:** TailwindCSS + DaisyUI
-- **Database:** MongoDB (via mongoose)
+- **Database:** PostgreSQL 17 (recommended, pg driver) or MongoDB (legacy, mongoose)
 - **File Storage:** Cloudflare R2 (AWS SDK)
 - **Authentication:** JWT (jose library)
 - **Email:** nodemailer
