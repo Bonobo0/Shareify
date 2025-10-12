@@ -2,6 +2,7 @@
 
 import { connectToDatabase as connectToPostgreSQL, query, withTransaction } from "@/lib/db/postgresql.js";
 import { SCHEMA_SQL } from "@/lib/db/schemaContent.js";
+import { toUUID } from "@/lib/db/model.js";
 import mongoose from "mongoose";
 import { getEffectiveDBType } from "@/lib/db/settings.js";
 
@@ -101,7 +102,7 @@ export async function migrateUsers() {
     for (const user of users) {
       try {
         const userData = {
-          id: user._id.toString(), // Keep MongoDB ID as UUID string for now
+          id: toUUID(user._id.toString()), // Convert MongoDB ObjectId to UUID
           email: user.email,
           password: user.password,
           name: user.name,
@@ -203,11 +204,11 @@ export async function migrateDirectories() {
     for (const dir of directories) {
       try {
         const dirData = {
-          id: dir._id.toString(),
+          id: toUUID(dir._id.toString()),
           name: dir.name,
           description: dir.description || '',
-          ownerId: dir.owner.toString(),
-          parentId: dir.parent ? dir.parent.toString() : null,
+          ownerId: toUUID(dir.owner.toString()),
+          parentId: dir.parent ? toUUID(dir.parent.toString()) : null,
           hash: dir.hash,
           path: dir.path,
           shared: JSON.stringify(dir.shared || []),
@@ -287,8 +288,8 @@ export async function migrateFiles() {
     for (const file of files) {
       try {
         const fileData = {
-          id: file._id.toString(),
-          ownerId: file.owner.toString(),
+          id: toUUID(file._id.toString()),
+          ownerId: toUUID(file.owner.toString()),
           originalName: file.originalName,
           fileName: file.fileName,
           hash: file.hash,
@@ -301,7 +302,7 @@ export async function migrateFiles() {
           originalSize: file.originalSize,
           originalMimetype: file.originalMimetype,
           shared: JSON.stringify(file.shared || []),
-          parentDirectoryId: file.parentDirectory ? file.parentDirectory.toString() : null,
+          parentDirectoryId: file.parentDirectory ? toUUID(file.parentDirectory.toString()) : null,
           deleted: file.deleted || false,
           createdAt: file.createdAt,
           updatedAt: file.updatedAt,
