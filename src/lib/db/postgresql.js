@@ -1,6 +1,5 @@
 import { Pool } from 'pg';
-import fs from 'fs';
-import path from 'path';
+import { SCHEMA_SQL } from './schemaContent.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -75,7 +74,7 @@ async function checkSchemaExists() {
   }
 }
 
-// Initialize schema from schema.sql file
+// Initialize schema from inlined schema content
 async function initializeSchema() {
   if (schemaInitialized) {
     return;
@@ -84,15 +83,8 @@ async function initializeSchema() {
   try {
     console.log('🔧 Initializing PostgreSQL schema...');
     
-    // Read schema file
-    const schemaPath = path.join(process.cwd(), 'src/lib/db/schema.sql');
-    
-    if (!fs.existsSync(schemaPath)) {
-      console.error('❌ Schema file not found at:', schemaPath);
-      return;
-    }
-
-    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+    // Use inlined schema content instead of reading from file
+    const schemaSql = SCHEMA_SQL;
     
     // Split by semicolons and execute each statement
     // Filter out empty statements and comment-only lines

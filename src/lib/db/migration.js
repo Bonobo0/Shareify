@@ -1,9 +1,8 @@
 "use server";
 
 import { connectToDatabase as connectToPostgreSQL, query, withTransaction } from "@/lib/db/postgresql.js";
+import { SCHEMA_SQL } from "@/lib/db/schemaContent.js";
 import mongoose from "mongoose";
-import fs from "fs";
-import path from "path";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -13,9 +12,8 @@ export async function initializePostgreSQLSchema() {
   try {
     await connectToPostgreSQL();
     
-    // Read and execute schema SQL
-    const schemaPath = path.join(process.cwd(), "src/lib/db/schema.sql");
-    const schemaSql = fs.readFileSync(schemaPath, "utf8");
+    // Use inlined schema content instead of reading from file
+    const schemaSql = SCHEMA_SQL;
     
     // Split by semicolons and execute each statement
     const statements = schemaSql
