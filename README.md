@@ -2,7 +2,7 @@
 ### **설명**
 **익명으로 파일을 자유롭게 공유할 수 있는 서비스입니다.**
 <br/>
-**Next.js, TailwindCSS, MongoDB, Cloudflare R2 등의 기술 스택들을 사용했습니다.**
+**Next.js, TailwindCSS, PostgreSQL/MongoDB, Cloudflare R2 등의 기술 스택들을 사용했습니다.**
 <br/>
 해당 프로젝트의 기능 구현 및 디버깅에 있어, 
 **생성형 AI(GitHub Copilot Agent - Claude Sonnet 4)**
@@ -36,7 +36,15 @@
 <br/>
 **데이터베이스, 오브젝트 스토리지, 이메일 서비스 등의 설정이 필요합니다.**
 <br/>
-**MongoDB, Cloudflare R2, SMTP 서버 등을 설정해야 합니다.**
+
+#### **데이터베이스 지원**
+**PostgreSQL 17 (권장) 또는 MongoDB를 사용할 수 있습니다.**
+- **PostgreSQL** (권장): Neon 호환, `DATABASE_URL` 설정
+- **MongoDB** (레거시): `MONGODB_URI` 설정
+- MongoDB에서 PostgreSQL로 마이그레이션: `MIGRATION.md` 참고
+<br/>
+
+**Cloudflare R2, SMTP 서버 등을 설정해야 합니다.**
 <br/>
 **사용하는 패키지 매니저에 따라 의존성 패키지를 설치해주세요.**
 <br/>
@@ -54,6 +62,12 @@ npm run start
 yarn build
 yarn start
 ```
+
+### **데이터베이스 마이그레이션**
+**MongoDB에서 PostgreSQL로 마이그레이션하려면:**
+1. `MIGRATION.md` 파일을 참고하세요
+2. 관리자로 로그인 후 `/admin/migration` 페이지에서 마이그레이션 가능
+3. 수동 단계별 마이그레이션 또는 자동 전체 마이그레이션 선택
 
 ### **Disclaimer**
 **이 프로젝트는 개인적인 연습용 프로젝트로, 실제 서비스를 위한 것이 아닙니다.**
