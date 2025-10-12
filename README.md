@@ -40,6 +40,7 @@
 #### **데이터베이스 지원**
 **PostgreSQL 17 (권장) 또는 MongoDB를 사용할 수 있습니다.**
 - **PostgreSQL** (권장): Neon 호환, `DATABASE_URL` 설정
+  - **자동 스키마 초기화**: PostgreSQL 설정 시 최초 연결 시 자동으로 테이블 생성
 - **MongoDB** (레거시): `MONGODB_URI` 설정
 - **관리자 페이지에서 데이터베이스 선택 가능**: `/admin/db-settings`
 - MongoDB에서 PostgreSQL로 마이그레이션: `MIGRATION.md` 참고

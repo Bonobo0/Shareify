@@ -36,6 +36,21 @@ For Neon PostgreSQL:
 
 ## Migration Process
 
+### Automatic Schema Initialization
+
+**New Feature**: When you configure PostgreSQL (set `DATABASE_URL`), the application will automatically initialize the database schema on first connection. No manual intervention needed!
+
+If tables don't exist:
+- The application detects this on the first database connection
+- Automatically reads and executes `src/lib/db/schema.sql`
+- Creates all necessary tables, indexes, functions, and triggers
+- Logs the initialization process for verification
+
+This means you can:
+1. Set `DATABASE_URL` in your `.env` file
+2. Start the application
+3. Schema is automatically created ✨
+
 ### Option 1: Automatic Migration (Recommended)
 
 1. **Access Admin Panel**
@@ -158,8 +173,16 @@ LIMIT 1;
 ## Troubleshooting
 
 ### Migration Fails with "relation does not exist"
-- Run "스키마 초기화" (Initialize Schema) first
+
+**This error should no longer occur** with the automatic schema initialization feature. However, if you still encounter it:
+- The schema will be automatically initialized on the next connection attempt
 - Check that `DATABASE_URL` is correct and accessible
+- Verify PostgreSQL server is running
+- Check application logs for initialization messages
+
+If automatic initialization fails:
+- Manually run "스키마 초기화" (Initialize Schema) at `/admin/migration`
+- Check PostgreSQL logs for permission or configuration issues
 
 ### "MONGODB_URI not set" Error
 - Keep `MONGODB_URI` in `.env` during migration
