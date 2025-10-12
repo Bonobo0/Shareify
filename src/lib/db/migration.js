@@ -428,15 +428,29 @@ export async function migrateAllData() {
 // Check migration status
 export async function getMigrationStatus() {
   try {
-    const pgResult = await query(`
-      SELECT 
-        (SELECT COUNT(*) FROM users) as users,
-        (SELECT COUNT(*) FROM directories) as directories,
-        (SELECT COUNT(*) FROM files) as files,
-        (SELECT COUNT(*) FROM rate_limits) as rate_limits
-    `);
+    let pgStats = { users: 0, directories: 0, files: 0, rate_limits: 0 };
+    let pgError = null;
+
+    // Try to get PostgreSQL stats
+    if (DATABASE_URL) {
+      try {
+        await connectToPostgreSQL();
+        const pgResult = await query(`
+          SELECT 
+            (SELECT COUNT(*) FROM users) as users,
+            (SELECT COUNT(*) FROM directories) as directories,
+            (SELECT COUNT(*) FROM files) as files,
+            (SELECT COUNT(*) FROM rate_limits) as rate_limits
+        `);
+        pgStats = pgResult.rows[0];
+      } catch (error) {
+        console.error("Error getting PostgreSQL stats:", error);
+        pgError = error.message;
+      }
+    }
     
     let mongoStats = { users: 0, directories: 0, files: 0, rateLimits: 0 };
+    let mongoError = null;
     
     if (MONGODB_URI) {
       try {
@@ -453,13 +467,18 @@ export async function getMigrationStatus() {
         await mongoose.disconnect();
       } catch (error) {
         console.error("Error getting MongoDB stats:", error);
+        mongoError = error.message;
       }
     }
     
     return {
       success: true,
-      postgresql: pgResult.rows[0],
+      postgresql: pgStats,
+      postgresqlError: pgError,
       mongodb: mongoStats,
+      mongodbError: mongoError,
+      databaseUrl: DATABASE_URL ? '설정됨' : '미설정',
+      mongodbUri: MONGODB_URI ? '설정됨' : '미설정',
     };
   } catch (error) {
     console.error("Error getting migration status:", error);

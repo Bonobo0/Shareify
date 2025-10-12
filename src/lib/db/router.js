@@ -1,23 +1,52 @@
-// Database Router - Selects between MongoDB and PostgreSQL based on environment variable
+// Database Router - Selects between MongoDB and PostgreSQL based on environment variable and settings
 // This allows for gradual migration and testing
 
-const USE_POSTGRESQL = process.env.USE_POSTGRESQL === 'true' || process.env.DATABASE_URL !== undefined;
+import { getEffectiveDBType } from './settings.js';
 
-export function getDBType() {
-  return USE_POSTGRESQL ? 'postgresql' : 'mongodb';
+let cachedDBType = null;
+
+// Determine which database to use
+async function determineDBType() {
+  if (cachedDBType) {
+    return cachedDBType;
+  }
+
+  try {
+    cachedDBType = await getEffectiveDBType();
+    return cachedDBType;
+  } catch (error) {
+    console.error("Error determining DB type, falling back to environment variables:", error);
+    // Fallback to environment variable logic
+    const USE_POSTGRESQL = process.env.USE_POSTGRESQL === 'true' || process.env.DATABASE_URL !== undefined;
+    cachedDBType = USE_POSTGRESQL ? 'postgresql' : 'mongodb';
+    return cachedDBType;
+  }
 }
 
-export function isUsingPostgreSQL() {
-  return USE_POSTGRESQL;
+export async function getDBType() {
+  const dbType = await determineDBType();
+  return dbType === 'none' ? 'mongodb' : dbType; // Default to mongodb if nothing configured
 }
 
-export function isUsingMongoDB() {
-  return !USE_POSTGRESQL;
+export async function isUsingPostgreSQL() {
+  const dbType = await determineDBType();
+  return dbType === 'postgresql';
+}
+
+export async function isUsingMongoDB() {
+  const dbType = await determineDBType();
+  return dbType === 'mongodb';
+}
+
+// Clear cache to force re-evaluation (useful after settings change)
+export function clearDBTypeCache() {
+  cachedDBType = null;
 }
 
 // Re-export connection functions based on database type
 export async function connectToDatabase() {
-  if (USE_POSTGRESQL) {
+  const dbType = await determineDBType();
+  if (dbType === 'postgresql') {
     const { connectToDatabase: pgConnect } = await import('./postgresql.js');
     return pgConnect();
   } else {
@@ -28,7 +57,8 @@ export async function connectToDatabase() {
 
 // Model loader - returns appropriate model based on database type
 export async function getModel(modelName) {
-  if (USE_POSTGRESQL) {
+  const dbType = await determineDBType();
+  if (dbType === 'postgresql') {
     // Load PostgreSQL models
     switch(modelName) {
       case 'User':
@@ -73,4 +103,5 @@ export default {
   isUsingMongoDB,
   connectToDatabase,
   getModel,
+  clearDBTypeCache,
 };

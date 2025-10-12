@@ -197,6 +197,9 @@ export default function AdminPage() {
           <p className="text-gray-600 mt-1">사용자 계정 및 할당량 관리</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/admin/db-settings" className="btn btn-secondary btn-sm">
+            DB 설정
+          </Link>
           <Link href="/admin/migration" className="btn btn-primary btn-sm">
             DB 마이그레이션
           </Link>

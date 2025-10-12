@@ -32,6 +32,7 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 .env
+.db-settings.json
 # vercel
 .vercel
 

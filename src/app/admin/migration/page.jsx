@@ -189,21 +189,39 @@ export default function MigrationPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <h3 className="font-bold mb-2">MongoDB</h3>
-                <ul className="space-y-1">
-                  <li>사용자: {status.mongodb?.users || 0}명</li>
-                  <li>디렉토리: {status.mongodb?.directories || 0}개</li>
-                  <li>파일: {status.mongodb?.files || 0}개</li>
-                  <li>Rate Limits: {status.mongodb?.rateLimits || 0}개</li>
-                </ul>
+                {status.mongodbError ? (
+                  <div className="alert alert-error alert-sm">
+                    <span className="text-xs">{status.mongodbError}</span>
+                  </div>
+                ) : (
+                  <ul className="space-y-1">
+                    <li>사용자: {status.mongodb?.users || 0}명</li>
+                    <li>디렉토리: {status.mongodb?.directories || 0}개</li>
+                    <li>파일: {status.mongodb?.files || 0}개</li>
+                    <li>Rate Limits: {status.mongodb?.rateLimits || 0}개</li>
+                  </ul>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  환경변수: {status.mongodbUri}
+                </p>
               </div>
               <div>
                 <h3 className="font-bold mb-2">PostgreSQL</h3>
-                <ul className="space-y-1">
-                  <li>사용자: {status.postgresql?.users || 0}명</li>
-                  <li>디렉토리: {status.postgresql?.directories || 0}개</li>
-                  <li>파일: {status.postgresql?.files || 0}개</li>
-                  <li>Rate Limits: {status.postgresql?.rate_limits || 0}개</li>
-                </ul>
+                {status.postgresqlError ? (
+                  <div className="alert alert-error alert-sm">
+                    <span className="text-xs">{status.postgresqlError}</span>
+                  </div>
+                ) : (
+                  <ul className="space-y-1">
+                    <li>사용자: {status.postgresql?.users || 0}명</li>
+                    <li>디렉토리: {status.postgresql?.directories || 0}개</li>
+                    <li>파일: {status.postgresql?.files || 0}개</li>
+                    <li>Rate Limits: {status.postgresql?.rate_limits || 0}개</li>
+                  </ul>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  환경변수: {status.databaseUrl}
+                </p>
               </div>
             </div>
             <div className="card-actions justify-end mt-4">
