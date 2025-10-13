@@ -175,7 +175,7 @@ export async function signUp(formData) {
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24시간
 
     // 새 사용자 생성
-    const user = new User({
+    const user = await User.create({
       email,
       password,
       name: name || email.split("@")[0],
@@ -183,8 +183,6 @@ export async function signUp(formData) {
       emailVerificationExpires: verificationExpires,
       isVerified: false, // 이메일 인증 필요
     });
-
-    await user.save();
 
     console.log("회원가입 완료:", {
       id: user._id,
