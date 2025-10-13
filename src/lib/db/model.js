@@ -1,21 +1,29 @@
 import { query, withTransaction } from './postgresql.js';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, v5 as uuidv5 } from 'uuid';
+
+// Namespace UUID for converting MongoDB ObjectIds to UUIDs
+// This ensures consistent conversion of the same ObjectId to the same UUID
+const MONGODB_OBJECTID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
 // Helper function to convert MongoDB-style ObjectId to UUID
 export function toUUID(id) {
   if (!id) return null;
+  
+  // Convert to string if it's an object
+  const idStr = (id && typeof id.toString === 'function') ? id.toString() : String(id);
+  
   // If it's already a UUID format, return it
-  if (typeof id === 'string' && id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-    return id;
+  if (idStr.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    return idStr;
   }
-  // If it's an object with toString, call it
-  if (id && typeof id.toString === 'function') {
-    const str = id.toString();
-    if (str.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-      return str;
-    }
+  
+  // If it's a MongoDB ObjectId (24 hex characters), convert to UUID v5
+  if (idStr.match(/^[0-9a-f]{24}$/i)) {
+    return uuidv5(idStr, MONGODB_OBJECTID_NAMESPACE);
   }
-  return id;
+  
+  // For any other format, return as-is (will likely fail on PostgreSQL, but preserves compatibility)
+  return idStr;
 }
 
 // Helper to convert snake_case to camelCase
