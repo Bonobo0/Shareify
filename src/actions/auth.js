@@ -35,7 +35,7 @@ export async function signIn(formData) {
       };
     }
 
-    const user = await User.findOne({ email }).select(
+    const user = await User.findOne({ email },
       "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes"
     );
 
@@ -271,7 +271,7 @@ export async function verifyAuth() {
 
     await connectToDatabase();
     const User = await getModel('User');
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findById(decoded.userId, "-password");
 
     if (!user) {
       return { authenticated: false };
@@ -378,7 +378,7 @@ export async function verifyPasswordResetToken({ token }) {
     const user = await User.findOne({
       passwordResetToken: token,
       passwordResetExpires: { $gt: new Date() },
-    }).select("+twoFactorEnabled");
+    }, "+twoFactorEnabled");
 
     if (!user) {
       return { error: "유효하지 않거나 만료된 재설정 링크입니다." };
@@ -436,7 +436,7 @@ export async function resetPassword({
     const user = await User.findOne({
       passwordResetToken: token,
       passwordResetExpires: { $gt: new Date() },
-    }).select(
+    },
       "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes"
     );
 
@@ -533,7 +533,7 @@ export async function changePassword({
     const User = await getModel('User');
 
     // 사용자 조회 (비밀번호 포함)
-    const user = await User.findById(decoded.userId).select("+password");
+    const user = await User.findById(decoded.userId, "+password");
     if (!user) {
       return { error: "사용자를 찾을 수 없습니다." };
     }

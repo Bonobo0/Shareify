@@ -64,13 +64,25 @@ export class Model {
     this.tableName = tableName;
   }
 
-  async findById(id, options = {}) {
+  async findById(id, projection = null, options = {}) {
     const uuid = toUUID(id);
     let selectClause = '*';
     
+    // Handle Mongoose-style projection as second parameter
+    // Can be a string like "-password"
+    // Or an options object like { select: "-password" }
+    let selectString = null;
+    if (typeof projection === 'string') {
+      selectString = projection;
+    } else if (projection && typeof projection === 'object' && projection.select) {
+      selectString = projection.select;
+    } else if (options.select) {
+      selectString = options.select;
+    }
+    
     // Handle field selection (exclude fields with -)
-    if (options.select) {
-      const fields = options.select.split(' ');
+    if (selectString) {
+      const fields = selectString.split(' ');
       const includeFields = fields.filter(f => !f.startsWith('-'));
       const excludeFields = fields.filter(f => f.startsWith('-')).map(f => f.substring(1));
       
@@ -95,12 +107,24 @@ export class Model {
     return result.rows[0] ? this._transformRow(result.rows[0]) : null;
   }
 
-  async findOne(conditions, options = {}) {
+  async findOne(conditions, projection = null, options = {}) {
     const { whereClause, values } = this._buildWhereClause(conditions);
     let selectClause = '*';
     
-    if (options.select) {
-      selectClause = this._buildSelectClause(options.select);
+    // Handle Mongoose-style projection as second parameter
+    // Can be a string like "-password"
+    // Or an options object like { select: "-password" }
+    let selectString = null;
+    if (typeof projection === 'string') {
+      selectString = projection;
+    } else if (projection && typeof projection === 'object' && projection.select) {
+      selectString = projection.select;
+    } else if (options.select) {
+      selectString = options.select;
+    }
+    
+    if (selectString) {
+      selectClause = this._buildSelectClause(selectString);
     }
     
     const result = await query(
