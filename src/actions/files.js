@@ -1,10 +1,7 @@
 "use server";
 
-import { connectToDatabase } from "@/lib/db/mongodb";
+import { connectToDatabase, getModel, isUsingMongoDB } from "@/lib/db/router";
 import { verifyToken } from "@/lib/auth/jwt";
-import File from "@/models/File";
-import Directory from "@/models/Directory";
-import User from "@/models/User";
 import mongoose from "mongoose";
 import { cookies } from "next/headers";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
@@ -15,6 +12,17 @@ import {
   generateDownloadUrl,
   deleteObject as deleteFileFromR2,
 } from "@/lib/r2/r2Client";
+
+// Helper function to safely convert ID based on database type
+async function toDBId(id) {
+  if (!id) return id;
+  const usingMongo = await isUsingMongoDB();
+  if (usingMongo) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  // For PostgreSQL, just return the string ID
+  return id;
+}
 
 async function getAuthenticatedUser() {
   const token = cookies().get("token")?.value;
@@ -47,6 +55,8 @@ export async function getFileList({
     }
 
     await connectToDatabase();
+    const File = await getModel('File');
+    const Directory = await getModel('Directory');
 
     // 정렬 옵션
     const sortOptions = {};
@@ -64,12 +74,12 @@ export async function getFileList({
       console.log("디렉토리 조회 결과:", directory);
 
       // 디렉토리 접근 권한 확인
-      const isOwner = directory.owner._id.toString() === userId;
+      const isOwner = (directory.owner._id || directory.owner.id || directory.owner).toString() === userId;
       const isDirectlyShared = directory.shared?.some((share) => {
         // Handle both populated and non-populated userId
         const shareUserId = share.userId._id
           ? share.userId._id.toString()
-          : share.userId.toString();
+          : (share.userId.id || share.userId).toString();
         return shareUserId === userId;
       });
       // 최상위 디렉토리 권한 확인
@@ -77,14 +87,15 @@ export async function getFileList({
       let currentDirectory = directory;
       // 상위 디렉토리로 올라가며 권한 확인
       while (currentDirectory && currentDirectory.parent) {
+        const userIdForQuery = await toDBId(userId);
         const parentDirectory = await Directory.findOne({
           _id: currentDirectory.parent,
           $or: [
-            { owner: new mongoose.Types.ObjectId(userId) },
+            { owner: userIdForQuery },
             {
               "shared": {
                 $elemMatch: {
-                  "userId": new mongoose.Types.ObjectId(userId),
+                  "userId": userIdForQuery,
                 },
               },
             },
@@ -96,9 +107,9 @@ export async function getFileList({
         }
         // 상위 디렉토리 접근 권한 확인
         if (
-          parentDirectory.owner._id.toString() === userId ||
+          (parentDirectory.owner._id || parentDirectory.owner.id || parentDirectory.owner).toString() === userId ||
           parentDirectory.shared.some(
-            (share) => share.userId._id.toString() === userId
+            (share) => (share.userId._id || share.userId.id || share.userId).toString() === userId
           )
         ) {
           hasParentAccess = true;
@@ -117,27 +128,30 @@ export async function getFileList({
     }
 
     // 필터 조건 (디렉토리 접근 권한이 있으면 해당 디렉토리의 모든 파일 조회)
+    const userIdForQuery = await toDBId(userId);
+    const dirIdForQuery = directoryId ? await toDBId(directoryId) : null;
+    
     let filter;
     if (directoryId && hasDirectoryAccess) {
       // 디렉토리에 권한이 있으면 해당 디렉토리의 모든 파일에 접근 가능
       filter = {
-        parentDirectory: new mongoose.Types.ObjectId(directoryId),
+        parentDirectory: dirIdForQuery,
         deleted: { $ne: true },
       };
     } else if (directoryId) {
       // directoryId가 있지만 권한이 없는 경우 (위에서 이미 에러 반환)
       filter = {
         $or: [
-          { owner: new mongoose.Types.ObjectId(userId) },
+          { owner: userIdForQuery },
           {
             "shared": {
               $elemMatch: {
-                "userId": new mongoose.Types.ObjectId(userId),
+                "userId": userIdForQuery,
               },
             },
           },
         ],
-        parentDirectory: new mongoose.Types.ObjectId(directoryId),
+        parentDirectory: dirIdForQuery,
         deleted: { $ne: true },
       };
     } else {
@@ -148,14 +162,14 @@ export async function getFileList({
         $or: [
           // 1. 소유한 파일 중 루트에 있는 것들
           {
-            owner: new mongoose.Types.ObjectId(userId),
+            owner: userIdForQuery,
             parentDirectory: null,
           },
           // 2. 직접 공유받은 파일들 (루트에 있는 것들만)
           {
             "shared": {
               $elemMatch: {
-                "userId": new mongoose.Types.ObjectId(userId),
+                "userId": userIdForQuery,
               },
             },
             parentDirectory: null,
@@ -192,7 +206,7 @@ export async function getFileList({
     console.log(
       "조회된 파일들:",
       files.map((f) => ({
-        id: f._id.toString(),
+        id: (f._id || f.id).toString(),
         originalName: f.originalName,
         isEncrypted: f.isEncrypted,
         originalSize: f.originalSize,
@@ -206,7 +220,7 @@ export async function getFileList({
 
     return {
       files: files.map((file) => ({
-        id: file._id.toString(),
+        id: (file._id || file.id).toString(),
         originalName: file.originalName,
         fileName: file.fileName,
         size: file.size,
@@ -217,33 +231,33 @@ export async function getFileList({
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
-        createdAt: file.createdAt ? file.createdAt.toISOString() : null,
-        updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
+        createdAt: file.createdAt ? (file.createdAt.toISOString ? file.createdAt.toISOString() : file.createdAt) : null,
+        updatedAt: file.updatedAt ? (file.updatedAt.toISOString ? file.updatedAt.toISOString() : file.updatedAt) : null,
         parentDirectory: file.parentDirectory
-          ? file.parentDirectory._id.toString()
+          ? (file.parentDirectory._id || file.parentDirectory.id || file.parentDirectory).toString()
           : null,
         parentDirectoryInfo: file.parentDirectory
           ? {
-              id: file.parentDirectory._id.toString(),
+              id: (file.parentDirectory._id || file.parentDirectory.id).toString(),
               name: file.parentDirectory.name,
               owner: {
-                id: file.parentDirectory.owner._id.toString(),
+                id: (file.parentDirectory.owner._id || file.parentDirectory.owner.id || file.parentDirectory.owner).toString(),
                 name: file.parentDirectory.owner.name,
                 email: file.parentDirectory.owner.email,
               },
             }
           : null,
         deleted: file.deleted,
-        owner: file.owner._id.toString() === userId,
+        owner: (file.owner._id || file.owner.id || file.owner).toString() === userId,
         ownerInfo: {
-          id: file.owner._id.toString(),
+          id: (file.owner._id || file.owner.id || file.owner).toString(),
           name: file.owner.name,
           email: file.owner.email,
         },
         sharedWith:
           file.shared?.map((share) => ({
-            _id: share._id.toString(),
-            userId: share.userId._id.toString(),
+            _id: (share._id || share.id).toString(),
+            userId: (share.userId._id || share.userId.id || share.userId).toString(),
             user: {
               name: share.userId.name,
               email: share.userId.email,

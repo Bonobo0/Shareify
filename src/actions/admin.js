@@ -50,19 +50,20 @@ export async function getAllUsers({ page = 1, limit = 50, sortBy = "createdAt", 
     const skip = (page - 1) * limit;
     const sortDirection = sortOrder === "desc" ? -1 : 1;
 
-    const users = await User.find({})
-      .select("name email role storageLimit storageUsed isVerified createdAt updatedAt suspended")
-      .sort({ [sortBy]: sortDirection })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const users = await User.find({}, {
+      select: "name email role storageLimit storageUsed isVerified createdAt updatedAt suspended",
+      sort: { [sortBy]: sortDirection },
+      skip: skip,
+      limit: limit,
+      lean: true
+    });
 
     const totalUsers = await User.countDocuments({});
 
     return {
       success: true,
       users: users.map(user => ({
-        id: user._id.toString(),
+        id: (user._id || user.id).toString(),
         name: user.name,
         email: user.email,
         role: user.role,
@@ -70,8 +71,8 @@ export async function getAllUsers({ page = 1, limit = 50, sortBy = "createdAt", 
         storageUsed: user.storageUsed || 0, // Default 0 if null/undefined
         isVerified: user.isVerified,
         suspended: user.suspended || false,
-        createdAt: user.createdAt ? user.createdAt.toISOString() : null,
-        updatedAt: user.updatedAt ? user.updatedAt.toISOString() : null,
+        createdAt: user.createdAt ? (user.createdAt.toISOString ? user.createdAt.toISOString() : user.createdAt) : null,
+        updatedAt: user.updatedAt ? (user.updatedAt.toISOString ? user.updatedAt.toISOString() : user.updatedAt) : null,
       })),
       pagination: {
         totalUsers,
@@ -268,15 +269,16 @@ export async function searchUsers({ query, limit = 20 }) {
         { name: { $regex: searchRegex } },
         { email: { $regex: searchRegex } },
       ],
-    })
-      .select("name email role storageLimit storageUsed isVerified createdAt suspended")
-      .limit(limit)
-      .lean();
+    }, {
+      select: "name email role storageLimit storageUsed isVerified createdAt suspended",
+      limit: limit,
+      lean: true
+    });
 
     return {
       success: true,
       users: users.map(user => ({
-        id: user._id.toString(),
+        id: (user._id || user.id).toString(),
         name: user.name,
         email: user.email,
         role: user.role,
@@ -284,7 +286,7 @@ export async function searchUsers({ query, limit = 20 }) {
         storageUsed: user.storageUsed || 0, // Default 0 if null/undefined
         isVerified: user.isVerified,
         suspended: user.suspended || false,
-        createdAt: user.createdAt ? user.createdAt.toISOString() : null,
+        createdAt: user.createdAt ? (user.createdAt.toISOString ? user.createdAt.toISOString() : user.createdAt) : null,
       })),
     };
   } catch (error) {
