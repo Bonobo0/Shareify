@@ -454,6 +454,111 @@ export class Model {
     return { deletedCount: result.rowCount, acknowledged: true };
   }
 
+  async findByIdAndDelete(id) {
+    const uuid = toUUID(id);
+    const result = await query(
+      `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING *`,
+      [uuid]
+    );
+    return result.rows[0] ? this._transformRow(result.rows[0]) : null;
+  }
+
+  async findByIdAndUpdate(id, update, options = {}) {
+    const uuid = toUUID(id);
+    
+    // Handle $set, $inc, etc.
+    const updateData = update.$set || update;
+    const incData = update.$inc || {};
+    
+    const snakeData = toSnakeCase(updateData);
+    const snakeIncData = toSnakeCase(incData);
+    
+    const fields = [];
+    const values = [];
+    let paramIndex = 1;
+    
+    // Handle $set fields
+    for (const [field, value] of Object.entries(snakeData)) {
+      if (field !== 'id' && field !== '_id') {
+        fields.push(`${field} = $${paramIndex}`);
+        values.push(value);
+        paramIndex++;
+      }
+    }
+    
+    // Handle $inc fields
+    for (const [field, value] of Object.entries(snakeIncData)) {
+      if (field !== 'id' && field !== '_id') {
+        fields.push(`${field} = ${field} + $${paramIndex}`);
+        values.push(value);
+        paramIndex++;
+      }
+    }
+    
+    if (fields.length === 0) {
+      // No update needed, just return the existing document
+      return await this.findById(uuid);
+    }
+    
+    values.push(uuid);
+    const setClause = fields.join(', ');
+    
+    const result = await query(
+      `UPDATE ${this.tableName} SET ${setClause} WHERE id = $${paramIndex} RETURNING *`,
+      values
+    );
+    
+    return result.rows[0] ? this._transformRow(result.rows[0]) : null;
+  }
+
+  async findOneAndUpdate(conditions, update, options = {}) {
+    const { whereClause, values: whereValues } = this._buildWhereClause(conditions);
+    
+    // Handle $set, $inc, etc.
+    const updateData = update.$set || update;
+    const incData = update.$inc || {};
+    
+    const snakeData = toSnakeCase(updateData);
+    const snakeIncData = toSnakeCase(incData);
+    
+    const fields = [];
+    const values = [];
+    let paramIndex = 1;
+    
+    // Handle $set fields
+    for (const [field, value] of Object.entries(snakeData)) {
+      if (field !== 'id' && field !== '_id') {
+        fields.push(`${field} = $${paramIndex}`);
+        values.push(value);
+        paramIndex++;
+      }
+    }
+    
+    // Handle $inc fields
+    for (const [field, value] of Object.entries(snakeIncData)) {
+      if (field !== 'id' && field !== '_id') {
+        fields.push(`${field} = ${field} + $${paramIndex}`);
+        values.push(value);
+        paramIndex++;
+      }
+    }
+    
+    if (fields.length === 0) {
+      return null;
+    }
+    
+    // Add where condition values
+    values.push(...whereValues);
+    const setClause = fields.join(', ');
+    
+    const result = await query(
+      `UPDATE ${this.tableName} SET ${setClause} ${whereClause} RETURNING *`,
+      values
+    );
+    
+    return result.rows[0] ? this._transformRow(result.rows[0]) : null;
+  }
+
   async countDocuments(conditions = {}) {
     const { whereClause, values } = this._buildWhereClause(conditions);
     const result = await query(
