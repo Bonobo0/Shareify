@@ -7,12 +7,22 @@ class UserModel extends Model {
   }
 
   // Override findOne to handle select with password and other sensitive fields
-  async findOne(conditions, options = {}) {
+  async findOne(conditions, projection = null, options = {}) {
     let selectClause = '*';
     
-    // Handle MongoDB-style select with +field to include normally excluded fields
-    if (options.select) {
-      const selectStr = options.select;
+    // Handle Mongoose-style projection as second parameter
+    // Can be a string like "-password" or "+password"
+    // Or an options object like { select: "-password" }
+    let selectStr = null;
+    if (typeof projection === 'string') {
+      selectStr = projection;
+    } else if (projection && typeof projection === 'object' && projection.select) {
+      selectStr = projection.select;
+    } else if (options.select) {
+      selectStr = options.select;
+    }
+    
+    if (selectStr) {
       // Check if we're including password or other sensitive fields
       if (selectStr.includes('+password')) {
         selectClause = '*'; // Include all fields including password
@@ -35,14 +45,28 @@ class UserModel extends Model {
     return this._addMethods(this._transformRow(result.rows[0]));
   }
 
-  async findById(id, options = {}) {
+  async findById(id, projection = null, options = {}) {
     const uuid = toUUID(id);
     let selectClause = '*';
     
-    if (options.select && options.select.includes('+password')) {
-      selectClause = '*';
+    // Handle Mongoose-style projection as second parameter
+    // Can be a string like "-password" or "+password"
+    // Or an options object like { select: "-password" }
+    let selectString = null;
+    if (typeof projection === 'string') {
+      selectString = projection;
+    } else if (projection && typeof projection === 'object' && projection.select) {
+      selectString = projection.select;
     } else if (options.select) {
-      selectClause = this._buildSelectClause(options.select);
+      selectString = options.select;
+    }
+    
+    if (selectString) {
+      if (selectString.includes('+password')) {
+        selectClause = '*';
+      } else {
+        selectClause = this._buildSelectClause(selectString);
+      }
     }
     
     const result = await query(
