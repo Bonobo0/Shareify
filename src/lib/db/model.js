@@ -464,9 +464,56 @@ export class Model {
   }
 
   async aggregate(pipeline) {
-    // Basic aggregation support
-    // This is a simplified version - full MongoDB aggregation would require more work
-    throw new Error('Aggregation not fully implemented yet. Use custom queries.');
+    // Basic aggregation support for PostgreSQL
+    // This is a simplified version that handles common MongoDB aggregation patterns
+    
+    // Check if this is a simple $group aggregation for sum
+    if (pipeline.length === 1 && pipeline[0].$group) {
+      const groupStage = pipeline[0].$group;
+      
+      // Handle simple sum aggregations
+      if (groupStage._id === null) {
+        // Global aggregation (no grouping)
+        const selectParts = [];
+        const groupFields = Object.entries(groupStage).filter(([key]) => key !== '_id');
+        
+        for (const [resultKey, aggregation] of groupFields) {
+          if (aggregation.$sum) {
+            // Handle $sum with $ifNull
+            if (typeof aggregation.$sum === 'object' && aggregation.$sum.$ifNull) {
+              const [field, defaultValue] = aggregation.$sum.$ifNull;
+              const snakeField = this._toSnakeCase(field.replace('$', ''));
+              selectParts.push(`SUM(COALESCE(${snakeField}, ${defaultValue})) as ${this._toSnakeCase(resultKey)}`);
+            } else if (typeof aggregation.$sum === 'string') {
+              // Simple field sum
+              const snakeField = this._toSnakeCase(aggregation.$sum.replace('$', ''));
+              selectParts.push(`SUM(${snakeField}) as ${this._toSnakeCase(resultKey)}`);
+            } else if (typeof aggregation.$sum === 'number') {
+              // Count
+              selectParts.push(`COUNT(*) * ${aggregation.$sum} as ${this._toSnakeCase(resultKey)}`);
+            }
+          } else if (aggregation.$avg) {
+            const snakeField = this._toSnakeCase(aggregation.$avg.replace('$', ''));
+            selectParts.push(`AVG(${snakeField}) as ${this._toSnakeCase(resultKey)}`);
+          } else if (aggregation.$count) {
+            selectParts.push(`COUNT(*) as ${this._toSnakeCase(resultKey)}`);
+          }
+        }
+        
+        if (selectParts.length > 0) {
+          const sql = `SELECT ${selectParts.join(', ')} FROM ${this.tableName}`;
+          const result = await query(sql);
+          return result.rows.map(row => toCamelCase(row));
+        }
+      }
+    }
+    
+    // For complex aggregations, throw an error with helpful message
+    throw new Error('Complex aggregation not fully implemented. Please use custom SQL queries for complex aggregations.');
+  }
+
+  _toSnakeCase(str) {
+    return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
   }
 
   _buildWhereClause(conditions) {
@@ -501,8 +548,8 @@ export class Model {
         }
       } else if (value === null) {
         clauses.push(`${key} IS NULL`);
-      } else if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-        // Handle operators like $ne, $gt, $gte, $lt, $lte, $in
+      } else if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) && !(value instanceof RegExp)) {
+        // Handle operators like $ne, $gt, $gte, $lt, $lte, $in, $regex
         for (const [op, opValue] of Object.entries(value)) {
           if (op === '$ne') {
             clauses.push(`${key} != $${paramIndex}`);
@@ -528,6 +575,26 @@ export class Model {
             clauses.push(`${key} = ANY($${paramIndex})`);
             values.push(opValue);
             paramIndex++;
+          } else if (op === '$regex') {
+            // Handle regex search - convert to PostgreSQL ILIKE or ~*
+            if (opValue instanceof RegExp) {
+              const regexStr = opValue.source;
+              const flags = opValue.flags;
+              if (flags.includes('i')) {
+                // Case-insensitive
+                clauses.push(`${key} ~* $${paramIndex}`);
+              } else {
+                // Case-sensitive
+                clauses.push(`${key} ~ $${paramIndex}`);
+              }
+              values.push(regexStr);
+              paramIndex++;
+            } else if (typeof opValue === 'string') {
+              // Treat as case-insensitive LIKE pattern
+              clauses.push(`${key} ILIKE $${paramIndex}`);
+              values.push(`%${opValue}%`);
+              paramIndex++;
+            }
           } else if (op === '$elemMatch') {
             // Handle JSONB array element matching
             // e.g., shared @> [{"userId": "xxx", "permission": "admin"}]
@@ -537,6 +604,19 @@ export class Model {
             paramIndex++;
           }
         }
+      } else if (value instanceof RegExp) {
+        // Handle direct RegExp value
+        const regexStr = value.source;
+        const flags = value.flags;
+        if (flags.includes('i')) {
+          // Case-insensitive
+          clauses.push(`${key} ~* $${paramIndex}`);
+        } else {
+          // Case-sensitive
+          clauses.push(`${key} ~ $${paramIndex}`);
+        }
+        values.push(regexStr);
+        paramIndex++;
       } else {
         clauses.push(`${key} = $${paramIndex}`);
         values.push(value);
