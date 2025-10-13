@@ -18,8 +18,8 @@ async function connectToMongoForMigration() {
   }
   
   // Create new connection
-  const connection = await mongoose.connect(MONGODB_URI);
-  return { connection, shouldDisconnect: true };
+  await mongoose.connect(MONGODB_URI);
+  return { connection: mongoose.connection, shouldDisconnect: true };
 }
 
 // Helper to safely disconnect only if we created the connection
@@ -83,7 +83,7 @@ export async function migrateUsers() {
     // Connect to MongoDB
     const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
     shouldDisconnect = needsDisconnect;
-    const db = mongoConnection.connection.db;
+    const db = mongoConnection.db;
     
     // Get users collection
     const users = await db.collection("users").find({}).toArray();
@@ -187,7 +187,7 @@ export async function migrateDirectories() {
   try {
     const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
     shouldDisconnect = needsDisconnect;
-    const db = mongoConnection.connection.db;
+    const db = mongoConnection.db;
     
     const directories = await db.collection("directories").find({}).toArray();
     
@@ -271,7 +271,7 @@ export async function migrateFiles() {
   try {
     const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
     shouldDisconnect = needsDisconnect;
-    const db = mongoConnection.connection.db;
+    const db = mongoConnection.db;
     
     const files = await db.collection("files").find({}).toArray();
     
@@ -368,7 +368,7 @@ export async function migrateRateLimits() {
   try {
     const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
     shouldDisconnect = needsDisconnect;
-    const db = mongoConnection.connection.db;
+    const db = mongoConnection.db;
     
     const rateLimits = await db.collection("ratelimits").find({}).toArray();
     
@@ -504,7 +504,7 @@ export async function getMigrationStatus() {
       try {
         const { connection: mongoConnection, shouldDisconnect: needsDisconnect } = await connectToMongoForMigration();
         shouldDisconnect = needsDisconnect;
-        const db = mongoConnection.connection.db;
+        const db = mongoConnection.db;
         
         mongoStats = {
           users: await db.collection("users").countDocuments(),
