@@ -58,6 +58,245 @@ export function toSnakeCase(obj) {
   return result;
 }
 
+// Query builder class for chainable query methods (Mongoose-like API)
+class Query {
+  constructor(model, conditions = {}) {
+    this.model = model;
+    this.conditions = conditions;
+    this.options = {
+      select: null,
+      sort: null,
+      skip: null,
+      limit: null,
+      lean: false,
+      populate: []
+    };
+  }
+
+  select(fields) {
+    this.options.select = fields;
+    return this;
+  }
+
+  sort(sortObj) {
+    this.options.sort = sortObj;
+    return this;
+  }
+
+  skip(count) {
+    this.options.skip = count;
+    return this;
+  }
+
+  limit(count) {
+    this.options.limit = count;
+    return this;
+  }
+
+  lean() {
+    this.options.lean = true;
+    return this;
+  }
+
+  populate(populateOptions) {
+    // Store populate options for later processing
+    // PostgreSQL will need to join tables or run separate queries
+    this.options.populate.push(populateOptions);
+    return this;
+  }
+
+  async exec() {
+    // Execute the query with all accumulated options
+    let results = await this.model._executeFindWithOptions(this.conditions, this.options);
+    
+    // Handle population (joining related data)
+    if (this.options.populate.length > 0) {
+      results = await this._handlePopulate(results);
+    }
+    
+    return results;
+  }
+
+  async _handlePopulate(results) {
+    // For PostgreSQL, we need to manually join or fetch related data
+    // This is a simplified implementation that fetches related data separately
+    
+    if (!results || results.length === 0) return results;
+    
+    for (const populateOption of this.options.populate) {
+      const path = typeof populateOption === 'string' ? populateOption : populateOption.path;
+      const select = typeof populateOption === 'object' ? populateOption.select : null;
+      const nestedPopulate = typeof populateOption === 'object' ? populateOption.populate : null;
+      
+      // Map field names to related models
+      const relatedModelName = this._getRelatedModelName(path);
+      if (!relatedModelName) continue;
+      
+      // Import the related model dynamically
+      let relatedModel;
+      try {
+        if (relatedModelName === 'User') {
+          const UserPG = await import('@/models/User.pg.js');
+          relatedModel = UserPG.default;
+        } else if (relatedModelName === 'Directory') {
+          const DirectoryPG = await import('@/models/Directory.pg.js');
+          relatedModel = DirectoryPG.default;
+        } else if (relatedModelName === 'File') {
+          const FilePG = await import('@/models/File.pg.js');
+          relatedModel = FilePG.default;
+        }
+      } catch (e) {
+        console.warn(`Could not load model ${relatedModelName}:`, e);
+        continue;
+      }
+      
+      if (!relatedModel) continue;
+      
+      // Handle nested paths (e.g., "shared.userId")
+      const pathParts = path.split('.');
+      
+      if (pathParts.length > 1) {
+        // Handle nested population (e.g., shared.userId)
+        await this._populateNested(results, pathParts, relatedModel, select);
+      } else {
+        // Handle direct population
+        await this._populateDirect(results, path, relatedModel, select, nestedPopulate);
+      }
+    }
+    
+    return results;
+  }
+
+  async _populateDirect(results, path, relatedModel, select, nestedPopulate) {
+    // Collect all IDs to fetch
+    const idsToFetch = new Set();
+    
+    for (const result of results) {
+      const fieldValue = result[path] || result[this._toSnakeCase(path)];
+      if (fieldValue) {
+        idsToFetch.add(fieldValue);
+      }
+    }
+    
+    if (idsToFetch.size === 0) return;
+    
+    // Fetch related documents
+    const relatedDocs = {};
+    for (const id of idsToFetch) {
+      try {
+        const doc = await relatedModel.findById(id, select);
+        if (doc) {
+          relatedDocs[id] = doc;
+        }
+      } catch (e) {
+        console.warn(`Error fetching related document ${id}:`, e);
+      }
+    }
+    
+    // Replace IDs with populated documents
+    for (const result of results) {
+      const fieldValue = result[path] || result[this._toSnakeCase(path)];
+      if (fieldValue && relatedDocs[fieldValue]) {
+        result[path] = relatedDocs[fieldValue];
+        // Also update snake_case version if it exists
+        const snakeKey = this._toSnakeCase(path);
+        if (result[snakeKey]) {
+          result[snakeKey] = relatedDocs[fieldValue];
+        }
+      }
+    }
+    
+    // Handle nested populate
+    if (nestedPopulate) {
+      for (const result of results) {
+        const populatedDoc = result[path];
+        if (populatedDoc && typeof populatedDoc === 'object') {
+          // Create a temporary query to handle nested population
+          const tempQuery = new Query(relatedModel, {});
+          tempQuery.options.populate = [nestedPopulate];
+          await tempQuery._handlePopulate([populatedDoc]);
+        }
+      }
+    }
+  }
+
+  async _populateNested(results, pathParts, relatedModel, select) {
+    // Handle nested paths like "shared.userId"
+    const [arrayField, idField] = pathParts;
+    
+    // Collect all IDs to fetch from nested arrays
+    const idsToFetch = new Set();
+    
+    for (const result of results) {
+      const arrayValue = result[arrayField] || result[this._toSnakeCase(arrayField)];
+      if (Array.isArray(arrayValue)) {
+        for (const item of arrayValue) {
+          if (item && item[idField]) {
+            idsToFetch.add(item[idField]);
+          }
+        }
+      }
+    }
+    
+    if (idsToFetch.size === 0) return;
+    
+    // Fetch related documents
+    const relatedDocs = {};
+    for (const id of idsToFetch) {
+      try {
+        const doc = await relatedModel.findById(id, select);
+        if (doc) {
+          relatedDocs[id] = doc;
+        }
+      } catch (e) {
+        console.warn(`Error fetching nested related document ${id}:`, e);
+      }
+    }
+    
+    // Replace IDs with populated documents in nested arrays
+    for (const result of results) {
+      const arrayValue = result[arrayField] || result[this._toSnakeCase(arrayField)];
+      if (Array.isArray(arrayValue)) {
+        for (const item of arrayValue) {
+          if (item && item[idField] && relatedDocs[item[idField]]) {
+            item[idField] = relatedDocs[item[idField]];
+          }
+        }
+      }
+    }
+  }
+
+  _getRelatedModelName(path) {
+    // Map field paths to model names
+    const pathToModel = {
+      'owner': 'User',
+      'ownerId': 'User',
+      'owner_id': 'User',
+      'userId': 'User',
+      'user_id': 'User',
+      'shared.userId': 'User',
+      'parentDirectory': 'Directory',
+      'parent_directory_id': 'Directory',
+      'parent': 'Directory'
+    };
+    
+    return pathToModel[path] || null;
+  }
+
+  _toSnakeCase(str) {
+    return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+  }
+
+  // Make the query thenable so it can be awaited directly
+  then(resolve, reject) {
+    return this.exec().then(resolve, reject);
+  }
+
+  catch(reject) {
+    return this.exec().catch(reject);
+  }
+}
+
 // Generic CRUD operations
 export class Model {
   constructor(tableName) {
@@ -134,7 +373,18 @@ export class Model {
     return result.rows[0] ? this._transformRow(result.rows[0]) : null;
   }
 
-  async find(conditions = {}, options = {}) {
+  find(conditions = {}, options = {}) {
+    // If options is a complex object with select, sort, etc., execute directly
+    // This maintains backward compatibility
+    if (options && (options.select || options.sort || options.skip || options.limit || options.lean)) {
+      return this._executeFindWithOptions(conditions, options);
+    }
+    
+    // Otherwise, return a Query instance for chaining
+    return new Query(this, conditions);
+  }
+
+  async _executeFindWithOptions(conditions = {}, options = {}) {
     const { whereClause, values } = this._buildWhereClause(conditions);
     let selectClause = '*';
     
