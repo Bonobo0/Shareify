@@ -1,7 +1,7 @@
 "use server";
 
-import { connectToDatabase } from "@/lib/db/mongodb";
-import User from "@/models/User";
+import { connectToDatabase } from "@/lib/db/router";
+import { getModel } from "@/lib/db/router";
 import { generateToken, verifyToken } from "@/lib/auth/jwt";
 import { cookies } from "next/headers";
 import {
@@ -22,6 +22,7 @@ export async function signIn(formData) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     const email = formData.get("email");
     const password = formData.get("password");
@@ -141,6 +142,7 @@ export async function signUp(formData) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     const email = formData.get("email");
     const password = formData.get("password");
@@ -268,6 +270,7 @@ export async function verifyAuth() {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
     const user = await User.findById(decoded.userId).select("-password");
 
     if (!user) {
@@ -312,6 +315,7 @@ export async function requestPasswordReset({ email }) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     // 사용자 조회
     const user = await User.findOne({ email: email.toLowerCase() });
@@ -368,6 +372,7 @@ export async function verifyPasswordResetToken({ token }) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     // 토큰으로 사용자 조회 (만료되지 않은 토큰만)
     const user = await User.findOne({
@@ -425,6 +430,7 @@ export async function resetPassword({
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     // 토큰으로 사용자 조회 (만료되지 않은 토큰만)
     const user = await User.findOne({
@@ -524,6 +530,7 @@ export async function changePassword({
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     // 사용자 조회 (비밀번호 포함)
     const user = await User.findById(decoded.userId).select("+password");

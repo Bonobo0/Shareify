@@ -1,8 +1,8 @@
 "use server";
 
-import { connectToDatabase } from "@/lib/db/mongodb";
+import { connectToDatabase } from "@/lib/db/router";
+import { getModel } from "@/lib/db/router";
 import { verifyToken } from "@/lib/auth/jwt";
-import User from "@/models/User";
 import mongoose from "mongoose";
 import { cookies } from "next/headers";
 
@@ -29,6 +29,7 @@ async function checkAdminPermission() {
   }
 
   await connectToDatabase();
+  const User = await getModel('User');
   
   const user = await User.findById(userId);
   if (!user || user.role !== "admin") {
@@ -45,6 +46,7 @@ export async function getAllUsers({ page = 1, limit = 50, sortBy = "createdAt", 
       return adminCheck;
     }
 
+    const User = await getModel('User');
     const skip = (page - 1) * limit;
     const sortDirection = sortOrder === "desc" ? -1 : 1;
 
@@ -96,6 +98,7 @@ export async function updateUserQuota({ userId, newLimit }) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     const user = await User.findById(userId);
     if (!user) {
@@ -129,6 +132,7 @@ export async function updateUserRole({ userId, newRole }) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     const user = await User.findById(userId);
     if (!user) {
@@ -170,6 +174,7 @@ export async function suspendUser({ userId, suspended }) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     const user = await User.findById(userId);
     if (!user) {
@@ -204,6 +209,7 @@ export async function getUserStats() {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     const totalUsers = await User.countDocuments({});
     const verifiedUsers = await User.countDocuments({ isVerified: true });
@@ -253,6 +259,7 @@ export async function searchUsers({ query, limit = 20 }) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     const searchRegex = new RegExp(query.trim(), "i");
     
@@ -298,6 +305,7 @@ export async function deleteUser({ userId, confirmEmail }) {
     }
 
     await connectToDatabase();
+    const User = await getModel('User');
 
     const user = await User.findById(userId);
     if (!user) {
