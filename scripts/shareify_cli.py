@@ -68,6 +68,17 @@ def _print_error(message: str) -> None:
     sys.stderr.write(f"Error: {message}\n")
 
 
+def _extract_error(response: requests.Response, fallback: str) -> str:
+    try:
+        data = response.json()
+    except ValueError:
+        text = (response.text or "").strip()
+        if text:
+            return f"{fallback} (status {response.status_code}): {text[:200]}"
+        return f"{fallback} (status {response.status_code})"
+    return data.get("error") or fallback
+
+
 def _require_encryption_support() -> None:
     if Cipher is None:
         raise RuntimeError(
@@ -105,11 +116,8 @@ def authenticate(
         raise RuntimeError(f"로그인 중 네트워크 오류가 발생했습니다: {exc}") from exc
 
     if response.status_code != 200:
-        try:
-            data = response.json()
-        except ValueError:
-            data = {"error": response.text or "Unknown error"}
-        raise RuntimeError(data.get("error", "로그인에 실패했습니다."))
+        message = _extract_error(response, "로그인에 실패했습니다.")
+        raise RuntimeError(message)
 
     data = response.json()
     token = data.get("token")
@@ -183,11 +191,7 @@ def request_upload(
         raise RuntimeError(f"사전 업로드 요청 중 네트워크 오류가 발생했습니다: {exc}") from exc
 
     if response.status_code != 200:
-        try:
-            data = response.json()
-        except ValueError:
-            data = {"error": response.text or "사전 업로드 요청이 실패했습니다."}
-        message = data.get("error", "사전 업로드 요청이 실패했습니다.")
+        message = _extract_error(response, "사전 업로드 요청이 실패했습니다.")
         retry_after = response.headers.get("Retry-After")
         if retry_after:
             message = f"{message} (Retry-After: {retry_after}s)"
@@ -251,11 +255,8 @@ def finalize_upload(base_url: str, token: str, file_id: str) -> Dict[str, object
         raise RuntimeError(f"업로드 완료 처리 중 네트워크 오류가 발생했습니다: {exc}") from exc
 
     if response.status_code != 200:
-        try:
-            data = response.json()
-        except ValueError:
-            data = {"error": response.text or "업로드 완료 처리 실패"}
-        raise RuntimeError(data.get("error", "업로드 완료 처리 실패"))
+        message = _extract_error(response, "업로드 완료 처리 실패")
+        raise RuntimeError(message)
 
     return response.json()
 

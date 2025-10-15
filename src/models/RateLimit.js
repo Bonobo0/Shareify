@@ -12,6 +12,11 @@ const rateLimitSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    endpoint: {
+      type: String,
+      default: null,
+      index: true,
+    },
     count: {
       type: Number,
       default: 1,
@@ -33,6 +38,7 @@ const rateLimitSchema = new mongoose.Schema(
 
 // 복합 인덱스로 빠른 조회
 rateLimitSchema.index({ identifier: 1, actionName: 1 }, { unique: true });
+rateLimitSchema.index({ identifier: 1, endpoint: 1 }, { unique: true });
 
 const RateLimit =
   mongoose.models.RateLimit || mongoose.model("RateLimit", rateLimitSchema);

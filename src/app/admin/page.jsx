@@ -4,7 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { getAllUsers, updateUserQuota, updateUserRole, suspendUser } from "@/actions/admin";
+import {
+  getAllUsers,
+  updateUserQuota,
+  updateUserRole,
+  suspendUser,
+  updateUserCliAccess,
+} from "@/actions/admin";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -166,6 +172,23 @@ export default function AdminPage() {
     }
   };
 
+  const handleCliAccessToggle = async (targetUser) => {
+    try {
+      const result = await updateUserCliAccess({
+        userId: targetUser.id,
+        cliAccess: !targetUser.cliAccess,
+      });
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      fetchUsers();
+    } catch (error) {
+      alert("CLI 접근 권한 변경 실패: " + error.message);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center">
@@ -263,7 +286,7 @@ export default function AdminPage() {
       <div className="card bg-base-200 shadow-sm">
         <div className="card-body">
           <h2 className="card-title mb-4">사용자 목록</h2>
-          
+
           {filteredUsers.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-600">
@@ -288,26 +311,41 @@ export default function AdminPage() {
                     <tr key={user.id}>
                       <td>
                         <div className="max-w-48 sm:max-w-none">
-                          <div className="font-medium truncate">{user.name || "이름 없음"}</div>
-                          <div className="text-sm text-gray-600 truncate">{user.email}</div>
+                          <div className="font-medium truncate">
+                            {user.name || "이름 없음"}
+                          </div>
+                          <div className="text-sm text-gray-600 truncate">
+                            {user.email}
+                          </div>
                         </div>
                       </td>
                       <td>
-                        <div className={`badge badge-sm ${user.role === "admin" ? "badge-primary" : "badge-ghost"}`}>
-                          <span className="text-xs">{user.role === "admin" ? "관리자" : "사용자"}</span>
+                        <div
+                          className={`badge badge-sm ${
+                            user.role === "admin"
+                              ? "badge-primary"
+                              : "badge-ghost"
+                          }`}
+                        >
+                          <span className="text-xs">
+                            {user.role === "admin" ? "관리자" : "사용자"}
+                          </span>
                         </div>
                       </td>
                       <td>
                         <div className="min-w-24">
                           <div className="text-sm">
-                            {formatBytes(user.storageUsed)} / {formatBytes(user.storageLimit)}
+                            {formatBytes(user.storageUsed)} /{" "}
+                            {formatBytes(user.storageLimit)}
                           </div>
                           <div className="w-20 bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-primary h-2 rounded-full"
                               style={{
                                 width: `${Math.min(
-                                  ((user.storageUsed || 0) / (user.storageLimit || 1)) * 100,
+                                  ((user.storageUsed || 0) /
+                                    (user.storageLimit || 1)) *
+                                    100,
                                   100
                                 )}%`,
                               }}
@@ -317,17 +355,36 @@ export default function AdminPage() {
                       </td>
                       <td>
                         <div className="flex flex-col gap-1">
-                          <div className={`badge badge-sm ${user.isVerified ? "badge-success" : "badge-warning"}`}>
-                            <span className="text-xs">{user.isVerified ? "인증됨" : "미인증"}</span>
+                          <div
+                            className={`badge badge-sm ${
+                              user.isVerified
+                                ? "badge-success"
+                                : "badge-warning"
+                            }`}
+                          >
+                            <span className="text-xs">
+                              {user.isVerified ? "인증됨" : "미인증"}
+                            </span>
                           </div>
                           {user.suspended && (
                             <div className="badge badge-sm badge-error">
                               <span className="text-xs">정지됨</span>
                             </div>
                           )}
+                          <div
+                            className={`badge badge-sm ${
+                              user.cliAccess ? "badge-info" : "badge-ghost"
+                            }`}
+                          >
+                            <span className="text-xs">
+                              {user.cliAccess ? "CLI 허용" : "CLI 차단"}
+                            </span>
+                          </div>
                         </div>
                       </td>
-                      <td className="hidden sm:table-cell text-sm">{formatDate(user.createdAt)}</td>
+                      <td className="hidden sm:table-cell text-sm">
+                        {formatDate(user.createdAt)}
+                      </td>
                       <td>
                         <div className="flex flex-wrap gap-1">
                           <button
@@ -347,10 +404,23 @@ export default function AdminPage() {
                           </button>
                           <button
                             onClick={() => openSuspendModal(user)}
-                            className={`btn btn-xs ${user.suspended ? "btn-warning" : "btn-error"}`}
+                            className={`btn btn-xs ${
+                              user.suspended ? "btn-warning" : "btn-error"
+                            }`}
                             title={user.suspended ? "계정 활성화" : "계정 정지"}
                           >
                             {user.suspended ? "해제" : "정지"}
+                          </button>
+                          <button
+                            onClick={() => handleCliAccessToggle(user)}
+                            className={`btn btn-xs ${
+                              user.cliAccess ? "btn-info" : "btn-outline"
+                            }`}
+                            title={
+                              user.cliAccess ? "CLI 접근 차단" : "CLI 접근 허용"
+                            }
+                          >
+                            CLI
                           </button>
                         </div>
                       </td>
@@ -369,9 +439,10 @@ export default function AdminPage() {
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-bold mb-4">저장소 할당량 변경</h3>
             <p className="text-sm text-gray-600 mb-4">
-              {selectedUser.name || selectedUser.email}의 저장소 할당량을 변경합니다.
+              {selectedUser.name || selectedUser.email}의 저장소 할당량을
+              변경합니다.
             </p>
-            
+
             <div className="form-control mb-4">
               <label className="label">
                 <span className="label-text">할당량 (GB)</span>
@@ -383,7 +454,10 @@ export default function AdminPage() {
                 className="input input-bordered"
                 value={modalData.storageLimit}
                 onChange={(e) =>
-                  setModalData({ ...modalData, storageLimit: parseInt(e.target.value) })
+                  setModalData({
+                    ...modalData,
+                    storageLimit: parseInt(e.target.value),
+                  })
                 }
               />
             </div>
@@ -407,7 +481,7 @@ export default function AdminPage() {
             <p className="text-sm text-gray-600 mb-4">
               {selectedUser.name || selectedUser.email}의 역할을 변경합니다.
             </p>
-            
+
             <div className="form-control mb-4">
               <label className="label">
                 <span className="label-text">역할</span>
@@ -415,7 +489,9 @@ export default function AdminPage() {
               <select
                 className="select select-bordered"
                 value={modalData.role}
-                onChange={(e) => setModalData({ ...modalData, role: e.target.value })}
+                onChange={(e) =>
+                  setModalData({ ...modalData, role: e.target.value })
+                }
               >
                 <option value="user">사용자</option>
                 <option value="admin">관리자</option>
@@ -450,7 +526,9 @@ export default function AdminPage() {
                 취소
               </button>
               <button
-                className={`btn ${selectedUser.suspended ? "btn-success" : "btn-error"}`}
+                className={`btn ${
+                  selectedUser.suspended ? "btn-success" : "btn-error"
+                }`}
                 onClick={handleUserSuspend}
               >
                 {selectedUser.suspended ? "활성화" : "정지"}

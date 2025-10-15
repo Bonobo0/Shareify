@@ -662,12 +662,27 @@ export async function getFileDownloadUrl({ fileId, shareLinkHash = null }) {
     const isDirectlyShared = file.shared?.some(
       (share) => share.userId.toString() === userId
     );
-
-    // 상위 디렉토리 권한 확인
+    // 현재 디렉토리 권한 확인
+    let hasAccess = false;
+    let currentDirectory = await Directory.findOne({
+      _id: file.parentDirectory,
+      $or: [
+        { owner: new mongoose.Types.ObjectId(userId) },
+        {
+          "shared": {
+            $elemMatch: {
+              "userId": new mongoose.Types.ObjectId(userId),
+            },
+          },
+        },
+      ],
+      deleted: { $ne: true },
+    }).lean();
+    if (currentDirectory) {
+      hasAccess = true;
+    }
+    // 상위 디렉토리로 올라가며 권한 확인
     let hasParentAccess = false;
-    let currentDirectory = await Directory.findById(
-      file.parentDirectory
-    ).lean();
     while (currentDirectory && !hasParentAccess) {
       const parentDirectory = await Directory.findOne({
         _id: currentDirectory.parent,
@@ -692,12 +707,7 @@ export async function getFileDownloadUrl({ fileId, shareLinkHash = null }) {
     }
 
     // 접근 권한 검증
-    if (!isOwner && !isDirectlyShared && !hasParentAccess) {
-      return { error: "파일에 접근할 권한이 없습니다." };
-    }
-
-    // 접근 권한 검증
-    if (!isOwner && !isDirectlyShared && !hasParentAccess) {
+    if (!isOwner && !isDirectlyShared && !hasParentAccess && !hasAccess) {
       return { error: "파일에 접근할 권한이 없습니다." };
     }
 

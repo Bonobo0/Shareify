@@ -74,6 +74,25 @@ export async function generateUploadUrl(
   }
 }
 
+export async function uploadObject(
+  key,
+  body,
+  contentType = "application/octet-stream"
+) {
+  if (!R2_BUCKET_NAME) {
+    throw new Error("R2_BUCKET_NAME이 설정되지 않았습니다.");
+  }
+
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  });
+
+  await s3Client.send(command);
+}
+
 // 다운로드용 Presigned URL 생성
 export async function generateDownloadUrl(
   filePath,

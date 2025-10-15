@@ -9,6 +9,30 @@ const ENCRYPTION_MODE = {
   AES_CTR: 2,
 };
 
+const AUTH_TAG_SIZE = 32;
+const AUTH_TAG_CONTEXT = "shareify-e2ee-v1";
+const AUTH_TAG_FLAG = 0x80000000;
+
+function concatUint8Arrays(...arrays) {
+  const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const array of arrays) {
+    result.set(array, offset);
+    offset += array.length;
+  }
+  return result;
+}
+
+async function deriveAuthTag(password, salt) {
+  const encoder = new TextEncoder();
+  const passwordBytes = encoder.encode(password);
+  const contextBytes = encoder.encode(AUTH_TAG_CONTEXT);
+  const data = concatUint8Arrays(salt, passwordBytes, contextBytes);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return new Uint8Array(digest);
+}
+
 // 암호화 키 생성 (사용자 비밀번호 기반)
 export async function deriveKeyFromPassword(
   password,
@@ -55,19 +79,30 @@ export function generateIV() {
 }
 
 // 스트림 생성기 함수
-async function* generateEncryptedStream(file, key, salt, initialCounter) {
+async function* generateEncryptedStream(
+  file,
+  key,
+  salt,
+  initialCounter,
+  authTag
+) {
   const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB 청크 크기로 줄임
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-  // 헤더 생성 및 반환 (모드 + salt + counter + 청크 수)
-  const header = new Uint8Array(1 + salt.length + initialCounter.length + 4);
+  // 헤더 생성 및 반환 (모드 + salt + counter + 청크 수 + auth tag)
+  const authTagLength = authTag.length;
+  const header = new Uint8Array(
+    1 + salt.length + initialCounter.length + 4 + authTagLength
+  );
   header[0] = ENCRYPTION_MODE.AES_CTR;
   header.set(salt, 1);
   header.set(initialCounter, 1 + salt.length);
+  const encodedChunkCount = totalChunks | AUTH_TAG_FLAG;
   header.set(
-    new Uint8Array(new Uint32Array([totalChunks]).buffer),
+    new Uint8Array(new Uint32Array([encodedChunkCount]).buffer),
     1 + salt.length + initialCounter.length
   );
+  header.set(authTag, 1 + salt.length + initialCounter.length + 4);
   yield header;
 
   let processedSize = 0;
@@ -126,6 +161,7 @@ export async function encryptFile(file, password) {
     const salt = generateSalt();
     const counter = generateCounter();
     const key = await deriveKeyFromPassword(password, salt, "AES-CTR");
+    const authTag = await deriveAuthTag(password, salt);
 
     // ReadableStream을 사용하여 스트리밍 방식으로 처리
     const stream = new ReadableStream({
@@ -135,7 +171,8 @@ export async function encryptFile(file, password) {
             file,
             key,
             salt,
-            counter
+            counter,
+            authTag
           )) {
             controller.enqueue(chunk);
           }
@@ -205,7 +242,7 @@ export async function decryptFile(
 
     // 첫 번째 바이트로 암호화 모드 확인 (새로운 형식인 경우)
     const encryptionMode = data[0];
-    let salt, counter, iv, encryptedData, key, decryptedData;
+    let salt, counter, iv, encryptedData, key, decryptedData, authTag;
 
     if (encryptionMode === ENCRYPTION_MODE.AES_CTR) {
       // AES-CTR 형식 (새로운 형식)
@@ -216,13 +253,37 @@ export async function decryptFile(
       offset += 16;
 
       // 청크 수 읽기
-      const chunksCount = new Uint32Array(
+      let encodedChunksCount = new Uint32Array(
         data.slice(offset, offset + 4).buffer
       )[0];
       offset += 4;
 
+      const hasAuthTag = (encodedChunksCount & AUTH_TAG_FLAG) !== 0;
+      const chunksCount = hasAuthTag
+        ? encodedChunksCount & ~AUTH_TAG_FLAG
+        : encodedChunksCount;
+
+      if (hasAuthTag) {
+        authTag = data.slice(offset, offset + AUTH_TAG_SIZE);
+        offset += AUTH_TAG_SIZE;
+      } else {
+        authTag = null;
+      }
+
       const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB 청크 크기
       key = await deriveKeyFromPassword(password, salt, "AES-CTR");
+
+      if (authTag) {
+        const expectedAuthTag = await deriveAuthTag(password, salt);
+        if (expectedAuthTag.length !== authTag.length) {
+          throw new Error("인증 태그가 손상되었습니다.");
+        }
+        for (let i = 0; i < authTag.length; i++) {
+          if (authTag[i] !== expectedAuthTag[i]) {
+            throw new Error("암호화 비밀번호가 올바르지 않습니다.");
+          }
+        }
+      }
 
       // 스트림으로 복호화
       const stream = new ReadableStream({

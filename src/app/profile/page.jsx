@@ -160,6 +160,7 @@ export default function ProfilePage() {
       const result = await changePassword({
         currentPassword,
         newPassword,
+        confirmPassword,
       });
 
       if (result.error) {

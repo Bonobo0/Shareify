@@ -29,7 +29,7 @@ async function checkAdminPermission() {
   }
 
   await connectToDatabase();
-  
+
   const user = await User.findById(userId);
   if (!user || user.role !== "admin") {
     return { error: "관리자 권한이 필요합니다." };
@@ -38,7 +38,12 @@ async function checkAdminPermission() {
   return { success: true, userId };
 }
 
-export async function getAllUsers({ page = 1, limit = 50, sortBy = "createdAt", sortOrder = "desc" } = {}) {
+export async function getAllUsers({
+  page = 1,
+  limit = 50,
+  sortBy = "createdAt",
+  sortOrder = "desc",
+} = {}) {
   try {
     const adminCheck = await checkAdminPermission();
     if (adminCheck.error) {
@@ -49,7 +54,9 @@ export async function getAllUsers({ page = 1, limit = 50, sortBy = "createdAt", 
     const sortDirection = sortOrder === "desc" ? -1 : 1;
 
     const users = await User.find({})
-      .select("name email role storageLimit storageUsed isVerified createdAt updatedAt suspended")
+      .select(
+        "name email role storageLimit storageUsed isVerified createdAt updatedAt suspended cliAccess"
+      )
       .sort({ [sortBy]: sortDirection })
       .skip(skip)
       .limit(limit)
@@ -59,7 +66,7 @@ export async function getAllUsers({ page = 1, limit = 50, sortBy = "createdAt", 
 
     return {
       success: true,
-      users: users.map(user => ({
+      users: users.map((user) => ({
         id: user._id.toString(),
         name: user.name,
         email: user.email,
@@ -68,6 +75,7 @@ export async function getAllUsers({ page = 1, limit = 50, sortBy = "createdAt", 
         storageUsed: user.storageUsed || 0, // Default 0 if null/undefined
         isVerified: user.isVerified,
         suspended: user.suspended || false,
+        cliAccess: Boolean(user.cliAccess),
         createdAt: user.createdAt ? user.createdAt.toISOString() : null,
         updatedAt: user.updatedAt ? user.updatedAt.toISOString() : null,
       })),
@@ -109,7 +117,9 @@ export async function updateUserQuota({ userId, newLimit }) {
 
     return {
       success: true,
-      message: `${user.email}의 저장소 할당량이 ${Math.round(newLimit / (1024 * 1024 * 1024))}GB로 변경되었습니다.`,
+      message: `${user.email}의 저장소 할당량이 ${Math.round(
+        newLimit / (1024 * 1024 * 1024)
+      )}GB로 변경되었습니다.`,
     };
   } catch (error) {
     console.error("저장소 할당량 업데이트 오류:", error);
@@ -150,7 +160,9 @@ export async function updateUserRole({ userId, newRole }) {
 
     return {
       success: true,
-      message: `${user.email}의 역할이 ${newRole === "admin" ? "관리자" : "사용자"}로 변경되었습니다.`,
+      message: `${user.email}의 역할이 ${
+        newRole === "admin" ? "관리자" : "사용자"
+      }로 변경되었습니다.`,
     };
   } catch (error) {
     console.error("사용자 역할 업데이트 오류:", error);
@@ -193,6 +205,40 @@ export async function suspendUser({ userId, suspended }) {
   } catch (error) {
     console.error("사용자 정지 상태 업데이트 오류:", error);
     return { error: "사용자 상태를 업데이트하는 중 오류가 발생했습니다." };
+  }
+}
+
+export async function updateUserCliAccess({ userId, cliAccess }) {
+  try {
+    const adminCheck = await checkAdminPermission();
+    if (adminCheck.error) {
+      return adminCheck;
+    }
+
+    if (!userId || typeof cliAccess !== "boolean") {
+      return { error: "유효하지 않은 파라미터입니다." };
+    }
+
+    await connectToDatabase();
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+
+    user.cliAccess = cliAccess;
+    user.updatedAt = new Date();
+    await user.save();
+
+    return {
+      success: true,
+      message: `${user.email}의 CLI 접근이 ${
+        cliAccess ? "허용" : "차단"
+      }되었습니다.`,
+    };
+  } catch (error) {
+    console.error("CLI 접근 권한 업데이트 오류:", error);
+    return { error: "CLI 접근 권한을 업데이트하는 중 오류가 발생했습니다." };
   }
 }
 
@@ -255,20 +301,22 @@ export async function searchUsers({ query, limit = 20 }) {
     await connectToDatabase();
 
     const searchRegex = new RegExp(query.trim(), "i");
-    
+
     const users = await User.find({
       $or: [
         { name: { $regex: searchRegex } },
         { email: { $regex: searchRegex } },
       ],
     })
-      .select("name email role storageLimit storageUsed isVerified createdAt suspended")
+      .select(
+        "name email role storageLimit storageUsed isVerified createdAt suspended cliAccess"
+      )
       .limit(limit)
       .lean();
 
     return {
       success: true,
-      users: users.map(user => ({
+      users: users.map((user) => ({
         id: user._id.toString(),
         name: user.name,
         email: user.email,
@@ -277,6 +325,7 @@ export async function searchUsers({ query, limit = 20 }) {
         storageUsed: user.storageUsed || 0, // Default 0 if null/undefined
         isVerified: user.isVerified,
         suspended: user.suspended || false,
+        cliAccess: Boolean(user.cliAccess),
         createdAt: user.createdAt ? user.createdAt.toISOString() : null,
       })),
     };
