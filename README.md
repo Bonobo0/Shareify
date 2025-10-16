@@ -5,7 +5,7 @@
 **Next.js, TailwindCSS, MongoDB, Cloudflare R2 등의 기술 스택들을 사용했습니다.**
 <br/>
 해당 프로젝트의 기능 구현 및 디버깅에 있어, 
-**생성형 AI(GitHub Copilot Agent - Claude Sonnet 4)**
+**생성형 AI(GitHub Copilot Agent - Claude Sonnet 4, OpenAI GPT-5 Codex)**
 의 도움을 받았습니다.
 <br/>
 기획과 설계를 제외한 부분에서는 프로젝트가 대부분 **AI driven development** 형식으로 진행되어, 코드의 퀄리티가 많이 떨어질 수 있습니다.
@@ -27,6 +27,14 @@
 - **File/directory search with many options**
 - **File/directory share with specific users or via shared links**
 - **File/directory bulk download/delete**
+
+### **CLI Tool**
+**파일 업로드를 위한 커맨드라인 도구를 제공합니다.**
+<br/>
+**`scripts/shareify_cli.py` 파일을 확인해주세요.**
+<br/>
+**상세한 사용법은 [scripts/shareify_cli.md](scripts/shareify_cli.md) 파일을 참고해주세요.**
+
 
 
 ### **Self-Hosting**
