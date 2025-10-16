@@ -1,6 +1,6 @@
 # Shareify CLI 도우미
 
-이 문서는 개인용 CLI API를 통해 Shareify에 파일을 업로드할 수 있는 커맨드라인 도구 `shareify_cli.py`의 사용법을 설명합니다.
+이 문서는 Shareify CLI API를 통해 파일을 업로드할 수 있는 커맨드라인 도구 `shareify_cli.py`의 사용법을 설명합니다.
 
 ## 준비 사항
 - Python 3.9 이상
@@ -13,12 +13,11 @@ pip install requests cryptography
 ```
 
 ## 시작하기
-1. Shareify 서버가 동작하도록 `.env.example`을 `.env`로 복사한 뒤 필수 환경 변수를 채워 넣습니다.
-2. `scripts/` 디렉터리로 이동합니다.
+1. `scripts/` 디렉터리로 이동합니다.
    ```
    cd scripts
    ```
-3. 다음 명령으로 CLI를 실행합니다.
+2. 다음 명령으로 CLI를 실행합니다.
    ```
    python3 shareify_cli.py upload path/to/file
    ```
@@ -38,9 +37,10 @@ PASSWORD=your-password
 TWO_FACTOR_CODE=123456   # 선택 사항
 USE_BACKUP_CODE=true     # 선택 사항
 ENCRYPTION_PASSWORD=secretpass  # 선택 사항, --encrypt 사용 시 적용
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...  # 선택 사항, 업로드 완료 알림
 ```
 
-디렉터리에 `.credential` 파일이 있다면 자동으로 사용합니다.
+`scripts/` 디렉터리에 `.credential` 파일이 있다면 자동으로 사용합니다.
 
 ## 명령어 안내
 현재 CLI는 `upload` 명령을 제공합니다.
@@ -59,6 +59,7 @@ python3 shareify_cli.py upload FILE [options]
 - `--directory-id ID` – 사용자가 작성 권한을 가진 디렉터리에 업로드
 - `--share-hash HASH` – 공유 링크 해시로 공유 디렉터리에 업로드
 - `--mime MIME` – 업로드 시 기록할 MIME 타입 덮어쓰기
+- `--discord-webhook URL` – 업로드 완료 시 지정한 디스코드 웹훅으로 알림 전송 (환경 변수 `SHAREIFY_DISCORD_WEBHOOK` 또는 자격 증명 파일의 `DISCORD_WEBHOOK_URL` 항목으로도 설정 가능)
 
 ### 클라이언트 측 암호화
 - `--encrypt` – 업로드 전에 로컬에서 파일 암호화
@@ -100,3 +101,30 @@ python3 shareify_cli.py upload image.png --token <JWT> --share-hash abcd1234
 - **인증 실패** – 이메일/비밀번호를 확인하고, 계정에 CLI 접근 권한이 활성화되어 있는지 검토하세요.
 - **레이트 리미트 오류** – 응답 헤더에 `Retry-After`가 있을 수 있으니 해당 시간 이후 재시도하세요.
 - **업로드 실패** – Shareify 서버에 접근 가능한지, R2 관련 환경 변수가 올바른지 확인하세요.
+
+## 디스코드 알림
+`--discord-webhook` 옵션이나 자격 증명 파일의 `DISCORD_WEBHOOK_URL` 항목, 또는 환경 변수 `SHAREIFY_DISCORD_WEBHOOK`을 통해 웹훅 URL을 지정하면 업로드가 성공했을 때 디스코드 임베드 메시지가 전송됩니다. 임베드에는 파일 이름, 크기, MIME 타입, 해시가 포함되며 파일 상세 페이지 링크도 함께 제공됩니다.
+
+## 백업 스크립트 (shareify_backup.sh)
+반복적으로 특정 폴더를 압축 → CLI로 암호화 업로드 → 성공 시 로컬 아카이브 삭제까지 자동화하려면 `shareify_backup.sh`를 사용할 수 있습니다. 사용 전 실행 권한을 부여하세요.
+
+```
+chmod +x shareify_backup.sh
+```
+사용법:
+```
+
+./shareify_backup.sh --source /path/to/folder [옵션]
+```
+
+주요 옵션:
+- `--interval MINUTES` – 백업 간격(분). 기본값 60.
+- `--credential-file PATH` / `SHAREIFY_CREDENTIAL_FILE` – CLI와 동일한 자격 증명 파일 경로.
+- `--encryption-password PASS` – CLI 암호화 비밀번호(생략 시 자격 증명/프롬프트 사용).
+- `--base-url URL` / `--directory-id ID` / `--share-hash HASH` – CLI와 동일한 대상 설정.
+- `--archive-dir DIR` – 임시 아카이브 저장 위치(기본 `/tmp/shareify_backups`).
+- `--run-once` – 한 번만 실행 후 종료.
+- `--no-exit-prompt` – 종료 시 “Press Enter…” 프롬프트 생략(자동화 용도).
+- 추가 CLI 인자를 `SHAREIFY_EXTRA_ARGS` 환경 변수로 전달 가능.
+
+Ctrl+C로 중단하면 즉시 종료하되 창은 열린 상태를 유지하며, 프롬프트에서 엔터를 누르면 닫힙니다. 업로드 실패 시 아카이브는 삭제하지 않으므로 원인 분석 후 재시도할 수 있습니다.

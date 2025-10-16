@@ -884,6 +884,9 @@ export async function getFileDetails({ hash, fileId }) {
     if (!file) {
       return { error: "파일을 찾을 수 없습니다." };
     }
+    if (file.deleted) {
+      return { error: "삭제된 파일입니다." };
+    }
 
     // 접근 권한 확인
     const isOwner = file.owner._id.toString() === userId;

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Simple Shareify CLI helper for authenticating and uploading files via the private API."""
 
 import argparse
@@ -10,6 +9,7 @@ import mimetypes
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Callable, Dict, Iterable, Optional
 
 import requests
@@ -84,6 +84,89 @@ def _require_encryption_support() -> None:
         raise RuntimeError(
             "Client-side encryption requires the 'cryptography' package. Install it with 'pip install cryptography'."
         )
+
+
+def _format_size(size: Optional[object]) -> str:
+    if not isinstance(size, (int, float)) or size < 0:
+        return "알 수 없음"
+
+    value = float(size)
+    units = ["B", "KB", "MB", "GB", "TB", "PB"]
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            formatted = f"{value:.2f}".rstrip("0").rstrip(".")
+            return f"{formatted} {unit}"
+        value /= 1024
+    return f"{int(size)} B"
+
+
+def _notify_discord(webhook_url: str, file_info: Dict[str, object], base_url: str) -> None:
+    if not webhook_url:
+        return
+
+    name = str(
+        file_info.get("originalName")
+        or file_info.get("fileName")
+        or "파일"
+    )
+
+    size_value = file_info.get("originalSize") or file_info.get("size")
+    mimetype = file_info.get("originalMimetype") or file_info.get("mimetype")
+    file_hash = file_info.get("hash")
+
+    fields = [
+        {"name": "파일 이름", "value": name, "inline": False},
+    ]
+
+    if size_value is not None:
+        fields.append(
+            {
+                "name": "파일 크기",
+                "value": _format_size(size_value),
+                "inline": True,
+            }
+        )
+
+    if mimetype:
+        fields.append(
+            {
+                "name": "MIME 타입",
+                "value": str(mimetype),
+                "inline": True,
+            }
+        )
+
+    if file_hash:
+        fields.append(
+            {
+                "name": "파일 해시",
+                "value": str(file_hash),
+                "inline": False,
+            }
+        )
+
+    embed: Dict[str, object] = {
+        "title": "파일 업로드 완료",
+        "description": "Shareify CLI 업로드가 성공적으로 완료되었습니다.",
+        "color": 0x2ECC71,
+        "fields": fields,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "footer": {"text": "Shareify CLI"},
+    }
+
+    if base_url and file_hash:
+        embed["url"] = f"{base_url}/file/{file_hash}"
+
+    payload = {"embeds": [embed]}
+
+    try:
+        response = requests.post(webhook_url, json=payload, timeout=10)
+        if not (200 <= response.status_code < 300):
+            _print_error(
+                f"디스코드 웹훅 전송 실패 (status {response.status_code})"
+            )
+    except requests.RequestException as exc:
+        _print_error(f"디스코드 웹훅 전송 중 오류: {exc}")
 
 
 def _counter_for_chunk(initial_counter: bytes, chunk_index: int) -> bytes:
@@ -416,6 +499,11 @@ def handle_upload(args: argparse.Namespace) -> None:
                              two_factor, use_backup_code)
 
     share_hash = args.share_hash.strip() if args.share_hash else None
+    discord_webhook = (
+        args.discord_webhook
+        or credentials.get("DISCORD_WEBHOOK_URL")
+        or os.environ.get("SHAREIFY_DISCORD_WEBHOOK")
+    )
 
     if args.encrypt:
         encryption_password = (
@@ -469,6 +557,10 @@ def handle_upload(args: argparse.Namespace) -> None:
     print("Upload completed:")
     print(json.dumps(finalize.get("file", {}), indent=2, ensure_ascii=False))
 
+    file_info = finalize.get("file")
+    if file_info and discord_webhook:
+        _notify_discord(discord_webhook, file_info, base_url)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Shareify CLI helper")
@@ -511,6 +603,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--share-hash", help="Writable share link hash for shared directories")
     upload_parser.add_argument(
         "--mime", help="Override MIME type when uploading the file")
+    upload_parser.add_argument(
+        "--discord-webhook",
+        help="Discord webhook URL to notify when the upload completes",
+    )
     upload_parser.add_argument(
         "--encrypt",
         action="store_true",
