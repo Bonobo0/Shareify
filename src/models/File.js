@@ -78,6 +78,17 @@ const FileSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // WebGL 관련 필드
+    isWebGLBuild: {
+      type: Boolean,
+      default: false, // WebGL 빌드 여부
+      required: false,
+    },
+    webGLValidated: {
+      type: Boolean,
+      default: false, // WebGL 빌드 검증 완료 여부
+      required: false,
+    },
     createdAt: {
       type: Date,
       default: Date.now,

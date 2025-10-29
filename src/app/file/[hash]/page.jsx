@@ -365,6 +365,11 @@ export default function FilePage() {
                   🔒 암호화됨
                 </div>
               )}
+              {file?.isWebGLBuild && (
+                <div className="badge badge-secondary badge-xs sm:badge-sm whitespace-nowrap">
+                  🎮 WebGL 게임
+                </div>
+              )}
               {file?.isPublic && (
                 <div className="badge badge-success badge-xs sm:badge-sm whitespace-nowrap">
                   공개
@@ -452,6 +457,15 @@ export default function FilePage() {
           </div>
 
           <div className="flex flex-wrap gap-1 sm:gap-2">
+            {file?.isWebGLBuild && (
+              <button
+                className="btn btn-accent btn-sm sm:btn-md"
+                onClick={() => router.push(`/play/${hash}`)}
+              >
+                🎮 게임 플레이
+              </button>
+            )}
+            
             <button
               className={`btn btn-primary btn-sm sm:btn-md ${
                 downloadLoading ? "loading" : ""
