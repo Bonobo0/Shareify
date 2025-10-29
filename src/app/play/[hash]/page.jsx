@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getFileDetails, getFileDownloadUrl } from "@/actions/files";
-import { downloadAndDecrypt } from "@/lib/crypto/encryption";
+import { decryptFile } from "@/lib/crypto/encryption";
 import { loadWebGLBuild, clearWebGLCache } from "@/lib/webgl/player";
 
 export default function PlayPage() {
@@ -101,19 +101,18 @@ export default function PlayPage() {
         setLoadProgress(30);
 
         // 복호화
-        const JSZip = (await import("jszip")).default;
-        const decryptedData = await downloadAndDecrypt(
-          result.downloadUrl,
+        const decryptResult = await decryptFile(
+          encryptedArrayBuffer,
           password,
           metadata
         );
 
-        if (decryptedData.error) {
-          throw new Error(decryptedData.error);
+        if (!decryptResult.success || decryptResult.error) {
+          throw new Error(decryptResult.error || "복호화에 실패했습니다.");
         }
 
-        // Blob으로 변환
-        fileBlob = new Blob([decryptedData], { type: "application/zip" });
+        // Blob으로 변환 (decryptedFile은 File 객체이므로 직접 사용 가능)
+        fileBlob = decryptResult.decryptedFile;
         
         setDecryptModal(false);
         setDecryptPassword("");
@@ -254,7 +253,8 @@ export default function PlayPage() {
           id="game-container"
           className="w-full bg-black rounded-lg overflow-hidden"
           style={{
-            aspectRatio: "16/9",
+            minHeight: "600px",
+            height: "calc(100vh - 200px)",
             display: gameReady ? "block" : "none",
           }}
         ></div>
