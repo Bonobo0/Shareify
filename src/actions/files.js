@@ -217,6 +217,8 @@ export async function getFileList({
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        isWebGLBuild: file.isWebGLBuild || false,
+        webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
         updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
         parentDirectory: file.parentDirectory
@@ -276,6 +278,7 @@ export async function uploadFile({
   isEncrypted = false,
   originalMetadata = null,
   shareHash = null,
+  isWebGLBuild = false,
 }) {
   try {
     // Rate limiting 체크
@@ -447,6 +450,8 @@ export async function uploadFile({
         isEncrypted && originalMetadata ? originalMetadata.originalSize : null,
       originalMimetype:
         isEncrypted && originalMetadata ? originalMetadata.originalType : null,
+      isWebGLBuild: isWebGLBuild || false,
+      webGLValidated: false,
     };
 
     // E2EE 메타데이터는 위에서 이미 설정됨
@@ -459,6 +464,7 @@ export async function uploadFile({
       originalMimetype: fileData.originalMimetype,
       size: fileData.size,
       mimetype: fileData.mimetype,
+      isWebGLBuild: fileData.isWebGLBuild,
     });
 
     const file = new File(fileData);
@@ -951,6 +957,8 @@ export async function getFileDetails({ hash, fileId }) {
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        isWebGLBuild: file.isWebGLBuild || false,
+        webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
         updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
         owner: {
@@ -1115,6 +1123,8 @@ export async function getMyUploadedFiles({
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        isWebGLBuild: file.isWebGLBuild || false,
+        webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
         updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
         parentDirectory: file.parentDirectory?._id.toString(),

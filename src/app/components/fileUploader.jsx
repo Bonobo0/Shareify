@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { uploadFile, completeFileUpload } from "@/actions/files";
 import { encryptFile } from "@/lib/crypto/encryption";
+import { validateWebGLBuildFile } from "@/lib/webgl/validation";
 
 export default function FileUploader({
   onUploadComplete,
@@ -20,6 +21,7 @@ export default function FileUploader({
   const [retryMode, setRetryMode] = useState(false); // 재시도 모드
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
+  const [isWebGLBuild, setIsWebGLBuild] = useState(false); // WebGL 빌드 여부
 
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) {
@@ -108,6 +110,26 @@ export default function FileUploader({
             [file.name]: { percent: 0, status: "uploading" },
           }));
 
+          // WebGL 빌드 검증 (WebGL로 표시된 경우, 암호화 전에 검증)
+          if (isWebGLBuild) {
+            setProgress((prev) => ({
+              ...prev,
+              [file.name]: { percent: 2, status: "validating" },
+            }));
+
+            console.log("WebGL 빌드 검증 시작:", file.name);
+            
+            const validationResult = await validateWebGLBuildFile(file);
+            
+            if (!validationResult.isValid) {
+              throw new Error(
+                validationResult.error || "유효한 WebGL 빌드가 아닙니다."
+              );
+            }
+            
+            console.log("WebGL 빌드 검증 완료:", file.name);
+          }
+
           let fileToUpload = file;
           let originalMetadata = null;
 
@@ -148,6 +170,7 @@ export default function FileUploader({
             directoryId: directoryId,
             isEncrypted: enableE2EE,
             originalMetadata: originalMetadata,
+            isWebGLBuild: isWebGLBuild,
           });
 
           const uploadResult = await uploadFile({
@@ -158,6 +181,7 @@ export default function FileUploader({
             isEncrypted: enableE2EE,
             originalMetadata: originalMetadata,
             shareHash: shareHash,
+            isWebGLBuild: isWebGLBuild,
           });
 
           if (uploadResult.error) {
@@ -379,6 +403,8 @@ export default function FileUploader({
                     <div className="mt-1">
                       <div className="flex justify-between text-xs text-gray-600 mb-1">
                         <span>
+                          {progress[file.name].status === "validating" &&
+                            "🔍 WebGL 빌드 검증 중..."}
                           {progress[file.name].status === "encrypting" &&
                             "🔒 암호화 중..."}
                           {progress[file.name].status === "uploading" &&
@@ -400,6 +426,8 @@ export default function FileUploader({
                             ? "progress-error"
                             : progress[file.name].status === "encrypting"
                             ? "progress-warning"
+                            : progress[file.name].status === "validating"
+                            ? "progress-info"
                             : "progress-primary"
                         }`}
                         value={progress[file.name].percent}
@@ -454,6 +482,28 @@ export default function FileUploader({
               </label>
             </div>
           )}
+        </div>
+
+        {/* WebGL 빌드 옵션 */}
+        <div className="border-t pt-4">
+          <div className="form-control">
+            <label className="label cursor-pointer">
+              <span className="label-text">
+                <span className="font-semibold">Unity WebGL 빌드</span>
+                <br />
+                <span className="text-sm text-gray-500">
+                  이 파일이 Unity WebGL 빌드 압축 파일인 경우 체크하세요
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="toggle toggle-secondary"
+                checked={isWebGLBuild}
+                onChange={(e) => setIsWebGLBuild(e.target.checked)}
+                disabled={uploading}
+              />
+            </label>
+          </div>
         </div>
 
         <div className="flex gap-2">
