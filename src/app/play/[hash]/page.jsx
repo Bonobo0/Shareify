@@ -23,19 +23,6 @@ export default function PlayPage() {
   const [gameReady, setGameReady] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
 
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (!isAuthenticated) {
-      router.push("/user/signin");
-      return;
-    }
-
-    if (hash) {
-      fetchFileDetails();
-    }
-  }, [hash, isAuthenticated, authLoading, router]);
-
   const fetchFileDetails = async () => {
     try {
       const result = await getFileDetails({ hash });
@@ -55,11 +42,6 @@ export default function PlayPage() {
         }
 
         setFile(fileData);
-        
-        // 암호화되지 않은 파일은 바로 로드 시작
-        if (!fileData.isEncrypted) {
-          await loadGame();
-        }
       }
     } catch (error) {
       setError(error.message);
@@ -67,6 +49,20 @@ export default function PlayPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      router.push("/user/signin");
+      return;
+    }
+
+    if (hash) {
+      fetchFileDetails();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash, isAuthenticated, authLoading, router]);
 
   const loadGame = async (password = null) => {
     setGameLoading(true);
