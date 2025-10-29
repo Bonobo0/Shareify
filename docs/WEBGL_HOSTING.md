@@ -55,7 +55,7 @@ Shareify에 Unity WebGL 빌드를 업로드하고 브라우저에서 직접 플�
 ### 클라이언트
 - **JSZip**: ZIP 파일 압축 해제
 - **IndexedDB**: 브라우저 로컬 캐싱
-- **Unity Loader**: Unity WebGL 빌드 로더
+- **Unity WebGL Build API**: Unity WebGL 빌드 로더 (Unity 2020.1+)
 
 ### 서버
 - **MongoDB**: WebGL 빌드 메타데이터 저장
@@ -174,7 +174,7 @@ src/
 ## 향후 개선 사항
 
 1. **자동 업데이트 감지**: 동일 빌드 업데이트 시 캐시 자동 갱신
-2. **멀티플레이 지원**: WebRTC를 통한 멀티플레이어 기능
+2. **멀티플레이 지원**: Unity Netcode 또는 Mirror Networking을 통한 멀티플레이어 기능
 3. **통계 수집**: 플레이 횟수, 플레이 시간 등 통계
 4. **미리보기 이미지**: 빌드 업로드 시 스크린샷 첨부
 5. **임베드 기능**: 외부 사이트에 게임 임베드 가능한 iframe 제공
