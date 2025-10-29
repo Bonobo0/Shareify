@@ -1279,6 +1279,11 @@ export default function FileList({
                                 🔒 암호화됨
                               </div>
                             )}
+                            {file.isWebGLBuild && (
+                              <div className="badge badge-secondary badge-xs sm:badge-sm whitespace-nowrap">
+                                🎮 WebGL 게임
+                              </div>
+                            )}
                             {file.isPublic && (
                               <div className="badge badge-success badge-xs sm:badge-sm whitespace-nowrap">
                                 공개
@@ -1371,6 +1376,19 @@ export default function FileList({
                               ⬇️ 다운로드
                             </button>
                           </li>
+                          {file.isWebGLBuild && (
+                            <li>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  document.activeElement.blur();
+                                  router.push(`/play/${file.hash}`);
+                                }}
+                              >
+                                🎮 게임 플레이
+                              </button>
+                            </li>
+                          )}
                           {isPreviewable(file) && (
                             <li>
                               <button
