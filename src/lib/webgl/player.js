@@ -39,8 +39,9 @@ export async function loadWebGLBuild(zipBlob, buildName, containerElementId, onP
       // 파일 데이터 추출
       const fileData = await fileEntry.async("blob");
       
-      // 파일명에서 경로 정규화 (일부 ZIP은 경로를 포함할 수 있음)
-      // 경로 구분자로 끝나는 경우는 이미 dir로 필터링되었으므로 처리 불필요
+      // 파일명 정규화: 경로 포함 시 마지막 파일명만 추출
+      // 예: "Build/game.loader.js" -> "game.loader.js"
+      // filter(Boolean)로 빈 문자열 제거 (trailing slash 처리)
       const normalizedFileName = fileName.includes('/') 
         ? fileName.split('/').filter(Boolean).pop() || fileName
         : fileName;

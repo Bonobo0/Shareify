@@ -83,7 +83,7 @@ export default function PlayPage() {
     }
 
     const contentLength = response.headers.get('content-length');
-    const total = parseInt(contentLength, 10);
+    const total = contentLength ? parseInt(contentLength, 10) : null;
     let loaded = 0;
 
     const reader = response.body.getReader();
@@ -97,22 +97,16 @@ export default function PlayPage() {
       chunks.push(value);
       loaded += value.length;
 
-      if (total && onProgress) {
+      // total이 유효한 경우에만 진행률 계산
+      if (total && !isNaN(total) && onProgress) {
         const progress = (loaded / total) * 100;
         onProgress(Math.round(progress));
       }
     }
 
-    const arrayBuffer = new Uint8Array(
-      chunks.reduce((acc, chunk) => acc + chunk.length, 0)
-    );
-    let position = 0;
-    for (const chunk of chunks) {
-      arrayBuffer.set(chunk, position);
-      position += chunk.length;
-    }
-
-    return arrayBuffer.buffer;
+    // Blob API를 사용하여 더 효율적으로 병합
+    const blob = new Blob(chunks);
+    return await blob.arrayBuffer();
   };
 
   const loadGame = async (password = null) => {
