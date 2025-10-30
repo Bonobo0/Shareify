@@ -127,6 +127,8 @@ export async function getSharedFileInfo({ hash }) {
         isEncrypted: file.isEncrypted,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        isWebGLBuild: file.isWebGLBuild,
+        webGLValidated: file.webGLValidated,
       },
     };
   } catch (error) {
@@ -476,7 +478,7 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
       parentDirectory: currentDirectory._id,
       deleted: { $ne: true },
     }).select(
-      "originalName size createdAt hash mimetype originalMimetype originalSize isEncrypted"
+      "originalName size createdAt hash mimetype originalMimetype originalSize isEncrypted isWebGLBuild webGLValidated"
     );
 
     // 현재 디렉토리의 하위 디렉토리 목록 조회
@@ -510,6 +512,8 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
         isEncrypted: file.isEncrypted || false,
+        isWebGLBuild: file.isWebGLBuild || false,
+        webGLValidated: file.webGLValidated || false,
       })),
       subdirectories: subdirectories.map((dir) => ({
         id: dir._id.toString(),

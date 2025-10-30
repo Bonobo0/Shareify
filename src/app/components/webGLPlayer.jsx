@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { loadWebGLBuild } from "@/lib/webgl/player";
 
+// 상수 정의
+const DOUBLE_TAP_DELAY_MS = 500; // 더블 탭 인식 시간 (밀리초)
+const DOUBLE_TAP_AREA_HEIGHT = "h-20"; // 더블 탭 감지 영역 높이
+
 /**
  * WebGL 게임 플레이어 컴포넌트
  * /play/[hash]/page.jsx와 공유 페이지에서 범용적으로 사용
@@ -37,6 +41,7 @@ export default function WebGLPlayer({
   const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState("");
   const [showOverlay, setShowOverlay] = useState(true);
+  const [lastTapTime, setLastTapTime] = useState(0);
 
   const containerIdRef = useState(() => 
     `game-container-${Math.random().toString(36).slice(2, 11)}`
@@ -88,10 +93,29 @@ export default function WebGLPlayer({
     }
   };
 
+  // 상단 영역 더블 탭 핸들러
+  const handleTopAreaClick = () => {
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapTime;
+    
+    // DOUBLE_TAP_DELAY_MS 이내에 다시 클릭하면 더블 탭으로 간주
+    if (timeSinceLastTap < DOUBLE_TAP_DELAY_MS && timeSinceLastTap > 0) {
+      setShowOverlay(true);
+      setLastTapTime(0); // 리셋
+    } else {
+      setLastTapTime(now);
+    }
+  };
+
   if (!isOpen) return null;
 
   const overlayClasses = `absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 transition-opacity duration-300 z-50 ${
     showOverlay ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+  }`;
+
+  // 더블 탭 감지를 위한 투명 영역
+  const doubleTapAreaClasses = `absolute top-0 left-0 right-0 ${DOUBLE_TAP_AREA_HEIGHT} z-40 ${
+    showOverlay ? 'pointer-events-none' : 'cursor-pointer'
   }`;
 
   return (
@@ -139,6 +163,15 @@ export default function WebGLPlayer({
           }}
         ></div>
 
+        {/* 더블 탭 감지 영역 - 게임 실행 중에만 표시 */}
+        {gameReady && !showOverlay && (
+          <div 
+            className={doubleTapAreaClasses}
+            onClick={handleTopAreaClick}
+            title="두 번 탭하여 컨트롤 표시"
+          />
+        )}
+
         {/* 오버레이 컨트롤 - 게임 실행 중에만 표시 */}
         {gameReady && (
           <div className={overlayClasses}>
@@ -160,7 +193,7 @@ export default function WebGLPlayer({
                 {isOwner && onTogglePublic && (
                   <>
                     <div className="flex items-center gap-2 bg-base-100/80 backdrop-blur rounded-lg px-3 py-1">
-                      <span className="text-sm hidden sm:inline">공개 공유</span>
+                      <span className="text-sm">공개 공유</span>
                       <input
                         type="checkbox"
                         className="toggle toggle-primary toggle-sm"
@@ -175,7 +208,7 @@ export default function WebGLPlayer({
                         onClick={onCopyShareUrl}
                         title="공유 링크 복사"
                       >
-                        🔗 링크 복사
+                        <span className="hidden sm:inline">🔗 </span>링크 복사
                       </button>
                     )}
                   </>
