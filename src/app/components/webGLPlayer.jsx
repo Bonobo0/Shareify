@@ -39,7 +39,7 @@ export default function WebGLPlayer({
   const [showOverlay, setShowOverlay] = useState(true);
 
   const containerIdRef = useState(() => 
-    `game-container-${Math.random().toString(36).substr(2, 9)}`
+    `game-container-${Math.random().toString(36).slice(2, 11)}`
   )[0];
 
   const startGame = useCallback(async () => {
