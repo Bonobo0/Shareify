@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { getSharedFileInfo, downloadSharedFile } from "@/actions/share";
-import { downloadAndDecrypt, decryptForPreview } from "@/lib/crypto/encryption";
+import { downloadAndDecrypt, decryptForPreview, decryptFile } from "@/lib/crypto/encryption";
 import PreviewModal from "@/app/components/previewModal";
 import WebGLPlayer from "@/app/components/webGLPlayer";
 
@@ -160,25 +160,36 @@ export default function SharePage() {
       if (file.isEncrypted && password) {
         console.log("암호화된 WebGL 빌드 복호화 시작...");
         try {
-          // 복호화 (downloadAndDecrypt가 내부적으로 fetch 수행)
-          const decryptedData = await downloadAndDecrypt(
-            result.downloadUrl,
+          // 파일 다운로드
+          const response = await fetch(result.downloadUrl);
+          if (!response.ok) {
+            throw new Error("파일 다운로드 실패");
+          }
+          const encryptedArrayBuffer = await response.arrayBuffer();
+
+          // 복호화
+          const metadata = {
+            originalName: result.filename || file.originalName,
+            originalType: result.originalMimetype || file.originalMimetype || file.mimetype,
+            originalSize: result.originalSize || file.originalSize || file.size,
+          };
+
+          const decryptResult = await decryptFile(
+            encryptedArrayBuffer,
             password,
-            {
-              originalName: result.filename || file.originalName,
-              originalMimetype:
-                result.originalMimetype ||
-                file.originalMimetype ||
-                file.mimetype,
-              originalSize: result.originalSize || file.originalSize || file.size,
-            }
+            metadata
           );
 
-          fileBlob = new Blob([decryptedData], { type: "application/zip" });
+          if (!decryptResult.success || decryptResult.error) {
+            throw new Error(decryptResult.error || "복호화에 실패했습니다.");
+          }
+
+          // Blob으로 변환 (decryptedFile은 File 객체이므로 직접 사용 가능)
+          fileBlob = decryptResult.decryptedFile;
           console.log("암호화된 WebGL 빌드 복호화 완료");
         } catch (decryptError) {
           console.error("복호화 실패:", decryptError);
-          throw new Error("복호화에 실패했습니다. 비밀번호를 확인해주세요.");
+          throw new Error(decryptError.message || "복호화에 실패했습니다. 비밀번호를 확인해주세요.");
         }
       } else {
         // 일반 파일 다운로드

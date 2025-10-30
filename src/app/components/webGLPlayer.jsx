@@ -160,13 +160,6 @@ export default function WebGLPlayer({
                   )}
                 </>
               )}
-              <button
-                className="btn btn-sm btn-ghost text-white"
-                onClick={() => setShowOverlay(!showOverlay)}
-                title={showOverlay ? "헤더 숨기기" : "헤더 보이기"}
-              >
-                {showOverlay ? "👁️" : "👁️‍🗨️"}
-              </button>
             </div>
           </div>
         </div>
