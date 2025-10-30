@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { loadWebGLBuild } from "@/lib/webgl/player";
 
+// 상수 정의
+const DOUBLE_TAP_DELAY_MS = 500; // 더블 탭 인식 시간 (밀리초)
+const DOUBLE_TAP_AREA_HEIGHT = "h-20"; // 더블 탭 감지 영역 높이
+
 /**
  * WebGL 게임 플레이어 컴포넌트
  * /play/[hash]/page.jsx와 공유 페이지에서 범용적으로 사용
@@ -94,8 +98,8 @@ export default function WebGLPlayer({
     const now = Date.now();
     const timeSinceLastTap = now - lastTapTime;
     
-    // 500ms 이내에 다시 클릭하면 더블 탭으로 간주
-    if (timeSinceLastTap < 500 && timeSinceLastTap > 0) {
+    // DOUBLE_TAP_DELAY_MS 이내에 다시 클릭하면 더블 탭으로 간주
+    if (timeSinceLastTap < DOUBLE_TAP_DELAY_MS && timeSinceLastTap > 0) {
       setShowOverlay(true);
       setLastTapTime(0); // 리셋
     } else {
@@ -110,7 +114,7 @@ export default function WebGLPlayer({
   }`;
 
   // 더블 탭 감지를 위한 투명 영역
-  const doubleTapAreaClasses = `absolute top-0 left-0 right-0 h-20 z-40 ${
+  const doubleTapAreaClasses = `absolute top-0 left-0 right-0 ${DOUBLE_TAP_AREA_HEIGHT} z-40 ${
     showOverlay ? 'pointer-events-none' : 'cursor-pointer'
   }`;
 
