@@ -470,7 +470,7 @@ export default function SharedDirectoryPage() {
             throw new Error(decryptResult.error || "복호화에 실패했습니다.");
           }
 
-          // Blob으로 변환 (decryptedFile은 File 객체이므로 직접 사용 가능)
+          // File 객체를 직접 사용 (decryptedFile은 File 객체)
           fileBlob = decryptResult.decryptedFile;
           console.log("암호화된 WebGL 빌드 복호화 완료");
         } catch (decryptError) {
