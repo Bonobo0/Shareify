@@ -160,13 +160,7 @@ export default function SharePage() {
       if (file.isEncrypted && password) {
         console.log("암호화된 WebGL 빌드 복호화 시작...");
         try {
-          const response = await fetch(result.downloadUrl);
-          if (!response.ok) {
-            throw new Error("파일 다운로드 실패");
-          }
-          const encryptedArrayBuffer = await response.arrayBuffer();
-
-          // 복호화
+          // 복호화 (downloadAndDecrypt가 내부적으로 fetch 수행)
           const decryptedData = await downloadAndDecrypt(
             result.downloadUrl,
             password,

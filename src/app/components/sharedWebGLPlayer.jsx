@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { loadWebGLBuild } from "@/lib/webgl/player";
 
 /**
@@ -17,14 +17,7 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
   const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (isOpen && fileBlob && !gameReady && !gameLoading) {
-      startGame();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, fileBlob]);
-
-  const startGame = async () => {
+  const startGame = useCallback(async () => {
     setGameLoading(true);
     setLoadProgress(0);
     setError("");
@@ -47,7 +40,13 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
     } finally {
       setGameLoading(false);
     }
-  };
+  }, [fileBlob, file]);
+
+  useEffect(() => {
+    if (isOpen && fileBlob && !gameReady && !gameLoading) {
+      startGame();
+    }
+  }, [isOpen, fileBlob, gameReady, gameLoading, startGame]);
 
   const handleClose = () => {
     setGameReady(false);
@@ -107,7 +106,7 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
               className="w-full bg-black rounded-lg overflow-hidden"
               style={{
                 aspectRatio: "16/9",
-                display: gameReady ? "block" : gameLoading ? "none" : "block",
+                display: gameLoading ? "none" : "block",
                 minHeight: gameReady ? "500px" : "300px",
               }}
             >
