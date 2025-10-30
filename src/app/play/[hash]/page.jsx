@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getFileDetails, getFileDownloadUrl } from "@/actions/files";
 import { decryptFile } from "@/lib/crypto/encryption";
-import { loadWebGLBuild, clearWebGLCache } from "@/lib/webgl/player";
+import { loadWebGLBuild } from "@/lib/webgl/player";
+import { toggleFilePublic } from "@/actions/share";
 
 export default function PlayPage() {
   const params = useParams();
@@ -22,6 +23,10 @@ export default function PlayPage() {
   const [gameLoading, setGameLoading] = useState(false);
   const [gameReady, setGameReady] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
+  const [isPublic, setIsPublic] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(true);
 
   const fetchFileDetails = async () => {
     try {
@@ -42,6 +47,12 @@ export default function PlayPage() {
         }
 
         setFile(fileData);
+        setIsPublic(fileData.isPublic);
+        setIsOwner(fileData.userPermission === "admin");
+        
+        if (fileData.isPublic) {
+          setShareUrl(`${window.location.origin}/share/${hash}`);
+        }
       }
     } catch (error) {
       setError(error.message);
@@ -161,10 +172,36 @@ export default function PlayPage() {
     }
   };
 
-  const handleClearCache = async () => {
-    if (confirm("캐시를 삭제하시겠습니까? 다음에 다시 다운로드해야 합니다.")) {
-      await clearWebGLCache(file.originalName);
-      alert("캐시가 삭제되었습니다.");
+  const togglePublicAccess = async () => {
+    if (!isOwner) return;
+
+    try {
+      const result = await toggleFilePublic({ fileId: file.id });
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      if (result.success) {
+        setIsPublic(result.isPublic);
+
+        if (result.isPublic) {
+          setShareUrl(`${window.location.origin}/share/${hash}`);
+          alert("공개 링크가 활성화되었습니다.");
+        } else {
+          setShareUrl("");
+          alert("공개 링크가 비활성화되었습니다.");
+        }
+      }
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  const copyShareUrl = () => {
+    if (shareUrl) {
+      navigator.clipboard.writeText(shareUrl);
+      alert("공유 링크가 클립보드에 복사되었습니다.");
     }
   };
 
@@ -192,77 +229,114 @@ export default function PlayPage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col p-4">
-        <div className="mb-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">{file?.originalName}</h1>
-          <div className="flex gap-2">
-            {gameReady && (
-              <button className="btn btn-sm" onClick={handleClearCache}>
-                🗑️ 캐시 삭제
-              </button>
+      {/* 전체 화면 게임 컨테이너 */}
+      <main className="relative w-screen h-screen overflow-hidden">
+        {!gameReady && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-base-100 z-10">
+            {!gameLoading && !file?.isEncrypted && (
+              <div className="card bg-base-200 p-6 max-w-md">
+                <h2 className="text-2xl font-bold mb-4">{file?.originalName}</h2>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => loadGame()}
+                >
+                  🎮 게임 시작
+                </button>
+              </div>
             )}
-            <button
-              className="btn btn-sm"
-              onClick={() => router.push(`/file/${hash}`)}
-            >
-              ← 파일 정보
-            </button>
-          </div>
-        </div>
 
-        {!gameReady && !file?.isEncrypted && (
-          <div className="card bg-base-200 p-6 mb-4">
-            <button
-              className="btn btn-primary"
-              onClick={() => loadGame()}
-              disabled={gameLoading}
-            >
-              {gameLoading ? "게임 로딩 중..." : "게임 시작"}
-            </button>
-          </div>
-        )}
+            {file?.isEncrypted && !gameReady && !gameLoading && (
+              <div className="card bg-base-200 p-6 max-w-md">
+                <h2 className="text-2xl font-bold mb-4">{file?.originalName}</h2>
+                <p className="mb-4">이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화 키를 입력해주세요.</p>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setDecryptModal(true)}
+                >
+                  🎮 게임 시작
+                </button>
+              </div>
+            )}
 
-        {file?.isEncrypted && !gameReady && (
-          <div className="card bg-base-200 p-6 mb-4">
-            <p className="mb-4">이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화 키를 입력해주세요.</p>
-            <button
-              className="btn btn-primary"
-              onClick={() => setDecryptModal(true)}
-              disabled={gameLoading}
-            >
-              게임 시작
-            </button>
+            {gameLoading && (
+              <div className="card bg-base-200 p-6 max-w-md">
+                <div className="text-center">
+                  <p className="mb-2 text-lg">게임 로딩 중... {Math.round(loadProgress)}%</p>
+                  <progress
+                    className="progress progress-primary w-full"
+                    value={loadProgress}
+                    max="100"
+                  ></progress>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {gameLoading && (
-          <div className="card bg-base-200 p-6 mb-4">
-            <div className="text-center">
-              <p className="mb-2">게임 로딩 중... {Math.round(loadProgress)}%</p>
-              <progress
-                className="progress progress-primary w-full"
-                value={loadProgress}
-                max="100"
-              ></progress>
-            </div>
-          </div>
-        )}
-
-        {/* 게임 컨테이너 */}
+        {/* 게임 컨테이너 - 커스텀 스타일 없이 */}
         <div
           id="game-container"
-          className="w-full bg-black rounded-lg overflow-hidden"
           style={{
-            minHeight: "600px",
-            height: "calc(100vh - 200px)",
+            width: "100%",
+            height: "100%",
             display: gameReady ? "block" : "none",
           }}
         ></div>
 
-        {!gameReady && !gameLoading && (
-          <div className="card bg-base-200 p-6 text-center">
-            <p className="text-gray-500">게임을 시작하려면 위의 버튼을 클릭하세요</p>
-          </div>
+        {/* 오버레이 컨트롤 - 게임 실행 중에만 표시 */}
+        {gameReady && (
+          <>
+            {/* 상단 오버레이 - 항상 표시되거나 호버 시 표시 */}
+            <div 
+              className={`absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 transition-opacity duration-300 z-50 ${showOverlay ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => router.back()}
+                    title="뒤로가기"
+                  >
+                    ← 뒤로가기
+                  </button>
+                  <h1 className="text-white text-lg font-bold hidden sm:block">{file?.originalName}</h1>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {isOwner && (
+                    <>
+                      <div className="flex items-center gap-2 bg-base-100/80 backdrop-blur rounded-lg px-3 py-1">
+                        <span className="text-sm hidden sm:inline">공개 공유</span>
+                        <input
+                          type="checkbox"
+                          className="toggle toggle-primary toggle-sm"
+                          checked={isPublic}
+                          onChange={togglePublicAccess}
+                          title="공개 공유 설정"
+                        />
+                      </div>
+                      {isPublic && shareUrl && (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={copyShareUrl}
+                          title="공유 링크 복사"
+                        >
+                          🔗 링크 복사
+                        </button>
+                      )}
+                    </>
+                  )}
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setShowOverlay(!showOverlay)}
+                    title={showOverlay ? "컨트롤 숨기기" : "컨트롤 보이기"}
+                  >
+                    {showOverlay ? "👁️" : "👁️‍🗨️"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </main>
 
