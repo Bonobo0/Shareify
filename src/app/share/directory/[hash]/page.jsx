@@ -12,9 +12,10 @@ import {
   downloadSharedFile,
   downloadSharedDirectoryFile,
 } from "@/actions/share";
-import { decryptForPreview } from "@/lib/crypto/encryption";
+import { decryptForPreview, downloadAndDecrypt } from "@/lib/crypto/encryption";
 import DeleteSharedDirectory from "@/app/components/deleteDirectory";
 import PreviewModal from "@/app/components/previewModal";
+import SharedWebGLPlayer from "@/app/components/sharedWebGLPlayer";
 
 export default function SharedDirectoryPage() {
   const params = useParams();
@@ -38,6 +39,15 @@ export default function SharedDirectoryPage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [errorModal, setErrorModal] = useState({ show: false, message: "" });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // WebGL 관련 상태
+  const [showWebGLModal, setShowWebGLModal] = useState(false);
+  const [webGLFile, setWebGLFile] = useState(null);
+  const [showWebGLPlayer, setShowWebGLPlayer] = useState(false);
+  const [webGLBlob, setWebGLBlob] = useState(null);
+  const [webGLPasswordModal, setWebGLPasswordModal] = useState(false);
+  const [webGLPassword, setWebGLPassword] = useState("");
+  const [webGLLoading, setWebGLLoading] = useState(false);
 
   // 파일 선택 관련 상태
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -194,6 +204,13 @@ export default function SharedDirectoryPage() {
   };
 
   const handleFileClick = async (file, event) => {
+    // WebGL 빌드인 경우 특별 처리
+    if (file.isWebGLBuild) {
+      setWebGLFile(file);
+      setShowWebGLModal(true);
+      return;
+    }
+
     // 미리보기 가능한 파일인지 확인
     const mimeType = file.originalMimetype || file.mimeType || "";
     const isPreviewableFile =
@@ -353,6 +370,134 @@ export default function SharedDirectoryPage() {
     await performPreview(selectedFile, previewPassword);
     setPreviewPassword("");
     setSelectedFile(null);
+  };
+
+  // WebGL 게임 다운로드 및 플레이 함수
+  const handleWebGLDownload = async () => {
+    if (!webGLFile) return;
+
+    try {
+      const result = await downloadSharedDirectoryFile({
+        shareHash: hash,
+        fileId: webGLFile.id,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "다운로드 실패");
+      }
+
+      // 다운로드 URL로 파일 다운로드
+      const response = await fetch(result.downloadUrl);
+      if (!response.ok) {
+        throw new Error(`다운로드 실패: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setShowWebGLModal(false);
+      setWebGLFile(null);
+    } catch (error) {
+      console.error("파일 다운로드 실패:", error);
+      showError("파일 다운로드에 실패했습니다: " + error.message);
+    }
+  };
+
+  const handleWebGLPlay = async () => {
+    if (!webGLFile) return;
+
+    // 암호화된 파일인 경우 비밀번호 입력 모달 표시
+    if (webGLFile.isEncrypted) {
+      setShowWebGLModal(false);
+      setWebGLPasswordModal(true);
+      return;
+    }
+
+    // 일반 파일 플레이
+    await performWebGLPlay();
+  };
+
+  const performWebGLPlay = async (password = null) => {
+    setWebGLLoading(true);
+
+    try {
+      const result = await downloadSharedDirectoryFile({
+        shareHash: hash,
+        fileId: webGLFile.id,
+      });
+
+      if (!result.success) {
+        throw new Error(
+          result.error || "다운로드 URL을 생성하는 중 오류가 발생했습니다."
+        );
+      }
+
+      let fileBlob;
+
+      // 암호화된 파일인 경우 복호화
+      if (webGLFile.isEncrypted && password) {
+        console.log("암호화된 WebGL 빌드 복호화 시작...");
+        try {
+          const response = await fetch(result.downloadUrl);
+          if (!response.ok) {
+            throw new Error("파일 다운로드 실패");
+          }
+
+          // 복호화
+          const decryptedData = await downloadAndDecrypt(
+            result.downloadUrl,
+            password,
+            {
+              originalName: webGLFile.name,
+              originalMimetype:
+                webGLFile.originalMimetype || webGLFile.mimeType,
+              originalSize: webGLFile.originalSize || webGLFile.size,
+            }
+          );
+
+          fileBlob = new Blob([decryptedData], { type: "application/zip" });
+          console.log("암호화된 WebGL 빌드 복호화 완료");
+        } catch (decryptError) {
+          console.error("복호화 실패:", decryptError);
+          throw new Error("복호화에 실패했습니다. 비밀번호를 확인해주세요.");
+        }
+      } else {
+        // 일반 파일 다운로드
+        const response = await fetch(result.downloadUrl);
+        if (!response.ok) {
+          throw new Error("파일 다운로드 실패");
+        }
+        fileBlob = await response.blob();
+      }
+
+      setWebGLBlob(fileBlob);
+      setShowWebGLPlayer(true);
+      setShowWebGLModal(false);
+    } catch (error) {
+      console.error("게임 로드 오류:", error);
+      showError(error.message);
+    } finally {
+      setWebGLLoading(false);
+    }
+  };
+
+  const handleWebGLPlayWithPassword = async () => {
+    if (!webGLPassword.trim()) {
+      showError("복호화 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    setWebGLPasswordModal(false);
+    await performWebGLPlay(webGLPassword);
+    setWebGLPassword("");
   };
 
   if (loading) {
@@ -651,9 +796,11 @@ export default function SharedDirectoryPage() {
                             />
                           )}
                           <span className="text-2xl mr-3 flex-shrink-0">
-                            {(
-                              file.originalMimetype || file.mimeType
-                            )?.startsWith("image/")
+                            {file.isWebGLBuild
+                              ? "🎮"
+                              : (
+                                  file.originalMimetype || file.mimeType
+                                )?.startsWith("image/")
                               ? "🖼️"
                               : (
                                   file.originalMimetype || file.mimeType
@@ -856,6 +1003,127 @@ export default function SharedDirectoryPage() {
           });
         }}
       />
+
+      {/* WebGL 게임 선택 모달 (게임 플레이 or 다운로드) */}
+      {showWebGLModal && webGLFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">🎮 WebGL 게임</h2>
+
+            <p className="text-sm text-gray-600 mb-2">
+              <strong>{webGLFile.name}</strong>
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              이 파일은 WebGL 빌드입니다. 게임을 플레이하거나 다운로드할 수
+              있습니다.
+            </p>
+
+            {webGLFile.isEncrypted && (
+              <div className="alert alert-warning mb-4">
+                <span className="text-sm">
+                  🔒 이 게임은 암호화되어 있습니다. 플레이하려면 복호화
+                  비밀번호가 필요합니다.
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+              <button
+                className="btn btn-primary btn-block"
+                onClick={handleWebGLPlay}
+                disabled={webGLLoading}
+              >
+                {webGLFile.isEncrypted
+                  ? "🔒 복호화 후 게임 플레이"
+                  : "🎮 게임 플레이"}
+              </button>
+              <button
+                className="btn btn-secondary btn-block"
+                onClick={handleWebGLDownload}
+              >
+                ⬇️ 다운로드
+              </button>
+              <button
+                className="btn btn-ghost btn-block"
+                onClick={() => {
+                  setShowWebGLModal(false);
+                  setWebGLFile(null);
+                }}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WebGL 게임 플레이용 암호화 파일 비밀번호 입력 모달 */}
+      {webGLPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">🔒 게임 복호화</h2>
+
+            <p className="text-sm text-gray-600 mb-4">
+              이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화
+              비밀번호를 입력해주세요.
+            </p>
+
+            <div className="form-control mb-4">
+              <label className="label">
+                <span className="label-text">복호화 비밀번호</span>
+              </label>
+              <input
+                type="password"
+                placeholder="비밀번호를 입력하세요"
+                className="input input-bordered"
+                value={webGLPassword}
+                onChange={(e) => setWebGLPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleWebGLPlayWithPassword();
+                  }
+                }}
+                disabled={webGLLoading}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setWebGLPasswordModal(false);
+                  setWebGLPassword("");
+                  setWebGLFile(null);
+                }}
+                disabled={webGLLoading}
+              >
+                취소
+              </button>
+              <button
+                className={`btn btn-primary ${webGLLoading ? "loading" : ""}`}
+                onClick={handleWebGLPlayWithPassword}
+                disabled={webGLLoading || !webGLPassword.trim()}
+              >
+                {webGLLoading ? "복호화 중..." : "게임 시작"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WebGL 플레이어 모달 */}
+      {showWebGLPlayer && webGLBlob && webGLFile && (
+        <SharedWebGLPlayer
+          isOpen={showWebGLPlayer}
+          onClose={() => {
+            setShowWebGLPlayer(false);
+            setWebGLBlob(null);
+            setWebGLFile(null);
+          }}
+          file={webGLFile}
+          fileBlob={webGLBlob}
+        />
+      )}
     </div>
   );
 }

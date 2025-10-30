@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getSharedFileInfo, downloadSharedFile } from "@/actions/share";
 import { downloadAndDecrypt, decryptForPreview } from "@/lib/crypto/encryption";
 import PreviewModal from "@/app/components/previewModal";
+import SharedWebGLPlayer from "@/app/components/sharedWebGLPlayer";
 
 export default function SharePage() {
   const params = useParams();
@@ -24,6 +25,12 @@ export default function SharePage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewPasswordModal, setPreviewPasswordModal] = useState(false);
   const [previewPassword, setPreviewPassword] = useState("");
+  // WebGL 관련 상태
+  const [showWebGLPlayer, setShowWebGLPlayer] = useState(false);
+  const [webGLBlob, setWebGLBlob] = useState(null);
+  const [webGLPasswordModal, setWebGLPasswordModal] = useState(false);
+  const [webGLPassword, setWebGLPassword] = useState("");
+  const [webGLLoading, setWebGLLoading] = useState(false);
 
   // Modal helper functions
   const showAlert = (message) => {
@@ -116,6 +123,97 @@ export default function SharePage() {
     setPreviewPasswordModal(false);
     await performPreview(previewPassword);
     setPreviewPassword("");
+  };
+
+  // WebGL 게임 플레이 함수
+  const handlePlayGame = async () => {
+    if (!file || !file.isWebGLBuild) {
+      showAlert("이 파일은 WebGL 빌드가 아닙니다.");
+      return;
+    }
+
+    // 암호화된 파일인 경우 비밀번호 입력 모달 표시
+    if (file.isEncrypted) {
+      setWebGLPasswordModal(true);
+      return;
+    }
+
+    // 일반 파일 플레이
+    await performPlayGame();
+  };
+
+  const performPlayGame = async (password = null) => {
+    setWebGLLoading(true);
+
+    try {
+      const result = await downloadSharedFile({ hash });
+
+      if (!result.success) {
+        throw new Error(
+          result.error || "다운로드 URL을 생성하는 중 오류가 발생했습니다."
+        );
+      }
+
+      let fileBlob;
+
+      // 암호화된 파일인 경우 복호화
+      if (file.isEncrypted && password) {
+        console.log("암호화된 WebGL 빌드 복호화 시작...");
+        try {
+          const response = await fetch(result.downloadUrl);
+          if (!response.ok) {
+            throw new Error("파일 다운로드 실패");
+          }
+          const encryptedArrayBuffer = await response.arrayBuffer();
+
+          // 복호화
+          const decryptedData = await downloadAndDecrypt(
+            result.downloadUrl,
+            password,
+            {
+              originalName: result.filename || file.originalName,
+              originalMimetype:
+                result.originalMimetype ||
+                file.originalMimetype ||
+                file.mimetype,
+              originalSize: result.originalSize || file.originalSize || file.size,
+            }
+          );
+
+          fileBlob = new Blob([decryptedData], { type: "application/zip" });
+          console.log("암호화된 WebGL 빌드 복호화 완료");
+        } catch (decryptError) {
+          console.error("복호화 실패:", decryptError);
+          throw new Error("복호화에 실패했습니다. 비밀번호를 확인해주세요.");
+        }
+      } else {
+        // 일반 파일 다운로드
+        const response = await fetch(result.downloadUrl);
+        if (!response.ok) {
+          throw new Error("파일 다운로드 실패");
+        }
+        fileBlob = await response.blob();
+      }
+
+      setWebGLBlob(fileBlob);
+      setShowWebGLPlayer(true);
+    } catch (error) {
+      console.error("게임 로드 오류:", error);
+      showAlert(error.message);
+    } finally {
+      setWebGLLoading(false);
+    }
+  };
+
+  const handlePlayGameWithPassword = async () => {
+    if (!webGLPassword.trim()) {
+      showAlert("복호화 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    setWebGLPasswordModal(false);
+    await performPlayGame(webGLPassword);
+    setWebGLPassword("");
   };
 
   const fetchSharedFile = useCallback(async () => {
@@ -293,10 +391,32 @@ export default function SharePage() {
                 </span>
               </div>
             )}
+            {file?.isWebGLBuild && (
+              <div className="mt-4">
+                <span className="badge badge-success badge-sm sm:badge-md whitespace-nowrap">
+                  🎮 WebGL 게임
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4">
-            {isPreviewable(file?.mimetype) && (
+            {file?.isWebGLBuild && (
+              <button
+                className={`btn btn-success btn-sm sm:btn-lg flex-1 sm:flex-none ${
+                  webGLLoading ? "loading" : ""
+                }`}
+                onClick={handlePlayGame}
+                disabled={webGLLoading}
+              >
+                {webGLLoading
+                  ? "로딩 중..."
+                  : file?.isEncrypted
+                  ? "🔒 복호화 후 게임 플레이"
+                  : "🎮 게임 플레이"}
+              </button>
+            )}
+            {isPreviewable(file?.mimetype) && !file?.isWebGLBuild && (
               <button
                 className={`btn btn-secondary btn-sm sm:btn-lg flex-1 sm:flex-none ${
                   previewLoading ? "loading" : ""
@@ -542,6 +662,72 @@ export default function SharePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* WebGL 게임 플레이용 암호화 파일 비밀번호 입력 모달 */}
+      {webGLPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">🔒 게임 복호화</h2>
+
+            <p className="text-sm text-gray-600 mb-4">
+              이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화 비밀번호를
+              입력해주세요.
+            </p>
+
+            <div className="form-control mb-4">
+              <label className="label">
+                <span className="label-text">복호화 비밀번호</span>
+              </label>
+              <input
+                type="password"
+                placeholder="비밀번호를 입력하세요"
+                className="input input-bordered"
+                value={webGLPassword}
+                onChange={(e) => setWebGLPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handlePlayGameWithPassword();
+                  }
+                }}
+                disabled={webGLLoading}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setWebGLPasswordModal(false);
+                  setWebGLPassword("");
+                }}
+                disabled={webGLLoading}
+              >
+                취소
+              </button>
+              <button
+                className={`btn btn-primary ${webGLLoading ? "loading" : ""}`}
+                onClick={handlePlayGameWithPassword}
+                disabled={webGLLoading || !webGLPassword.trim()}
+              >
+                {webGLLoading ? "복호화 중..." : "게임 시작"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WebGL 플레이어 모달 */}
+      {showWebGLPlayer && webGLBlob && (
+        <SharedWebGLPlayer
+          isOpen={showWebGLPlayer}
+          onClose={() => {
+            setShowWebGLPlayer(false);
+            setWebGLBlob(null);
+          }}
+          file={file}
+          fileBlob={webGLBlob}
+        />
       )}
     </>
   );
