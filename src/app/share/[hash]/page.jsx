@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getSharedFileInfo, downloadSharedFile } from "@/actions/share";
 import { downloadAndDecrypt, decryptForPreview } from "@/lib/crypto/encryption";
 import PreviewModal from "@/app/components/previewModal";
-import SharedWebGLPlayer from "@/app/components/sharedWebGLPlayer";
+import WebGLPlayer from "@/app/components/webGLPlayer";
 
 export default function SharePage() {
   const params = useParams();
@@ -713,7 +713,7 @@ export default function SharePage() {
 
       {/* WebGL 플레이어 모달 */}
       {showWebGLPlayer && webGLBlob && (
-        <SharedWebGLPlayer
+        <WebGLPlayer
           isOpen={showWebGLPlayer}
           onClose={() => {
             setShowWebGLPlayer(false);

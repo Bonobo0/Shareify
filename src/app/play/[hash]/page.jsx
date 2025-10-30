@@ -5,8 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getFileDetails, getFileDownloadUrl } from "@/actions/files";
 import { decryptFile } from "@/lib/crypto/encryption";
-import { loadWebGLBuild } from "@/lib/webgl/player";
 import { toggleFilePublic } from "@/actions/share";
+import WebGLPlayer from "@/app/components/webGLPlayer";
 
 export default function PlayPage() {
   const params = useParams();
@@ -20,13 +20,11 @@ export default function PlayPage() {
   const [decryptModal, setDecryptModal] = useState(false);
   const [decryptPassword, setDecryptPassword] = useState("");
   const [decryptLoading, setDecryptLoading] = useState(false);
-  const [gameLoading, setGameLoading] = useState(false);
-  const [gameReady, setGameReady] = useState(false);
-  const [loadProgress, setLoadProgress] = useState(0);
   const [isPublic, setIsPublic] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [isOwner, setIsOwner] = useState(false);
-  const [showOverlay, setShowOverlay] = useState(true);
+  const [showGamePlayer, setShowGamePlayer] = useState(false);
+  const [gameBlob, setGameBlob] = useState(null);
 
   const fetchFileDetails = async () => {
     try {
@@ -76,9 +74,6 @@ export default function PlayPage() {
   }, [hash, isAuthenticated, authLoading, router]);
 
   const loadGame = async (password = null) => {
-    setGameLoading(true);
-    setLoadProgress(0);
-
     try {
       // 다운로드 URL 가져오기
       const result = await getFileDownloadUrl({ fileId: file.id });
@@ -93,11 +88,8 @@ export default function PlayPage() {
       if (file.isEncrypted) {
         if (!password) {
           setDecryptModal(true);
-          setGameLoading(false);
           return;
         }
-
-        setLoadProgress(10);
         
         const metadata = {
           originalName: file.originalName,
@@ -108,8 +100,6 @@ export default function PlayPage() {
         // 파일 다운로드 및 복호화
         const response = await fetch(result.downloadUrl);
         const encryptedArrayBuffer = await response.arrayBuffer();
-        
-        setLoadProgress(30);
 
         // 복호화
         const decryptResult = await decryptFile(
@@ -129,30 +119,16 @@ export default function PlayPage() {
         setDecryptPassword("");
       } else {
         // 일반 파일 다운로드
-        setLoadProgress(10);
         const response = await fetch(result.downloadUrl);
         fileBlob = await response.blob();
       }
 
-      setLoadProgress(50);
-
-      // WebGL 빌드 로드
-      await loadWebGLBuild(
-        fileBlob,
-        file.originalName,
-        "game-container",
-        (progress) => {
-          setLoadProgress(50 + progress * 0.5);
-        }
-      );
-
-      setLoadProgress(100);
-      setGameReady(true);
+      // WebGL 플레이어 표시
+      setGameBlob(fileBlob);
+      setShowGamePlayer(true);
     } catch (error) {
       console.error("게임 로드 오류:", error);
       setError(error.message || "게임을 로드하는 중 오류가 발생했습니다.");
-    } finally {
-      setGameLoading(false);
     }
   };
 
@@ -229,25 +205,12 @@ export default function PlayPage() {
 
   return (
     <>
-      {/* 전체 화면 게임 컨테이너 */}
-      <main className="relative w-screen h-screen overflow-hidden">
-        {!gameReady && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-base-100 z-10">
-            {!gameLoading && !file?.isEncrypted && (
-              <div className="card bg-base-200 p-6 max-w-md">
-                <h2 className="text-2xl font-bold mb-4">{file?.originalName}</h2>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => loadGame()}
-                >
-                  🎮 게임 시작
-                </button>
-              </div>
-            )}
-
-            {file?.isEncrypted && !gameReady && !gameLoading && (
-              <div className="card bg-base-200 p-6 max-w-md">
-                <h2 className="text-2xl font-bold mb-4">{file?.originalName}</h2>
+      {!showGamePlayer && (
+        <main className="flex min-h-screen flex-col items-center justify-center">
+          <div className="card bg-base-200 p-6 max-w-md">
+            <h2 className="text-2xl font-bold mb-4">{file?.originalName}</h2>
+            {file?.isEncrypted ? (
+              <>
                 <p className="mb-4">이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화 키를 입력해주세요.</p>
                 <button
                   className="btn btn-primary"
@@ -255,90 +218,38 @@ export default function PlayPage() {
                 >
                   🎮 게임 시작
                 </button>
-              </div>
-            )}
-
-            {gameLoading && (
-              <div className="card bg-base-200 p-6 max-w-md">
-                <div className="text-center">
-                  <p className="mb-2 text-lg">게임 로딩 중... {Math.round(loadProgress)}%</p>
-                  <progress
-                    className="progress progress-primary w-full"
-                    value={loadProgress}
-                    max="100"
-                  ></progress>
-                </div>
-              </div>
+              </>
+            ) : (
+              <button
+                className="btn btn-primary"
+                onClick={() => loadGame()}
+              >
+                🎮 게임 시작
+              </button>
             )}
           </div>
-        )}
+        </main>
+      )}
 
-        {/* 게임 컨테이너 - 커스텀 스타일 없이 */}
-        <div
-          id="game-container"
-          style={{
-            width: "100%",
-            height: "100%",
-            display: gameReady ? "block" : "none",
+      {/* WebGL 플레이어 */}
+      {showGamePlayer && gameBlob && (
+        <WebGLPlayer
+          isOpen={showGamePlayer}
+          onClose={() => {
+            setShowGamePlayer(false);
+            setGameBlob(null);
           }}
-        ></div>
-
-        {/* 오버레이 컨트롤 - 게임 실행 중에만 표시 */}
-        {gameReady && (
-          <>
-            {/* 상단 오버레이 - 항상 표시되거나 호버 시 표시 */}
-            <div 
-              className={`absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 transition-opacity duration-300 z-50 ${showOverlay ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
-            >
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => router.back()}
-                    title="뒤로가기"
-                  >
-                    ← 뒤로가기
-                  </button>
-                  <h1 className="text-white text-lg font-bold hidden sm:block">{file?.originalName}</h1>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {isOwner && (
-                    <>
-                      <div className="flex items-center gap-2 bg-base-100/80 backdrop-blur rounded-lg px-3 py-1">
-                        <span className="text-sm hidden sm:inline">공개 공유</span>
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary toggle-sm"
-                          checked={isPublic}
-                          onChange={togglePublicAccess}
-                          title="공개 공유 설정"
-                        />
-                      </div>
-                      {isPublic && shareUrl && (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={copyShareUrl}
-                          title="공유 링크 복사"
-                        >
-                          🔗 링크 복사
-                        </button>
-                      )}
-                    </>
-                  )}
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => setShowOverlay(!showOverlay)}
-                    title={showOverlay ? "컨트롤 숨기기" : "컨트롤 보이기"}
-                  >
-                    {showOverlay ? "👁️" : "👁️‍🗨️"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </main>
+          file={file}
+          fileBlob={gameBlob}
+          showBackButton={true}
+          onBack={() => router.back()}
+          isOwner={isOwner}
+          isPublic={isPublic}
+          shareUrl={shareUrl}
+          onTogglePublic={togglePublicAccess}
+          onCopyShareUrl={copyShareUrl}
+        />
+      )}
 
       {/* 복호화 모달 */}
       {decryptModal && (

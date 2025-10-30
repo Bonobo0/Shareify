@@ -4,20 +4,43 @@ import { useState, useEffect, useCallback } from "react";
 import { loadWebGLBuild } from "@/lib/webgl/player";
 
 /**
- * 공유 파일용 WebGL 플레이어 컴포넌트
- * /play/[hash]/page.jsx의 게임 컨테이너 구조를 따름
+ * WebGL 게임 플레이어 컴포넌트
+ * /play/[hash]/page.jsx와 공유 페이지에서 범용적으로 사용
  * @param {Object} props
- * @param {boolean} props.isOpen - 모달 표시 여부
- * @param {Function} props.onClose - 모달 닫기 콜백
+ * @param {boolean} props.isOpen - 플레이어 표시 여부
+ * @param {Function} props.onClose - 닫기 콜백
  * @param {Object} props.file - 파일 정보
  * @param {Blob} props.fileBlob - 다운로드된 파일 Blob (WebGL 빌드 ZIP)
+ * @param {boolean} props.showBackButton - 뒤로가기 버튼 표시 여부 (기본: false)
+ * @param {Function} props.onBack - 뒤로가기 콜백
+ * @param {boolean} props.isOwner - 파일 소유자 여부 (기본: false)
+ * @param {boolean} props.isPublic - 공개 상태 (기본: false)
+ * @param {string} props.shareUrl - 공유 URL
+ * @param {Function} props.onTogglePublic - 공개 토글 콜백
+ * @param {Function} props.onCopyShareUrl - 공유 URL 복사 콜백
  */
-export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
+export default function WebGLPlayer({ 
+  isOpen, 
+  onClose, 
+  file, 
+  fileBlob,
+  showBackButton = false,
+  onBack,
+  isOwner = false,
+  isPublic = false,
+  shareUrl = "",
+  onTogglePublic,
+  onCopyShareUrl,
+}) {
   const [gameLoading, setGameLoading] = useState(false);
   const [gameReady, setGameReady] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState("");
   const [showOverlay, setShowOverlay] = useState(true);
+
+  const containerIdRef = useState(() => 
+    `game-container-${Math.random().toString(36).substr(2, 9)}`
+  )[0];
 
   const startGame = useCallback(async () => {
     setGameLoading(true);
@@ -29,7 +52,7 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
       await loadWebGLBuild(
         fileBlob,
         file.originalName || file.name,
-        "shared-game-container",
+        containerIdRef,
         (progress) => {
           setLoadProgress(progress);
         }
@@ -42,7 +65,7 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
     } finally {
       setGameLoading(false);
     }
-  }, [fileBlob, file]);
+  }, [fileBlob, file, containerIdRef]);
 
   useEffect(() => {
     if (isOpen && fileBlob && !gameReady && !gameLoading) {
@@ -57,7 +80,19 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
     onClose();
   };
 
+  const handleBackClick = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      handleClose();
+    }
+  };
+
   if (!isOpen) return null;
+
+  const overlayClasses = `absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 transition-opacity duration-300 z-50 ${
+    showOverlay ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+  }`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
@@ -96,7 +131,7 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
 
         {/* 게임 컨테이너 - /play/[hash]/page.jsx와 동일한 구조 */}
         <div
-          id="shared-game-container"
+          id={containerIdRef}
           style={{
             width: "100%",
             height: "100%",
@@ -106,17 +141,15 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
 
         {/* 오버레이 컨트롤 - 게임 실행 중에만 표시 */}
         {gameReady && (
-          <div 
-            className={`absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 transition-opacity duration-300 z-50 ${showOverlay ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
-          >
+          <div className={overlayClasses}>
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <button
-                  className="btn btn-sm btn-ghost text-white"
-                  onClick={handleClose}
-                  title="닫기"
+                  className="btn btn-sm btn-ghost"
+                  onClick={handleBackClick}
+                  title={showBackButton ? "뒤로가기" : "닫기"}
                 >
-                  ✕ 닫기
+                  {showBackButton ? "← 뒤로가기" : "✕ 닫기"}
                 </button>
                 <h1 className="text-white text-lg font-bold hidden sm:block">
                   {file?.originalName || file?.name}
@@ -124,8 +157,31 @@ export default function SharedWebGLPlayer({ isOpen, onClose, file, fileBlob }) {
               </div>
               
               <div className="flex items-center gap-2">
+                {isOwner && onTogglePublic && (
+                  <>
+                    <div className="flex items-center gap-2 bg-base-100/80 backdrop-blur rounded-lg px-3 py-1">
+                      <span className="text-sm hidden sm:inline">공개 공유</span>
+                      <input
+                        type="checkbox"
+                        className="toggle toggle-primary toggle-sm"
+                        checked={isPublic}
+                        onChange={onTogglePublic}
+                        title="공개 공유 설정"
+                      />
+                    </div>
+                    {isPublic && shareUrl && onCopyShareUrl && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={onCopyShareUrl}
+                        title="공유 링크 복사"
+                      >
+                        🔗 링크 복사
+                      </button>
+                    )}
+                  </>
+                )}
                 <button
-                  className="btn btn-sm btn-ghost text-white"
+                  className="btn btn-sm btn-ghost"
                   onClick={() => setShowOverlay(!showOverlay)}
                   title={showOverlay ? "컨트롤 숨기기" : "컨트롤 보이기"}
                 >

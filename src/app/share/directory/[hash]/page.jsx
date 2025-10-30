@@ -15,7 +15,7 @@ import {
 import { decryptForPreview, downloadAndDecrypt } from "@/lib/crypto/encryption";
 import DeleteSharedDirectory from "@/app/components/deleteDirectory";
 import PreviewModal from "@/app/components/previewModal";
-import SharedWebGLPlayer from "@/app/components/sharedWebGLPlayer";
+import WebGLPlayer from "@/app/components/webGLPlayer";
 
 export default function SharedDirectoryPage() {
   const params = useParams();
@@ -1108,7 +1108,7 @@ export default function SharedDirectoryPage() {
 
       {/* WebGL 플레이어 모달 */}
       {showWebGLPlayer && webGLBlob && webGLFile && (
-        <SharedWebGLPlayer
+        <WebGLPlayer
           isOpen={showWebGLPlayer}
           onClose={() => {
             setShowWebGLPlayer(false);
