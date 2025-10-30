@@ -75,6 +75,46 @@ export default function PlayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash, isAuthenticated, authLoading, router]);
 
+  const downloadWithProgress = async (url, onProgress) => {
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error("파일 다운로드에 실패했습니다.");
+    }
+
+    const contentLength = response.headers.get('content-length');
+    const total = parseInt(contentLength, 10);
+    let loaded = 0;
+
+    const reader = response.body.getReader();
+    const chunks = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      chunks.push(value);
+      loaded += value.length;
+
+      if (total && onProgress) {
+        const progress = (loaded / total) * 100;
+        onProgress(Math.round(progress));
+      }
+    }
+
+    const arrayBuffer = new Uint8Array(
+      chunks.reduce((acc, chunk) => acc + chunk.length, 0)
+    );
+    let position = 0;
+    for (const chunk of chunks) {
+      arrayBuffer.set(chunk, position);
+      position += chunk.length;
+    }
+
+    return arrayBuffer.buffer;
+  };
+
   const loadGame = async (password = null) => {
     try {
       setIsDownloading(true);
@@ -104,47 +144,16 @@ export default function PlayPage() {
         };
 
         // 파일 다운로드 및 진행률 추적
-        const response = await fetch(result.downloadUrl);
-        
-        if (!response.ok) {
-          throw new Error("파일 다운로드에 실패했습니다.");
-        }
-
-        const contentLength = response.headers.get('content-length');
-        const total = parseInt(contentLength, 10);
-        let loaded = 0;
-
-        const reader = response.body.getReader();
-        const chunks = [];
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) break;
-
-          chunks.push(value);
-          loaded += value.length;
-
-          if (total) {
-            const progress = (loaded / total) * 100;
-            setDownloadProgress(Math.round(progress));
-          }
-        }
-
-        const encryptedArrayBuffer = new Uint8Array(
-          chunks.reduce((acc, chunk) => acc + chunk.length, 0)
+        const encryptedArrayBuffer = await downloadWithProgress(
+          result.downloadUrl,
+          setDownloadProgress
         );
-        let position = 0;
-        for (const chunk of chunks) {
-          encryptedArrayBuffer.set(chunk, position);
-          position += chunk.length;
-        }
 
         setDownloadProgress(100);
 
         // 복호화
         const decryptResult = await decryptFile(
-          encryptedArrayBuffer.buffer,
+          encryptedArrayBuffer,
           password,
           metadata
         );
@@ -160,42 +169,11 @@ export default function PlayPage() {
         setDecryptPassword("");
       } else {
         // 일반 파일 다운로드 (진행률 추적)
-        const response = await fetch(result.downloadUrl);
-        
-        if (!response.ok) {
-          throw new Error("파일 다운로드에 실패했습니다.");
-        }
-
-        const contentLength = response.headers.get('content-length');
-        const total = parseInt(contentLength, 10);
-        let loaded = 0;
-
-        const reader = response.body.getReader();
-        const chunks = [];
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) break;
-
-          chunks.push(value);
-          loaded += value.length;
-
-          if (total) {
-            const progress = (loaded / total) * 100;
-            setDownloadProgress(Math.round(progress));
-          }
-        }
-
-        const arrayBuffer = new Uint8Array(
-          chunks.reduce((acc, chunk) => acc + chunk.length, 0)
+        const arrayBuffer = await downloadWithProgress(
+          result.downloadUrl,
+          setDownloadProgress
         );
-        let position = 0;
-        for (const chunk of chunks) {
-          arrayBuffer.set(chunk, position);
-          position += chunk.length;
-        }
-
+        
         fileBlob = new Blob([arrayBuffer]);
         setDownloadProgress(100);
       }
