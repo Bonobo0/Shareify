@@ -25,6 +25,8 @@ export default function PlayPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [showGamePlayer, setShowGamePlayer] = useState(false);
   const [gameBlob, setGameBlob] = useState(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const fetchFileDetails = async () => {
     try {
@@ -73,8 +75,45 @@ export default function PlayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash, isAuthenticated, authLoading, router]);
 
+  const downloadWithProgress = async (url, onProgress) => {
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error("파일 다운로드에 실패했습니다.");
+    }
+
+    const contentLength = response.headers.get('content-length');
+    const total = contentLength ? parseInt(contentLength, 10) : null;
+    let loaded = 0;
+
+    const reader = response.body.getReader();
+    const chunks = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      chunks.push(value);
+      loaded += value.length;
+
+      // total이 유효한 경우에만 진행률 계산
+      if (total && !isNaN(total) && onProgress) {
+        const progress = (loaded / total) * 100;
+        onProgress(Math.round(progress));
+      }
+    }
+
+    // Blob API를 사용하여 더 효율적으로 병합
+    const blob = new Blob(chunks);
+    return await blob.arrayBuffer();
+  };
+
   const loadGame = async (password = null) => {
     try {
+      setIsDownloading(true);
+      setDownloadProgress(0);
+      
       // 다운로드 URL 가져오기
       const result = await getFileDownloadUrl({ fileId: file.id });
 
@@ -87,6 +126,7 @@ export default function PlayPage() {
       // 암호화된 파일인 경우 복호화
       if (file.isEncrypted) {
         if (!password) {
+          setIsDownloading(false);
           setDecryptModal(true);
           return;
         }
@@ -97,9 +137,13 @@ export default function PlayPage() {
           originalSize: file.originalSize,
         };
 
-        // 파일 다운로드 및 복호화
-        const response = await fetch(result.downloadUrl);
-        const encryptedArrayBuffer = await response.arrayBuffer();
+        // 파일 다운로드 및 진행률 추적
+        const encryptedArrayBuffer = await downloadWithProgress(
+          result.downloadUrl,
+          setDownloadProgress
+        );
+
+        setDownloadProgress(100);
 
         // 복호화
         const decryptResult = await decryptFile(
@@ -118,17 +162,25 @@ export default function PlayPage() {
         setDecryptModal(false);
         setDecryptPassword("");
       } else {
-        // 일반 파일 다운로드
-        const response = await fetch(result.downloadUrl);
-        fileBlob = await response.blob();
+        // 일반 파일 다운로드 (진행률 추적)
+        const arrayBuffer = await downloadWithProgress(
+          result.downloadUrl,
+          setDownloadProgress
+        );
+        
+        fileBlob = new Blob([arrayBuffer]);
+        setDownloadProgress(100);
       }
 
       // WebGL 플레이어 표시
       setGameBlob(fileBlob);
       setShowGamePlayer(true);
+      setIsDownloading(false);
     } catch (error) {
       console.error("게임 로드 오류:", error);
       setError(error.message || "게임을 로드하는 중 오류가 발생했습니다.");
+      setIsDownloading(false);
+      setDownloadProgress(0);
     }
   };
 
@@ -209,7 +261,17 @@ export default function PlayPage() {
         <main className="flex min-h-screen flex-col items-center justify-center">
           <div className="card bg-base-200 p-6 max-w-md">
             <h2 className="text-2xl font-bold mb-4">{file?.originalName}</h2>
-            {file?.isEncrypted ? (
+            
+            {isDownloading ? (
+              <div className="text-center">
+                <p className="mb-4">파일 다운로드 중... {downloadProgress}%</p>
+                <progress
+                  className="progress progress-primary w-full"
+                  value={downloadProgress}
+                  max="100"
+                ></progress>
+              </div>
+            ) : file?.isEncrypted ? (
               <>
                 <p className="mb-4">이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화 키를 입력해주세요.</p>
                 <button

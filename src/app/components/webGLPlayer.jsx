@@ -10,6 +10,7 @@ const DOUBLE_TAP_AREA_HEIGHT = "h-20"; // 더블 탭 감지 영역 높이
 /**
  * WebGL 게임 플레이어 컴포넌트
  * /play/[hash]/page.jsx와 공유 페이지에서 범용적으로 사용
+ * 헤더 기반 컨트롤로 게임 플레이어 위에 표시
  * @param {Object} props
  * @param {boolean} props.isOpen - 플레이어 표시 여부
  * @param {Function} props.onClose - 닫기 콜백
@@ -109,19 +110,70 @@ export default function WebGLPlayer({
 
   if (!isOpen) return null;
 
-  const overlayClasses = `absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 transition-opacity duration-300 z-50 ${
-    showOverlay ? 'opacity-100' : 'opacity-0 hover:opacity-100'
-  }`;
-
   // 더블 탭 감지를 위한 투명 영역
   const doubleTapAreaClasses = `absolute top-0 left-0 right-0 ${DOUBLE_TAP_AREA_HEIGHT} z-40 ${
     showOverlay ? 'pointer-events-none' : 'cursor-pointer'
   }`;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
-      {/* 전체 화면 게임 컨테이너 - /play/[hash]/page.jsx 구조 따름 */}
-      <div className="relative w-full h-full overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* 헤더 컨트롤 - 게임 플레이어 위에 고정 */}
+      {gameReady && (
+        <div className={`bg-gradient-to-b from-black/90 to-black/70 backdrop-blur-sm p-4 transition-all duration-300 z-50 ${
+          showOverlay ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+        }`}>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <button
+                className="btn btn-sm btn-ghost text-white"
+                onClick={handleBackClick}
+                title={showBackButton ? "뒤로가기" : "닫기"}
+              >
+                {showBackButton ? "← 뒤로가기" : "✕ 닫기"}
+              </button>
+              <h1 className="text-white text-lg font-bold hidden sm:block">
+                {file?.originalName || file?.name}
+              </h1>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {isOwner && onTogglePublic && (
+                <>
+                  <div className="flex items-center gap-2 bg-base-100/80 backdrop-blur rounded-lg px-3 py-1">
+                    <span className="text-sm text-white">공개 공유</span>
+                    <input
+                      type="checkbox"
+                      className="toggle toggle-primary toggle-sm"
+                      checked={isPublic}
+                      onChange={onTogglePublic}
+                      title="공개 공유 설정"
+                    />
+                  </div>
+                  {isPublic && shareUrl && onCopyShareUrl && (
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={onCopyShareUrl}
+                      title="공유 링크 복사"
+                    >
+                      <span className="hidden sm:inline">🔗 </span>링크 복사
+                    </button>
+                  )}
+                </>
+              )}
+              <button
+                className="btn btn-sm btn-ghost text-white"
+                onClick={() => setShowOverlay(!showOverlay)}
+                title={showOverlay ? "헤더 숨기기" : "헤더 보이기"}
+              >
+                {showOverlay ? "👁️" : "👁️‍🗨️"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 게임 컨테이너 영역 - 남은 공간 모두 사용 */}
+      <div className="relative flex-1 overflow-hidden">
         {/* 로딩/에러 오버레이 */}
         {!gameReady && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-base-100 z-10">
@@ -153,7 +205,7 @@ export default function WebGLPlayer({
           </div>
         )}
 
-        {/* 게임 컨테이너 - /play/[hash]/page.jsx와 동일한 구조 */}
+        {/* 게임 컨테이너 */}
         <div
           id={containerIdRef}
           style={{
@@ -163,66 +215,13 @@ export default function WebGLPlayer({
           }}
         ></div>
 
-        {/* 더블 탭 감지 영역 - 게임 실행 중에만 표시 */}
+        {/* 더블 탭 감지 영역 - 게임 실행 중에 헤더가 숨겨져 있을 때만 활성화 */}
         {gameReady && !showOverlay && (
           <div 
             className={doubleTapAreaClasses}
             onClick={handleTopAreaClick}
-            title="두 번 탭하여 컨트롤 표시"
+            title="두 번 탭하여 헤더 표시"
           />
-        )}
-
-        {/* 오버레이 컨트롤 - 게임 실행 중에만 표시 */}
-        {gameReady && (
-          <div className={overlayClasses}>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={handleBackClick}
-                  title={showBackButton ? "뒤로가기" : "닫기"}
-                >
-                  {showBackButton ? "← 뒤로가기" : "✕ 닫기"}
-                </button>
-                <h1 className="text-white text-lg font-bold hidden sm:block">
-                  {file?.originalName || file?.name}
-                </h1>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {isOwner && onTogglePublic && (
-                  <>
-                    <div className="flex items-center gap-2 bg-base-100/80 backdrop-blur rounded-lg px-3 py-1">
-                      <span className="text-sm">공개 공유</span>
-                      <input
-                        type="checkbox"
-                        className="toggle toggle-primary toggle-sm"
-                        checked={isPublic}
-                        onChange={onTogglePublic}
-                        title="공개 공유 설정"
-                      />
-                    </div>
-                    {isPublic && shareUrl && onCopyShareUrl && (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={onCopyShareUrl}
-                        title="공유 링크 복사"
-                      >
-                        <span className="hidden sm:inline">🔗 </span>링크 복사
-                      </button>
-                    )}
-                  </>
-                )}
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => setShowOverlay(!showOverlay)}
-                  title={showOverlay ? "컨트롤 숨기기" : "컨트롤 보이기"}
-                >
-                  {showOverlay ? "👁️" : "👁️‍🗨️"}
-                </button>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>

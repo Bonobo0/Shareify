@@ -28,12 +28,28 @@ export async function loadWebGLBuild(zipBlob, buildName, containerElementId, onP
     
     for (let i = 0; i < files.length; i++) {
       const fileName = files[i];
-      if (contents.files[fileName].dir) continue;
+      const fileEntry = contents.files[fileName];
       
-      const fileData = await contents.files[fileName].async("blob");
-      buildFiles[fileName] = {
+      // 디렉토리는 건너뛰기
+      if (fileEntry.dir) {
+        console.log("디렉토리 건너뛰기:", fileName);
+        continue;
+      }
+      
+      // 파일 데이터 추출
+      const fileData = await fileEntry.async("blob");
+      
+      // 파일명 정규화: 경로 포함 시 마지막 파일명만 추출
+      // 예: "Build/game.loader.js" -> "game.loader.js"
+      // filter(Boolean)로 빈 문자열 제거 (trailing slash 처리)
+      const normalizedFileName = fileName.includes('/') 
+        ? fileName.split('/').filter(Boolean).pop() || fileName
+        : fileName;
+      
+      buildFiles[normalizedFileName] = {
         blob: fileData,
         url: URL.createObjectURL(fileData),
+        originalPath: fileName, // 원본 경로 보존
       };
       
       onProgress?.(15 + (i / files.length) * 25);
@@ -41,23 +57,41 @@ export async function loadWebGLBuild(zipBlob, buildName, containerElementId, onP
     
     onProgress?.(40);
     
-    // Unity 로더 스크립트 찾기
+    // Unity 로더 스크립트 찾기 (경로 및 파일명 모두 확인)
     const loaderFile = Object.keys(buildFiles).find(
-      (name) => name.endsWith(".loader.js") || name.match(/Build\/.*\.loader\.js$/)
+      (name) => {
+        const originalPath = buildFiles[name].originalPath;
+        return name.endsWith(".loader.js") || 
+               originalPath.endsWith(".loader.js") ||
+               name.match(/\.loader\.js$/) || 
+               originalPath.match(/Build\/.*\.loader\.js$/);
+      }
     );
     
     if (!loaderFile) {
+      console.error("사용 가능한 파일:", Object.keys(buildFiles));
       throw new Error("Unity 로더 파일을 찾을 수 없습니다.");
     }
     
-    // 필요한 파일들의 URL 매핑
-    const dataFile = Object.keys(buildFiles).find((name) => name.endsWith(".data"));
-    const frameworkFile = Object.keys(buildFiles).find((name) => 
-      name.endsWith(".framework.js") || name.match(/Build\/.*\.framework\.js$/)
-    );
-    const wasmFile = Object.keys(buildFiles).find((name) => name.endsWith(".wasm"));
+    // 필요한 파일들의 URL 매핑 (경로 및 파일명 모두 확인)
+    const dataFile = Object.keys(buildFiles).find((name) => {
+      const originalPath = buildFiles[name].originalPath;
+      return name.endsWith(".data") || originalPath.endsWith(".data");
+    });
+    const frameworkFile = Object.keys(buildFiles).find((name) => {
+      const originalPath = buildFiles[name].originalPath;
+      return name.endsWith(".framework.js") || 
+             originalPath.endsWith(".framework.js") ||
+             originalPath.match(/Build\/.*\.framework\.js$/);
+    });
+    const wasmFile = Object.keys(buildFiles).find((name) => {
+      const originalPath = buildFiles[name].originalPath;
+      return name.endsWith(".wasm") || originalPath.endsWith(".wasm");
+    });
     
     if (!dataFile || !frameworkFile || !wasmFile) {
+      console.error("사용 가능한 파일:", Object.keys(buildFiles));
+      console.error("찾은 파일:", { dataFile, frameworkFile, wasmFile, loaderFile });
       throw new Error("필수 WebGL 파일이 누락되었습니다.");
     }
     
