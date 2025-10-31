@@ -9,6 +9,7 @@
  * @param {string} buildName - 빌드 이름
  * @param {string} containerElementId - 게임을 렌더링할 컨테이너 요소 ID
  * @param {Function} onProgress - 진행률 콜백 (0-100)
+ * @returns {Promise<Object>} Unity 인스턴스 객체
  */
 export async function loadWebGLBuild(zipBlob, buildName, containerElementId, onProgress) {
   try {
@@ -149,17 +150,39 @@ export async function loadWebGLBuild(zipBlob, buildName, containerElementId, onP
       
       onProgress?.(90);
       
-      await window.createUnityInstance(canvas, config, (progress) => {
+      const unityInstance = await window.createUnityInstance(canvas, config, (progress) => {
         onProgress?.(90 + progress * 10);
       });
       
       onProgress?.(100);
       console.log("WebGL 빌드 로드 완료");
+      
+      // Unity 인스턴스 반환
+      return unityInstance;
     } else {
       throw new Error("Unity 로더를 찾을 수 없습니다.");
     }
   } catch (error) {
     console.error("WebGL 빌드 로드 오류:", error);
     throw error;
+  }
+}
+
+/**
+ * Unity 인스턴스 정리 및 종료
+ * @param {Object} unityInstance - Unity 인스턴스 객체
+ */
+export function unloadWebGLBuild(unityInstance) {
+  try {
+    if (unityInstance && typeof unityInstance.Quit === "function") {
+      console.log("Unity 인스턴스 종료 중...");
+      unityInstance.Quit().then(() => {
+        console.log("Unity 인스턴스 종료 완료");
+      }).catch((error) => {
+        console.error("Unity 인스턴스 종료 오류:", error);
+      });
+    }
+  } catch (error) {
+    console.error("Unity 인스턴스 정리 오류:", error);
   }
 }

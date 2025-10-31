@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { loadWebGLBuild } from "@/lib/webgl/player";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { loadWebGLBuild, unloadWebGLBuild } from "@/lib/webgl/player";
 
 // 상수 정의
 const DOUBLE_TAP_DELAY_MS = 500; // 더블 탭 인식 시간 (밀리초)
@@ -47,6 +47,9 @@ export default function WebGLPlayer({
   const containerIdRef = useState(() => 
     `game-container-${Math.random().toString(36).slice(2, 11)}`
   )[0];
+  
+  // Unity 인스턴스 참조
+  const unityInstanceRef = useRef(null);
 
   const startGame = useCallback(async () => {
     setGameLoading(true);
@@ -54,8 +57,8 @@ export default function WebGLPlayer({
     setError("");
 
     try {
-      // WebGL 빌드 로드
-      await loadWebGLBuild(
+      // WebGL 빌드 로드 및 Unity 인스턴스 저장
+      const unityInstance = await loadWebGLBuild(
         fileBlob,
         file.originalName || file.name,
         containerIdRef,
@@ -63,6 +66,9 @@ export default function WebGLPlayer({
           setLoadProgress(progress);
         }
       );
+      
+      // Unity 인스턴스 참조 저장
+      unityInstanceRef.current = unityInstance;
 
       setGameReady(true);
     } catch (err) {
@@ -78,8 +84,25 @@ export default function WebGLPlayer({
       startGame();
     }
   }, [isOpen, fileBlob, gameReady, gameLoading, startGame]);
+  
+  // 컴포넌트 언마운트 시 Unity 인스턴스 정리
+  useEffect(() => {
+    return () => {
+      if (unityInstanceRef.current) {
+        console.log("컴포넌트 언마운트 - Unity 인스턴스 정리");
+        unloadWebGLBuild(unityInstanceRef.current);
+        unityInstanceRef.current = null;
+      }
+    };
+  }, []);
 
   const handleClose = () => {
+    // Unity 인스턴스 정리
+    if (unityInstanceRef.current) {
+      unloadWebGLBuild(unityInstanceRef.current);
+      unityInstanceRef.current = null;
+    }
+    
     setGameReady(false);
     setLoadProgress(0);
     setError("");
