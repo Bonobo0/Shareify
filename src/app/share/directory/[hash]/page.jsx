@@ -633,18 +633,6 @@ export default function SharedDirectoryPage() {
               ℹ️ 상위 디렉토리로의 이동은 디렉토리 명 위의 브레드크럼을 클릭하여
               가능합니다.
             </p>
-            <p className="alert alert-success mt-2">
-              ℹ️ 공유 디렉토리에서의 파일 검색 기능은 추후 추가될 예정입니다.
-            </p>
-            <p className="alert alert-success mt-2">
-              ℹ️ 자신이 업로드한 파일을 관리하려면{" "}
-              <Link
-                href="/my-uploads"
-                className="text-red-600 hover:text-blue-800"
-              >
-                내 업로드
-              </Link>
-            </p>
           </div>
         </div>
 
