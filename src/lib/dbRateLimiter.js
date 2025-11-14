@@ -26,16 +26,7 @@ class DatabaseRateLimiter {
       const now = new Date();
       const resetTime = new Date(now.getTime() + limits.windowMs);
 
-      // 기존 레코드의 누락된 endpoint 필드 보정
-      await RateLimit.updateOne(
-        {
-          identifier,
-          actionName: action,
-          $or: [{ endpoint: { $exists: false } }, { endpoint: null }],
-        },
-        { $set: { endpoint: action } }
-      );
-
+      // findOneAndUpdate를 사용하여 단일 쿼리로 처리 (성능 최적화)
       // 기존 레코드 찾기 또는 새로 생성
       let rateLimitRecord = await RateLimit.findOne({
         identifier,

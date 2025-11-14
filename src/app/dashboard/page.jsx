@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import FileUploader from "../components/fileUploader";
 import FileList from "../components/fileList";
@@ -23,6 +23,39 @@ export default function Dashboard() {
   const [storageInfo, setStorageInfo] = useState({ used: 0, total: 0 });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [userRefreshed, setUserRefreshed] = useState(false);
+
+  // 스토리지 정보 조회 함수 메모이제이션
+  const fetchStorageInfo = useCallback(async () => {
+    try {
+      const result = await getStorageInfo();
+
+      if (result.success) {
+        setStorageInfo({
+          used: result.usedStorage || 0,
+          total: result.quota || 5 * 1024 * 1024 * 1024,
+          available: result.availableStorage || 0,
+          percentage: result.usagePercentage || 0,
+        });
+      } else {
+        console.error("스토리지 정보 조회 실패:", result.error);
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error("스토리지 정보 가져오기 실패:", error);
+      setLoading(false);
+    }
+  }, []);
+
+  // 업로드 완료 핸들러 메모이제이션
+  const handleUploadComplete = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  // 디렉토리 생성 핸들러 메모이제이션
+  const handleDirectoryCreated = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     // 인증 상태가 로딩 중이면 기다림
@@ -57,37 +90,8 @@ export default function Dashboard() {
     user,
     userRefreshed,
     refreshUser,
+    fetchStorageInfo,
   ]);
-
-  const fetchStorageInfo = async () => {
-    try {
-      const result = await getStorageInfo();
-
-      if (result.success) {
-        setStorageInfo({
-          used: result.usedStorage || 0,
-          total: result.quota || 5 * 1024 * 1024 * 1024,
-          available: result.availableStorage || 0,
-          percentage: result.usagePercentage || 0,
-        });
-      } else {
-        console.error("스토리지 정보 조회 실패:", result.error);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error("스토리지 정보 가져오기 실패:", error);
-      setLoading(false);
-    }
-  };
-
-  const handleUploadComplete = () => {
-    setRefreshTrigger((prev) => prev + 1);
-  };
-
-  const handleDirectoryCreated = () => {
-    setRefreshTrigger((prev) => prev + 1);
-  };
 
   if (authLoading || loading) {
     return (

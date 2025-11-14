@@ -106,9 +106,12 @@ const FileSchema = new mongoose.Schema(
   }
 );
 
-// 인덱스 설정
-FileSchema.index({ userId: 1 });
-FileSchema.index({ parentDirectory: 1 });
+// 인덱스 설정 - 성능 최적화
+FileSchema.index({ owner: 1, deleted: 1 }); // 소유자별 파일 조회 최적화
+FileSchema.index({ parentDirectory: 1, deleted: 1 }); // 디렉토리별 파일 조회 최적화
+FileSchema.index({ hash: 1 }); // 해시로 파일 조회 최적화
+FileSchema.index({ createdAt: -1 }); // 최신순 정렬 최적화
+FileSchema.index({ 'shared.userId': 1 }); // 공유된 파일 조회 최적화
 
 // 기존 모델이 있으면 재사용, 없으면 새로 생성
 // 모델이 이미 존재하는 경우에는 기존 모델을 삭제하고 재생성

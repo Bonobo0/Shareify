@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useState, useEffect, useContext } from "react";
+import { createContext, useState, useEffect, useContext, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, signUp, signOut, verifyAuth } from "@/actions/auth";
 import { getUserInfo } from "@/actions/user";
@@ -149,18 +149,23 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Context value를 메모이제이션하여 불필요한 re-render 방지
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      isAuthenticated: !!user,
+      login,
+      signup,
+      logout,
+      refreshUser,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, loading]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        isAuthenticated: !!user,
-        login,
-        signup,
-        logout,
-        refreshUser,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

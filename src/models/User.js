@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     lowercase: true,
+    index: true, // 이메일 조회 최적화
   },
   password: {
     type: String,
@@ -92,7 +93,9 @@ UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
   try {
-    const salt = await bcrypt.genSalt(12);
+    // bcrypt salt rounds: 10이 보안과 성능의 균형점
+    // 12는 너무 느릴 수 있음 (특히 대량 사용자 생성 시)
+    const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (error) {

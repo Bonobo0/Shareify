@@ -83,9 +83,12 @@ const DirectorySchema = new mongoose.Schema({
   },
 });
 
-// 인덱스 설정
-DirectorySchema.index({ userId: 1 });
-DirectorySchema.index({ parent: 1 });
+// 인덱스 설정 - 성능 최적화
+DirectorySchema.index({ owner: 1, deleted: 1 }); // 소유자별 디렉토리 조회 최적화
+DirectorySchema.index({ parent: 1, deleted: 1 }); // 부모 디렉토리별 조회 최적화
+DirectorySchema.index({ hash: 1 }); // 해시로 디렉토리 조회 최적화
+DirectorySchema.index({ 'shared.userId': 1 }); // 공유된 디렉토리 조회 최적화
+DirectorySchema.index({ 'shareLinks.hash': 1 }); // 공유 링크 조회 최적화
 
 const Directory =
   mongoose.models.Directory || mongoose.model("Directory", DirectorySchema);
