@@ -83,125 +83,112 @@ export async function downloadFilesAsZip(
       });
     }
 
-    // 각 파일을 병렬로 다운로드하고 ZIP에 추가
-    const downloadPromises = files.map(async (file) => {
-      try {
-        const response = await fetch(file.downloadUrl);
-        if (!response.ok) {
-          throw new Error(
-            `Failed to download ${file.originalName}: ${response.status}`
-          );
-        }
-
-        let blob = await response.blob();
-
-        // 암호화된 파일인 경우 복호화 처리
-        if (file.isEncrypted) {
-          console.log(`암호화된 파일 처리 시작: ${file.originalName}`);
-          console.log(`파일 정보:`, {
-            id: file.id,
-            originalName: file.originalName,
-            originalMimetype: file.originalMimetype,
-            mimetype: file.mimetype || file.mimeType,
-            isEncrypted: file.isEncrypted,
-          });
-
-          let password = null;
-
-          // 비밀번호 맵에서 해당 파일의 비밀번호 찾기
-          if (
-            typeof encryptionPasswordMap === "object" &&
-            encryptionPasswordMap !== null
-          ) {
-            password = encryptionPasswordMap[file.id];
-            console.log(
-              `파일 ${file.id}의 비밀번호 찾기 결과:`,
-              password ? "있음" : "없음"
-            );
-          } else if (typeof encryptionPasswordMap === "string") {
-            password = encryptionPasswordMap;
-            console.log(`단일 비밀번호 사용:`, password ? "있음" : "없음");
-          }
-
-          if (!password) {
+    // 병렬 다운로드 수를 제한하여 메모리 사용 최적화 (최대 5개 동시 다운로드)
+    const CONCURRENT_DOWNLOADS = 5;
+    const results = [];
+    
+    for (let i = 0; i < files.length; i += CONCURRENT_DOWNLOADS) {
+      const batch = files.slice(i, i + CONCURRENT_DOWNLOADS);
+      const batchPromises = batch.map(async (file) => {
+        try {
+          const response = await fetch(file.downloadUrl);
+          if (!response.ok) {
             throw new Error(
-              `${file.originalName}의 복호화 비밀번호가 제공되지 않았습니다.`
+              `Failed to download ${file.originalName}: ${response.status}`
             );
           }
 
-          try {
-            console.log(`복호화 시작: ${file.originalName}`);
-            const originalMetadata = {
-              originalName: file.originalName || file.name,
-              originalType:
-                file.originalMimetype ||
-                file.mimeType ||
-                file.mimetype ||
-                "application/octet-stream",
-            };
-            console.log(`복호화 메타데이터:`, originalMetadata);
+          let blob = await response.blob();
 
-            const decryptResult = await decryptFile(
-              await blob.arrayBuffer(),
-              password,
-              originalMetadata
-            );
-            if (!decryptResult.success) {
-              throw new Error(decryptResult.error);
+          // 암호화된 파일인 경우 복호화 처리
+          if (file.isEncrypted) {
+            console.log(`암호화된 파일 처리 시작: ${file.originalName}`);
+
+            let password = null;
+
+            // 비밀번호 맵에서 해당 파일의 비밀번호 찾기
+            if (
+              typeof encryptionPasswordMap === "object" &&
+              encryptionPasswordMap !== null
+            ) {
+              password = encryptionPasswordMap[file.id];
+            } else if (typeof encryptionPasswordMap === "string") {
+              password = encryptionPasswordMap;
             }
-            blob = decryptResult.decryptedFile;
-            console.log(`복호화 성공: ${file.originalName}`);
-          } catch (decryptError) {
-            console.error(`복호화 실패: ${file.originalName}`, decryptError);
-            throw new Error(
-              `${file.originalName} 복호화 실패: 비밀번호를 확인해주세요.`
-            );
+
+            if (!password) {
+              throw new Error(
+                `${file.originalName}의 복호화 비밀번호가 제공되지 않았습니다.`
+              );
+            }
+
+            try {
+              console.log(`복호화 시작: ${file.originalName}`);
+              const originalMetadata = {
+                originalName: file.originalName || file.name,
+                originalType:
+                  file.originalMimetype ||
+                  file.mimeType ||
+                  file.mimetype ||
+                  "application/octet-stream",
+              };
+
+              const decryptResult = await decryptFile(
+                await blob.arrayBuffer(),
+                password,
+                originalMetadata
+              );
+              if (!decryptResult.success) {
+                throw new Error(decryptResult.error);
+              }
+              blob = decryptResult.decryptedFile;
+              console.log(`복호화 성공: ${file.originalName}`);
+            } catch (decryptError) {
+              console.error(`복호화 실패: ${file.originalName}`, decryptError);
+              throw new Error(
+                `${file.originalName} 복호화 실패: 비밀번호를 확인해주세요.`
+              );
+            }
           }
+
+          // Blob을 ArrayBuffer로 변환하여 JSZip 호환성 확보
+          let fileData;
+          if (blob instanceof Blob) {
+            fileData = await blob.arrayBuffer();
+          } else if (blob instanceof ArrayBuffer) {
+            fileData = blob;
+          } else {
+            const newBlob = new Blob([blob]);
+            fileData = await newBlob.arrayBuffer();
+          }
+
+          const fileName = file.originalName || file.name || file.path;
+          zip.file(fileName, fileData);
+
+          completedFiles++;
+
+          // 진행률 업데이트
+          if (onProgress) {
+            onProgress({
+              completed: completedFiles,
+              total: totalFiles,
+              currentFile: file.originalName,
+              percentage: Math.round((completedFiles / totalFiles) * 100),
+              encryptedCount: encryptedFiles.length,
+            });
+          }
+
+          return { success: true, file: file.originalName };
+        } catch (error) {
+          console.error(`파일 ${file.originalName} 다운로드 실패:`, error);
+          return { error: error.message, file: file.originalName };
         }
-
-        // 디렉토리 구조를 유지하면서 파일을 ZIP에 추가
-        // Blob을 ArrayBuffer로 변환하여 JSZip 호환성 확보
-        let fileData;
-        if (blob instanceof Blob) {
-          fileData = await blob.arrayBuffer();
-        } else if (blob instanceof ArrayBuffer) {
-          fileData = blob;
-        } else {
-          // 다른 타입의 경우 Blob으로 변환 후 ArrayBuffer로 변환
-          const newBlob = new Blob([blob]);
-          fileData = await newBlob.arrayBuffer();
-        }
-
-        // 파일명은 originalName을 우선 사용, path는 디렉토리 구조가 있을 때만 사용
-        const fileName = file.originalName || file.name || file.path;
-        console.log(
-          `ZIP에 추가할 파일명: ${fileName} (원본: ${file.originalName})`
-        );
-
-        zip.file(fileName, fileData);
-
-        completedFiles++;
-
-        // 진행률 업데이트
-        if (onProgress) {
-          onProgress({
-            completed: completedFiles,
-            total: totalFiles,
-            currentFile: file.originalName,
-            percentage: Math.round((completedFiles / totalFiles) * 100),
-            encryptedCount: encryptedFiles.length,
-          });
-        }
-
-        return { success: true, file: file.originalName };
-      } catch (error) {
-        console.error(`파일 ${file.originalName} 다운로드 실패:`, error);
-        return { error: error.message, file: file.originalName };
-      }
-    });
-
-    // 모든 파일 다운로드 완료까지 대기
-    const results = await Promise.all(downloadPromises);
+      });
+      
+      // 배치별로 처리하고 결과 수집
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+    }
 
     // 실패한 파일들 확인
     const failedFiles = results.filter((result) => result.error);
