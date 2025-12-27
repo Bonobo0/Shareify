@@ -19,7 +19,7 @@
     "jszip": "^3.10.1",
     "mongodb": "^6.17.0",
     "mongoose": "^8.16.4",
-    "next": "14.1.4",
+    "next": "14.2.35",
     "nodemailer": "^7.0.5",
     "qrcode": "^1.5.4",
     "react": "^18",
