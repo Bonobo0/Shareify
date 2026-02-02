@@ -2,7 +2,16 @@
 
 import { connectToDatabase } from "@/lib/db/mongodb";
 import User from "@/models/User";
-import { generateToken, verifyToken } from "@/lib/auth/jwt";
+import {
+  generateTokenPair,
+  verifyToken,
+  verifyAccessToken,
+  getRefreshTokenFromCookie,
+} from "@/lib/auth/jwt";
+import {
+  invalidateRefreshToken,
+  invalidateAllUserRefreshTokens,
+} from "@/lib/redis/client";
 import { cookies } from "next/headers";
 import {
   generateVerificationToken,
@@ -10,6 +19,10 @@ import {
 } from "@/lib/email/emailService";
 import { verify2FAToken, verifyBackupCode } from "@/lib/auth/twoFactor";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
+
+// Cookie configuration
+const ACCESS_TOKEN_MAX_AGE = 15 * 60; // 15분
+const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60; // 7일
 
 export async function signIn(formData) {
   try {
@@ -102,14 +115,22 @@ export async function signIn(formData) {
       }
     }
 
-    const token = await generateToken(user._id);
+    const { accessToken, refreshToken } = await generateTokenPair(user._id);
 
-    // 쿠키에 토큰 저장
-    cookies().set("token", token, {
+    // Access token 쿠키 설정
+    cookies().set("access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7일
+      maxAge: ACCESS_TOKEN_MAX_AGE,
+    });
+
+    // Refresh token 쿠키 설정
+    cookies().set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: REFRESH_TOKEN_MAX_AGE,
     });
 
     return {
@@ -202,14 +223,23 @@ export async function signUp(formData) {
       console.error("회원가입 후 인증 메일 전송 실패:", emailResult.error);
     }
 
-    // 토큰 생성 및 쿠키 설정 (이메일 미인증 상태로도 로그인 허용)
-    const token = await generateToken(user._id);
+    // 토큰 페어 생성 및 쿠키 설정 (이메일 미인증 상태로도 로그인 허용)
+    const { accessToken, refreshToken } = await generateTokenPair(user._id);
 
-    cookies().set("token", token, {
+    // Access token 쿠키 설정
+    cookies().set("access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7일
+      maxAge: ACCESS_TOKEN_MAX_AGE,
+    });
+
+    // Refresh token 쿠키 설정
+    cookies().set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: REFRESH_TOKEN_MAX_AGE,
     });
 
     return {
@@ -235,8 +265,26 @@ export async function signUp(formData) {
 
 export async function signOut() {
   try {
-    // 기존 쿠키 삭제
-    cookies().set("token", "", {
+    // Refresh token 가져와서 Redis에서 무효화
+    const refreshToken = cookies().get("refresh_token")?.value;
+    if (refreshToken) {
+      const payload = await verifyToken(refreshToken);
+      if (payload && payload.jti) {
+        await invalidateRefreshToken(payload.userId, payload.jti);
+      }
+    }
+
+    // Access token 쿠키 삭제
+    cookies().set("access_token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      expires: new Date(0),
+    });
+
+    // Refresh token 쿠키 삭제
+    cookies().set("refresh_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -256,13 +304,13 @@ export async function signOut() {
 
 export async function verifyAuth() {
   try {
-    const token = cookies().get("token")?.value;
+    const accessToken = cookies().get("access_token")?.value;
 
-    if (!token) {
+    if (!accessToken) {
       return { authenticated: false };
     }
 
-    const decoded = await verifyToken(token);
+    const decoded = await verifyAccessToken(accessToken);
     if (!decoded) {
       return { authenticated: false };
     }
@@ -501,12 +549,12 @@ export async function changePassword({
   confirmPassword,
 }) {
   try {
-    const token = cookies().get("token")?.value;
-    if (!token) {
+    const accessToken = cookies().get("access_token")?.value;
+    if (!accessToken) {
       return { error: "로그인이 필요합니다." };
     }
 
-    const decoded = await verifyToken(token);
+    const decoded = await verifyAccessToken(accessToken);
     if (!decoded) {
       return { error: "유효하지 않은 토큰입니다." };
     }

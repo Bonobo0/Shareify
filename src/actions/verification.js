@@ -1,7 +1,7 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyToken } from "@/lib/auth/jwt";
+import { verifyAccessToken } from "@/lib/auth/jwt";
 import User from "@/models/User";
 import { cookies } from "next/headers";
 import {
@@ -18,10 +18,10 @@ import {
 } from "@/lib/auth/twoFactor";
 
 async function getAuthenticatedUser() {
-  const token = cookies().get("token")?.value;
+  const token = cookies().get("access_token")?.value;
   if (!token) return null;
 
-  const decoded = await verifyToken(token);
+  const decoded = await verifyAccessToken(token);
   return decoded?.userId || null;
 }
 

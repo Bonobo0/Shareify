@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/mongodb";
 import User from "@/models/User";
-import { generateToken } from "@/lib/auth/jwt";
+import { generateTokenPair } from "@/lib/auth/jwt";
 import { verify2FAToken, verifyBackupCode } from "@/lib/auth/twoFactor";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
 
@@ -99,11 +99,14 @@ export async function POST(request) {
       }
     }
 
-    const token = await generateToken(user._id);
+    const { accessToken, refreshToken } = await generateTokenPair(user._id);
 
     return NextResponse.json({
       success: true,
-      token,
+      accessToken,
+      refreshToken,
+      // 하위 호환성을 위해 token 필드도 유지 (deprecated)
+      token: accessToken,
       user: {
         id: user._id.toString(),
         email: user.email,
