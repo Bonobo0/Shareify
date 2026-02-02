@@ -1,28 +1,13 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyToken } from "@/lib/auth/jwt";
+import { getAuthenticatedUserId } from "@/lib/auth-helpers";
 import User from "@/models/User";
 import mongoose from "mongoose";
 import { cookies } from "next/headers";
 
-async function getAuthenticatedUser() {
-  const token = cookies().get("token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const decoded = await verifyToken(token);
-  if (!decoded) {
-    return null;
-  }
-
-  return decoded.userId;
-}
-
 async function checkAdminPermission() {
-  const userId = await getAuthenticatedUser();
+  const userId = await getAuthenticatedUserId();
 
   if (!userId) {
     return { error: "인증이 필요합니다." };

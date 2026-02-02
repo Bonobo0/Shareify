@@ -1,7 +1,7 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyToken } from "@/lib/auth/jwt";
+import { getAuthenticatedUserId } from "@/lib/auth-helpers";
 import File from "@/models/File";
 import Directory from "@/models/Directory";
 import User from "@/models/User";
@@ -16,21 +16,6 @@ import {
   deleteObject as deleteFileFromR2,
 } from "@/lib/r2/r2Client";
 
-async function getAuthenticatedUser() {
-  const token = cookies().get("token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const decoded = await verifyToken(token);
-  if (!decoded) {
-    return null;
-  }
-
-  return decoded.userId;
-}
-
 export async function getFileList({
   directoryId,
   page = 1,
@@ -40,7 +25,7 @@ export async function getFileList({
   shareLinkHash = "null",
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -299,7 +284,7 @@ export async function uploadFile({
       originalMetadata,
     });
 
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -505,7 +490,7 @@ export async function uploadFile({
 
 export async function completeFileUpload({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -554,7 +539,7 @@ export async function completeFileUpload({ fileId }) {
 
 export async function deleteFile({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -645,7 +630,7 @@ export async function deleteFile({ fileId }) {
 
 export async function getFileDownloadUrl({ fileId, shareLinkHash = null }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -761,7 +746,7 @@ export async function shareFile({ fileId, email, permission = "read" }) {
       };
     }
 
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -860,7 +845,7 @@ export async function shareFile({ fileId, email, permission = "read" }) {
 
 export async function getFileDetails({ hash, fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1064,7 +1049,7 @@ export async function getMyUploadedFiles({
   sortOrder = "desc",
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1175,7 +1160,7 @@ export async function getMyUploadedFiles({
 
 export async function removeFileShare({ fileId, shareId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1245,7 +1230,7 @@ export async function removeFileShare({ fileId, shareId }) {
 // 디렉토리의 모든 파일을 재귀적으로 가져오는 함수
 export async function getAllFilesForDownload({ directoryId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1361,7 +1346,7 @@ export async function getAllFilesForDownload({ directoryId }) {
 // 선택된 파일들의 다운로드 정보를 가져오는 함수
 export async function getSelectedFilesForDownload({ fileIds }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };

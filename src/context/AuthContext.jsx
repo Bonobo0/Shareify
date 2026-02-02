@@ -2,8 +2,7 @@
 
 import { createContext, useState, useEffect, useContext, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { signIn, signUp, signOut, verifyAuth } from "@/actions/auth";
-import { getUserInfo } from "@/actions/user";
+import { authClient } from "@/lib/auth-client";
 
 const AuthContext = createContext();
 
@@ -16,10 +15,20 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const result = await verifyAuth();
+        const session = await authClient.getSession();
 
-        if (result.authenticated) {
-          setUser(result.user);
+        if (session?.data?.user) {
+          setUser({
+            id: session.data.user.id,
+            email: session.data.user.email,
+            name: session.data.user.name,
+            isVerified: session.data.user.emailVerified,
+            twoFactorEnabled: session.data.user.twoFactorEnabled,
+            role: session.data.user.role || "user",
+            storageLimit: session.data.user.storageLimit,
+            storageUsed: session.data.user.storageUsed,
+            profileImage: session.data.user.profileImage,
+          });
         } else {
           setUser(null);
         }
@@ -34,46 +43,87 @@ export function AuthProvider({ children }) {
     fetchUser();
   }, []);
 
-  // 로그인 함수 (2FA 지원)
+  // 로그인 함수 (이메일/비밀번호)
   const login = async (...args) => {
     try {
-      let formData;
+      let email, password, twoFactorCode, isBackupCode;
 
       if (args.length === 1 && args[0] instanceof FormData) {
         // FormData가 직접 전달된 경우 (2FA 포함)
-        formData = args[0];
+        const formData = args[0];
+        email = formData.get("email");
+        password = formData.get("password");
+        twoFactorCode = formData.get("twoFactorCode");
+        isBackupCode = formData.get("isBackupCode") === "true";
       } else if (args.length >= 2) {
         // email, password 형태로 전달된 경우
-        const [email, password] = args;
-        formData = new FormData();
-        formData.append("email", email);
-        formData.append("password", password);
+        [email, password] = args;
       } else {
         throw new Error("올바르지 않은 로그인 파라미터입니다.");
       }
 
-      const result = await signIn(formData);
+      // 2FA 코드가 있는 경우
+      if (twoFactorCode) {
+        const result = await authClient.twoFactor.verifyTotp({
+          code: twoFactorCode,
+        });
 
-      if (result.error) {
-        return {
-          success: false,
-          error: result.error,
-          requiresTwoFactor: result.requiresTwoFactor,
-        };
-      }
+        if (result.error) {
+          return {
+            success: false,
+            error: result.error.message || "잘못된 인증 코드입니다.",
+            requiresTwoFactor: true,
+          };
+        }
 
-      if (result.success) {
-        // 로그인 성공 시 사용자 정보 즉시 새로고침
-        const authResult = await verifyAuth();
-        if (authResult.authenticated) {
-          setUser(authResult.user);
-        } else {
-          setUser(result.user);
+        // 세션 새로고침
+        const session = await authClient.getSession();
+        if (session?.data?.user) {
+          setUser({
+            id: session.data.user.id,
+            email: session.data.user.email,
+            name: session.data.user.name,
+            isVerified: session.data.user.emailVerified,
+            twoFactorEnabled: session.data.user.twoFactorEnabled,
+            role: session.data.user.role || "user",
+          });
         }
         return { success: true };
       }
 
-      return { success: false, error: "로그인에 실패했습니다." };
+      // 일반 로그인
+      const result = await authClient.signIn.email({
+        email,
+        password,
+      });
+
+      if (result.error) {
+        // 2FA 필요 여부 확인
+        if (result.error.message?.includes("two-factor") || result.error.code === "TWO_FACTOR_REQUIRED") {
+          return {
+            success: false,
+            error: "2단계 인증 코드가 필요합니다.",
+            requiresTwoFactor: true,
+          };
+        }
+        return {
+          success: false,
+          error: result.error.message || "로그인에 실패했습니다.",
+        };
+      }
+
+      // 로그인 성공 시 사용자 정보 업데이트
+      if (result.data?.user) {
+        setUser({
+          id: result.data.user.id,
+          email: result.data.user.email,
+          name: result.data.user.name,
+          isVerified: result.data.user.emailVerified,
+          twoFactorEnabled: result.data.user.twoFactorEnabled,
+          role: result.data.user.role || "user",
+        });
+      }
+      return { success: true };
     } catch (error) {
       return {
         success: false,
@@ -82,27 +132,50 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Keycloak 소셜 로그인 함수
+  const loginWithKeycloak = async () => {
+    try {
+      const result = await authClient.signIn.social({
+        provider: "keycloak",
+        callbackURL: "/dashboard",
+      });
+
+      if (result.error) {
+        return { success: false, error: result.error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
   // 회원가입 함수
   const signup = async (email, password, name) => {
     try {
-      const formData = new FormData();
-      formData.append("email", email);
-      formData.append("password", password);
-      if (name) formData.append("name", name);
-
-      const result = await signUp(formData);
+      const result = await authClient.signUp.email({
+        email,
+        password,
+        name: name || email.split("@")[0],
+      });
 
       if (result.error) {
-        return { success: false, error: result.error };
+        return { success: false, error: result.error.message };
       }
 
-      if (result.success) {
-        // 회원가입 성공 시 사용자 상태 즉시 업데이트
-        setUser(result.user);
+      if (result.data?.user) {
+        setUser({
+          id: result.data.user.id,
+          email: result.data.user.email,
+          name: result.data.user.name,
+          isVerified: result.data.user.emailVerified,
+          twoFactorEnabled: false,
+          role: "user",
+        });
         return {
           success: true,
-          message: result.message,
-          emailSent: result.emailSent,
+          message: "회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.",
+          emailSent: true,
         };
       }
 
@@ -115,9 +188,16 @@ export function AuthProvider({ children }) {
   // 사용자 정보 새로고침 함수
   const refreshUser = async () => {
     try {
-      const result = await verifyAuth();
-      if (result.authenticated) {
-        setUser(result.user);
+      const session = await authClient.getSession();
+      if (session?.data?.user) {
+        setUser({
+          id: session.data.user.id,
+          email: session.data.user.email,
+          name: session.data.user.name,
+          isVerified: session.data.user.emailVerified,
+          twoFactorEnabled: session.data.user.twoFactorEnabled,
+          role: session.data.user.role || "user",
+        });
         return { success: true };
       } else {
         setUser(null);
@@ -133,19 +213,15 @@ export function AuthProvider({ children }) {
   // 로그아웃 함수
   const logout = async () => {
     try {
-      await signOut();
+      await authClient.signOut();
       setUser(null);
-      router.push("/"); // 클라이언트 사이드에서 리다이렉션
+      router.push("/");
       return { success: true };
     } catch (error) {
       console.error("로그아웃 오류:", error);
-      // redirect 오류는 무시하고 상태만 업데이트
-      if (error.message && error.message.includes("NEXT_REDIRECT")) {
-        setUser(null);
-        router.push("/");
-        return { success: true };
-      }
-      return { success: false, error: error.message };
+      setUser(null);
+      router.push("/");
+      return { success: true };
     }
   };
 
@@ -156,6 +232,7 @@ export function AuthProvider({ children }) {
       loading,
       isAuthenticated: !!user,
       login,
+      loginWithKeycloak,
       signup,
       logout,
       refreshUser,

@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 function SigninContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isAuthenticated, loading: authLoading } = useAuth();
+  const { login, loginWithKeycloak, isAuthenticated, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -82,6 +82,21 @@ function SigninContent() {
     } catch (error) {
       setError(error.message);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeycloakLogin = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const result = await loginWithKeycloak();
+      if (!result.success) {
+        throw new Error(result.error || "Keycloak 로그인에 실패했습니다.");
+      }
+    } catch (error) {
+      setError(error.message);
       setLoading(false);
     }
   };
@@ -184,6 +199,21 @@ function SigninContent() {
             {loading ? "처리 중..." : showTwoFactor ? "로그인 완료" : "로그인"}
           </button>
         </form>
+
+        {/* Keycloak SSO 로그인 버튼 */}
+        <div className="divider my-6">또는</div>
+        
+        <button
+          type="button"
+          className={`btn btn-lg btn-outline ${loading ? "loading" : ""}`}
+          onClick={handleKeycloakLogin}
+          disabled={loading}
+        >
+          <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+          </svg>
+          Keycloak으로 로그인
+        </button>
 
         <div className="space-y-3 mt-4">
           <p className="text-gray-500">

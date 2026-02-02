@@ -1,28 +1,13 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyToken } from "@/lib/auth/jwt";
+import { getAuthenticatedUserId } from "@/lib/auth-helpers";
 import File from "@/models/File";
 import Directory from "@/models/Directory";
 import User from "@/models/User";
 import mongoose from "mongoose";
 import { generateDownloadUrl } from "@/lib/r2/r2Client";
 import { cookies } from "next/headers";
-
-async function getAuthenticatedUser() {
-  const token = cookies().get("token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const decoded = await verifyToken(token);
-  if (!decoded) {
-    return null;
-  }
-
-  return decoded.userId;
-}
 
 export async function getSharedFileInfo({ hash }) {
   try {
@@ -40,7 +25,7 @@ export async function getSharedFileInfo({ hash }) {
     }
 
     // 현재 사용자 확인
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     // 접근 권한 확인
     let hasAccess = false;
@@ -155,7 +140,7 @@ export async function downloadSharedFile({ hash }) {
     }
 
     // 현재 사용자 확인
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     // 접근 권한 확인
     let hasAccess = false;
@@ -253,7 +238,7 @@ export async function downloadSharedFile({ hash }) {
 
 export async function getSharedItems() {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "인증이 필요합니다." };
@@ -333,7 +318,7 @@ export async function getSharedItems() {
 
 export async function toggleFilePublic({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return { error: "인증이 필요합니다." };
@@ -436,7 +421,7 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
     if (new Date() > shareLink.expiresAt) {
       return { error: "만료된 공유 링크입니다." };
     }
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
 
     // 현재 탐색할 디렉토리 결정
     let currentDirectory = directory;
@@ -892,7 +877,7 @@ export async function createSharedSubdirectory({
 }) {
   try {
     // 인증 확인 - 비로그인 사용자는 디렉토리 생성 불가
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
     if (!userId) {
       return { error: "로그인이 필요합니다." };
     }

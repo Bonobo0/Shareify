@@ -1,7 +1,7 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyToken } from "@/lib/auth/jwt";
+import { getAuthenticatedUserId } from "@/lib/auth-helpers";
 import User from "@/models/User";
 import { cookies } from "next/headers";
 import {
@@ -17,18 +17,10 @@ import {
   verifyBackupCode,
 } from "@/lib/auth/twoFactor";
 
-async function getAuthenticatedUser() {
-  const token = cookies().get("token")?.value;
-  if (!token) return null;
-
-  const decoded = await verifyToken(token);
-  return decoded?.userId || null;
-}
-
 // 이메일 인증 토큰 전송
 export async function sendEmailVerification() {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
     if (!userId) {
       return { error: "인증이 필요합니다." };
     }
@@ -101,7 +93,7 @@ export async function verifyEmail({ token }) {
 // 2FA 설정 시작
 export async function setup2FA() {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
     if (!userId) {
       return { error: "인증이 필요합니다." };
     }
@@ -145,7 +137,7 @@ export async function setup2FA() {
 // 2FA 활성화 (인증 코드 확인)
 export async function enable2FA({ token, secret }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
     if (!userId) {
       return { error: "인증이 필요합니다." };
     }
@@ -189,7 +181,7 @@ export async function enable2FA({ token, secret }) {
 // 2FA 비활성화
 export async function disable2FA({ password }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUserId();
     if (!userId) {
       return { error: "인증이 필요합니다." };
     }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyToken } from "./lib/auth/jwt";
+import { getAuth } from "./lib/auth";
 
 // 인증이 필요한 경로 리스트
 const PROTECTED_ROUTES = [
@@ -31,6 +31,9 @@ const BYPASS_ROUTES = [
   "/_next",
   "/favicon.ico",
   "/public",
+  
+  // Better Auth API 경로
+  "/api/auth",
 ];
 
 export async function middleware(request) {
@@ -55,22 +58,37 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  // 쿠키에서 토큰 가져오기
-  const token = request.cookies.get("token")?.value;
+  // Better Auth 세션 확인
+  try {
+    const auth = await getAuth();
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
 
-  // 토큰이 없거나 유효하지 않으면 로그인 페이지로 리다이렉트
-  const payload = await verifyToken(token);
+    if (!session) {
+      // 현재 URL을 콜백 URL로 저장하여 로그인 후 돌아올 수 있도록 함
+      const signinUrl = new URL("/user/signin", request.url);
+      signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
 
-  if (!token || !payload) {
-    // 현재 URL을 콜백 URL로 저장하여 로그인 후 돌아올 수 있도록 함
+      return NextResponse.redirect(signinUrl);
+    }
+
+    // 계정 정지 상태 확인
+    if (session.user?.suspended === true) {
+      const signinUrl = new URL("/user/signin", request.url);
+      signinUrl.searchParams.set("error", "suspended");
+      return NextResponse.redirect(signinUrl);
+    }
+
+    // 인증 성공: 요청 진행
+    return NextResponse.next();
+  } catch (error) {
+    console.error("Middleware auth error:", error);
+    // 인증 오류 시 로그인 페이지로 리다이렉트
     const signinUrl = new URL("/user/signin", request.url);
     signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
-
     return NextResponse.redirect(signinUrl);
   }
-
-  // 인증 성공: 요청 진행
-  return NextResponse.next();
 }
 
 export const config = {

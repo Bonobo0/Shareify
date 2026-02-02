@@ -2,7 +2,8 @@
 
 import { connectToDatabase } from "@/lib/db/mongodb";
 import User from "@/models/User";
-import { generateToken, verifyToken } from "@/lib/auth/jwt";
+import { getAuth } from "@/lib/auth";
+import { getServerSession, getAuthenticatedUserId } from "@/lib/auth-helpers";
 import { cookies } from "next/headers";
 import {
   generateVerificationToken,
@@ -256,38 +257,33 @@ export async function signOut() {
 
 export async function verifyAuth() {
   try {
-    const token = cookies().get("token")?.value;
-
-    if (!token) {
-      return { authenticated: false };
-    }
-
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return { authenticated: false };
-    }
-
-    await connectToDatabase();
-    const user = await User.findById(decoded.userId).select("-password");
+    const { user } = await getServerSession();
 
     if (!user) {
       return { authenticated: false };
     }
 
+    await connectToDatabase();
+    const dbUser = await User.findById(user.id).select("-password");
+
+    if (!dbUser) {
+      return { authenticated: false };
+    }
+
     // 계정 정지 상태 확인 (suspended 필드가 없는 기존 사용자는 false로 처리)
-    if (user.suspended === true) {
+    if (dbUser.suspended === true) {
       return { authenticated: false };
     }
 
     return {
       authenticated: true,
       user: {
-        id: user._id.toString(),
-        email: user.email,
-        name: user.name,
-        isVerified: user.isVerified,
-        twoFactorEnabled: user.twoFactorEnabled,
-        role: user.role,
+        id: dbUser._id.toString(),
+        email: dbUser.email,
+        name: dbUser.name,
+        isVerified: dbUser.isVerified,
+        twoFactorEnabled: dbUser.twoFactorEnabled,
+        role: dbUser.role,
       },
     };
   } catch (error) {
@@ -501,14 +497,9 @@ export async function changePassword({
   confirmPassword,
 }) {
   try {
-    const token = cookies().get("token")?.value;
-    if (!token) {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
       return { error: "로그인이 필요합니다." };
-    }
-
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return { error: "유효하지 않은 토큰입니다." };
     }
 
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -526,7 +517,7 @@ export async function changePassword({
     await connectToDatabase();
 
     // 사용자 조회 (비밀번호 포함)
-    const user = await User.findById(decoded.userId).select("+password");
+    const user = await User.findById(userId).select("+password");
     if (!user) {
       return { error: "사용자를 찾을 수 없습니다." };
     }

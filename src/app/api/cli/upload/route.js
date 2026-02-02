@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyToken } from "@/lib/auth/jwt";
+import { getApiSession } from "@/lib/auth-helpers";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
 import User from "@/models/User";
 import File from "@/models/File";
@@ -13,13 +13,6 @@ import {
 } from "@/lib/r2/r2Client";
 
 export const runtime = "nodejs";
-
-function extractBearerToken(headerValue) {
-  if (!headerValue) return null;
-  const trimmed = headerValue.trim();
-  if (!trimmed.toLowerCase().startsWith("bearer ")) return null;
-  return trimmed.slice(7).trim();
-}
 
 function toObjectId(value) {
   if (!value) return null;
@@ -153,20 +146,12 @@ export async function POST(request) {
       return response;
     }
 
-    const authorization = request.headers.get("authorization");
-    const token = extractBearerToken(authorization);
+    // Better Auth 세션 검증
+    const { user: sessionUser } = await getApiSession(request);
 
-    if (!token) {
+    if (!sessionUser?.id) {
       return NextResponse.json(
         { error: "인증 토큰이 필요합니다." },
-        { status: 401 }
-      );
-    }
-
-    const payload = await verifyToken(token);
-    if (!payload?.userId) {
-      return NextResponse.json(
-        { error: "유효하지 않은 토큰입니다." },
         { status: 401 }
       );
     }
@@ -253,7 +238,7 @@ export async function POST(request) {
 
     await connectToDatabase();
 
-    const user = await User.findById(payload.userId);
+    const user = await User.findById(sessionUser.id);
     if (!user) {
       return NextResponse.json(
         { error: "사용자를 찾을 수 없습니다." },
@@ -297,7 +282,7 @@ export async function POST(request) {
     let parentDirectory = null;
     if (directoryId) {
       const directoryResult = await ensureDirectoryWriteAccess(
-        payload.userId,
+        sessionUser.id,
         directoryId,
         shareHash
       );
@@ -326,7 +311,7 @@ export async function POST(request) {
       mimetype: normalizedMime,
       hash: fileHash,
       path: uniqueFilename,
-      owner: payload.userId,
+      owner: sessionUser.id,
       parentDirectory: parentDirectoryId,
       uploaded: false,
       isEncrypted: Boolean(isEncrypted),
@@ -366,20 +351,12 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
-    const authorization = request.headers.get("authorization");
-    const token = extractBearerToken(authorization);
+    // Better Auth 세션 검증
+    const { user: sessionUser } = await getApiSession(request);
 
-    if (!token) {
+    if (!sessionUser?.id) {
       return NextResponse.json(
         { error: "인증 토큰이 필요합니다." },
-        { status: 401 }
-      );
-    }
-
-    const payload = await verifyToken(token);
-    if (!payload?.userId) {
-      return NextResponse.json(
-        { error: "유효하지 않은 토큰입니다." },
         { status: 401 }
       );
     }
@@ -403,7 +380,7 @@ export async function PATCH(request) {
 
     await connectToDatabase();
 
-    const user = await User.findById(payload.userId);
+    const user = await User.findById(sessionUser.id);
     if (!user) {
       return NextResponse.json(
         { error: "사용자를 찾을 수 없습니다." },
@@ -427,7 +404,7 @@ export async function PATCH(request) {
 
     const file = await File.findOne({
       _id: fileId,
-      owner: payload.userId,
+      owner: sessionUser.id,
     });
 
     if (!file) {
