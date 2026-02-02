@@ -66,9 +66,9 @@ export async function getApiSession(request) {
 /**
  * Bearer 토큰을 헤더에서 추출하는 유틸리티 함수
  * @param {string} authHeader - Authorization 헤더 값
- * @returns {string|null}
+ * @returns {Promise<string|null>}
  */
-export function extractBearerToken(authHeader) {
+export async function extractBearerToken(authHeader) {
   if (!authHeader) return null;
   const trimmed = authHeader.trim();
   if (!trimmed.toLowerCase().startsWith("bearer ")) return null;
