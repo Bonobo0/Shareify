@@ -2,7 +2,7 @@
 
 import { createContext, useState, useEffect, useContext, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { signIn, signUp, signOut, verifyAuth } from "@/actions/auth";
+import { signIn, signUp, signOut, verifyAuth, refreshTokens } from "@/actions/auth";
 import { getUserInfo } from "@/actions/user";
 
 const AuthContext = createContext();
@@ -12,11 +12,20 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // 사용자 정보 로드
+  // 사용자 정보 로드 (토큰 자동 갱신 포함)
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const result = await verifyAuth();
+        let result = await verifyAuth();
+
+        // access_token이 만료된 경우 refresh_token으로 갱신 시도
+        if (!result.authenticated) {
+          const refreshResult = await refreshTokens();
+          if (refreshResult.success) {
+            // 토큰 갱신 성공 시 다시 인증 확인
+            result = await verifyAuth();
+          }
+        }
 
         if (result.authenticated) {
           setUser(result.user);
@@ -112,10 +121,20 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // 사용자 정보 새로고침 함수
+  // 사용자 정보 새로고침 함수 (토큰 자동 갱신 포함)
   const refreshUser = async () => {
     try {
-      const result = await verifyAuth();
+      let result = await verifyAuth();
+
+      // access_token이 만료된 경우 refresh_token으로 갱신 시도
+      if (!result.authenticated) {
+        const refreshResult = await refreshTokens();
+        if (refreshResult.success) {
+          // 토큰 갱신 성공 시 다시 인증 확인
+          result = await verifyAuth();
+        }
+      }
+
       if (result.authenticated) {
         setUser(result.user);
         return { success: true };
