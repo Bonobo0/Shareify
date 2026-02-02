@@ -10,6 +10,7 @@ let redis = null;
  */
 export function getRedisClient() {
   if (!redis) {
+    console.log("Connecting to Redis at", REDIS_URL);
     redis = new Redis(REDIS_URL, {
       maxRetriesPerRequest: 3,
       retryStrategy: (times) => {
@@ -108,7 +109,7 @@ export async function invalidateAllUserRefreshTokens(userId) {
         "MATCH",
         pattern,
         "COUNT",
-        100
+        100,
       );
       cursor = nextCursor;
 

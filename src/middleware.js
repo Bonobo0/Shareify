@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAccessToken } from "./lib/auth/jwt";
+import { verifyAccessToken } from "./lib/auth/edgeAccessToken";
 
 // 인증이 필요한 경로 리스트
 const PROTECTED_ROUTES = [
@@ -39,7 +39,7 @@ export async function middleware(request) {
   // 우회 경로는 인증 검사 건너뜀
   if (
     BYPASS_ROUTES.some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`)
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
     )
   ) {
     return NextResponse.next();
@@ -47,7 +47,7 @@ export async function middleware(request) {
 
   // 보호된 경로인지 확인
   const isProtectedRoute = PROTECTED_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
 
   // 보호된 경로가 아니라면 인증 검사 없이 진행
@@ -59,6 +59,7 @@ export async function middleware(request) {
   const accessToken = request.cookies.get("access_token")?.value;
 
   // access_token이 없거나 유효하지 않으면 로그인 페이지로 리다이렉트
+  console.log("Middleware: Verifying access token for path", pathname);
   const payload = await verifyAccessToken(accessToken);
 
   if (!accessToken || !payload) {

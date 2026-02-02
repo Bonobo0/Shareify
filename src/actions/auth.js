@@ -48,7 +48,7 @@ export async function signIn(formData) {
     }
 
     const user = await User.findOne({ email }).select(
-      "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes"
+      "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes",
     );
 
     if (!user) {
@@ -94,7 +94,7 @@ export async function signIn(formData) {
         // 백업 코드 검증
         const backupResult = verifyBackupCode(
           twoFactorCode,
-          user.twoFactorBackupCodes
+          user.twoFactorBackupCodes,
         );
         if (backupResult.valid) {
           // 사용된 백업 코드 표시
@@ -116,9 +116,10 @@ export async function signIn(formData) {
     }
 
     const { accessToken, refreshToken } = await generateTokenPair(user._id);
+    const cookieStore = await cookies();
 
     // Access token 쿠키 설정
-    cookies().set("access_token", accessToken, {
+    cookieStore.set("access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -126,7 +127,7 @@ export async function signIn(formData) {
     });
 
     // Refresh token 쿠키 설정
-    cookies().set("refresh_token", refreshToken, {
+    cookieStore.set("refresh_token", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -215,7 +216,7 @@ export async function signUp(formData) {
     const emailResult = await sendVerificationEmail(
       email,
       verificationToken,
-      user.name
+      user.name,
     );
 
     if (emailResult.error) {
@@ -225,9 +226,10 @@ export async function signUp(formData) {
 
     // 토큰 페어 생성 및 쿠키 설정 (이메일 미인증 상태로도 로그인 허용)
     const { accessToken, refreshToken } = await generateTokenPair(user._id);
+    const cookieStore = await cookies();
 
     // Access token 쿠키 설정
-    cookies().set("access_token", accessToken, {
+    cookieStore.set("access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -235,7 +237,7 @@ export async function signUp(formData) {
     });
 
     // Refresh token 쿠키 설정
-    cookies().set("refresh_token", refreshToken, {
+    cookieStore.set("refresh_token", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -266,7 +268,8 @@ export async function signUp(formData) {
 export async function signOut() {
   try {
     // Refresh token 가져와서 Redis에서 무효화
-    const refreshToken = cookies().get("refresh_token")?.value;
+    const cookieStore = await cookies();
+    const refreshToken = cookieStore.get("refresh_token")?.value;
     if (refreshToken) {
       const payload = await verifyToken(refreshToken);
       if (payload && payload.jti) {
@@ -275,7 +278,7 @@ export async function signOut() {
     }
 
     // Access token 쿠키 삭제
-    cookies().set("access_token", "", {
+    cookieStore.set("access_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -284,7 +287,7 @@ export async function signOut() {
     });
 
     // Refresh token 쿠키 삭제
-    cookies().set("refresh_token", "", {
+    cookieStore.set("refresh_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -317,7 +320,8 @@ export async function signOut() {
 export async function refreshTokens() {
   try {
     // Get refresh token from cookie
-    const refreshToken = cookies().get("refresh_token")?.value;
+    const cookieStore = await cookies();
+    const refreshToken = cookieStore.get("refresh_token")?.value;
 
     if (!refreshToken) {
       return {
@@ -337,7 +341,7 @@ export async function refreshTokens() {
     }
 
     // Set new access token cookie
-    cookies().set("access_token", tokenPair.accessToken, {
+    cookieStore.set("access_token", tokenPair.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -345,7 +349,7 @@ export async function refreshTokens() {
     });
 
     // Set new refresh token cookie
-    cookies().set("refresh_token", tokenPair.refreshToken, {
+    cookieStore.set("refresh_token", tokenPair.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -367,7 +371,8 @@ export async function refreshTokens() {
 
 export async function verifyAuth() {
   try {
-    const accessToken = cookies().get("access_token")?.value;
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get("access_token")?.value;
 
     if (!accessToken) {
       return { authenticated: false };
@@ -542,7 +547,7 @@ export async function resetPassword({
       passwordResetToken: token,
       passwordResetExpires: { $gt: new Date() },
     }).select(
-      "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes"
+      "+password +twoFactorEnabled +twoFactorSecret +twoFactorBackupCodes",
     );
 
     if (!user) {
@@ -564,7 +569,7 @@ export async function resetPassword({
         // 백업 코드 확인
         const backupCodeResult = await verifyBackupCode(
           user._id.toString(),
-          twoFactorCode
+          twoFactorCode,
         );
         if (!backupCodeResult.success) {
           return { error: backupCodeResult.error };
@@ -574,7 +579,7 @@ export async function resetPassword({
         // TOTP 코드 확인
         const totpResult = await verify2FAToken(
           user.twoFactorSecret,
-          twoFactorCode
+          twoFactorCode,
         );
         if (!totpResult.success) {
           return { error: "유효하지 않은 2FA 인증 코드입니다." };
@@ -612,7 +617,8 @@ export async function changePassword({
   confirmPassword,
 }) {
   try {
-    const accessToken = cookies().get("access_token")?.value;
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get("access_token")?.value;
     if (!accessToken) {
       return { error: "로그인이 필요합니다." };
     }
