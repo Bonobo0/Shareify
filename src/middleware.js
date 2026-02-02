@@ -31,9 +31,6 @@ const BYPASS_ROUTES = [
   "/_next",
   "/favicon.ico",
   "/public",
-
-  // 토큰 갱신 API (인증 없이 접근 가능해야 함)
-  "/api/auth/refresh",
 ];
 
 export async function middleware(request) {

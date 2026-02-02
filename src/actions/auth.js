@@ -6,7 +6,7 @@ import {
   generateTokenPair,
   verifyToken,
   verifyAccessToken,
-  getRefreshTokenFromCookie,
+  rotateRefreshToken,
 } from "@/lib/auth/jwt";
 import {
   invalidateRefreshToken,
@@ -298,6 +298,69 @@ export async function signOut() {
     return {
       success: false,
       error: "로그아웃 중 오류가 발생했습니다.",
+    };
+  }
+}
+
+/**
+ * Refresh access token using refresh token (RTR - Refresh Token Rotation)
+ * Server Action for token refresh - replaces the old /api/auth/refresh API route
+ *
+ * This function:
+ * 1. Validates the current refresh token from cookie
+ * 2. Invalidates the old refresh token in Redis
+ * 3. Generates a new access token + refresh token pair
+ * 4. Sets both tokens as HttpOnly cookies
+ *
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function refreshTokens() {
+  try {
+    // Get refresh token from cookie
+    const refreshToken = cookies().get("refresh_token")?.value;
+
+    if (!refreshToken) {
+      return {
+        success: false,
+        error: "Refresh token이 없습니다.",
+      };
+    }
+
+    // Rotate refresh token (RTR)
+    const tokenPair = await rotateRefreshToken(refreshToken);
+
+    if (!tokenPair) {
+      return {
+        success: false,
+        error: "유효하지 않거나 만료된 refresh token입니다.",
+      };
+    }
+
+    // Set new access token cookie
+    cookies().set("access_token", tokenPair.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: ACCESS_TOKEN_MAX_AGE,
+    });
+
+    // Set new refresh token cookie
+    cookies().set("refresh_token", tokenPair.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: REFRESH_TOKEN_MAX_AGE,
+    });
+
+    return {
+      success: true,
+      message: "토큰이 갱신되었습니다.",
+    };
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    return {
+      success: false,
+      error: "토큰 갱신 중 오류가 발생했습니다.",
     };
   }
 }
