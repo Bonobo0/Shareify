@@ -20,7 +20,7 @@
     "jszip": "^3.10.1",
     "mongodb": "^6.17.0",
     "mongoose": "^8.16.4",
-    "next": "14.2.35",
+    "next": "^15.2.9",
     "nodemailer": "^7.0.5",
     "qrcode": "^1.5.4",
     "react": "^18",
@@ -31,7 +31,7 @@
   "devDependencies": {
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
-    "eslint-config-next": "14.1.4",
+    "eslint-config-next": "^15.2.9",
     "postcss": "^8",
     "tailwindcss": "^3.3.0"
   }
