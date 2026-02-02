@@ -4,7 +4,7 @@ import {
   getActionRateLimitStats,
   resetActionRateLimit,
 } from "@/lib/actionRateLimit";
-import { verifyToken } from "@/lib/auth/jwt";
+import { verifyAccessToken } from "@/lib/auth/jwt";
 import { cookies } from "next/headers";
 import { connectToDatabase } from "@/lib/db/mongodb";
 import User from "@/models/User";
@@ -12,10 +12,10 @@ import User from "@/models/User";
 // 관리자 권한 확인
 async function isAdmin() {
   try {
-    const token = cookies().get("token")?.value;
+    const token = cookies().get("access_token")?.value;
     if (!token) return false;
 
-    const decoded = await verifyToken(token);
+    const decoded = await verifyAccessToken(token);
     if (!decoded) return false;
 
     await connectToDatabase();

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyToken } from "./lib/auth/jwt";
+import { verifyAccessToken } from "./lib/auth/jwt";
 
 // 인증이 필요한 경로 리스트
 const PROTECTED_ROUTES = [
@@ -55,13 +55,13 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  // 쿠키에서 토큰 가져오기
-  const token = request.cookies.get("token")?.value;
+  // 쿠키에서 access_token 가져오기
+  const accessToken = request.cookies.get("access_token")?.value;
 
-  // 토큰이 없거나 유효하지 않으면 로그인 페이지로 리다이렉트
-  const payload = await verifyToken(token);
+  // access_token이 없거나 유효하지 않으면 로그인 페이지로 리다이렉트
+  const payload = await verifyAccessToken(accessToken);
 
-  if (!token || !payload) {
+  if (!accessToken || !payload) {
     // 현재 URL을 콜백 URL로 저장하여 로그인 후 돌아올 수 있도록 함
     const signinUrl = new URL("/user/signin", request.url);
     signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);

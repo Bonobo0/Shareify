@@ -2,7 +2,16 @@
 
 import { connectToDatabase } from "@/lib/db/mongodb";
 import User from "@/models/User";
-import { generateToken, verifyToken } from "@/lib/auth/jwt";
+import {
+  generateTokenPair,
+  verifyToken,
+  verifyAccessToken,
+  rotateRefreshToken,
+} from "@/lib/auth/jwt";
+import {
+  invalidateRefreshToken,
+  invalidateAllUserRefreshTokens,
+} from "@/lib/redis/client";
 import { cookies } from "next/headers";
 import {
   generateVerificationToken,
@@ -10,6 +19,10 @@ import {
 } from "@/lib/email/emailService";
 import { verify2FAToken, verifyBackupCode } from "@/lib/auth/twoFactor";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
+
+// Cookie configuration
+const ACCESS_TOKEN_MAX_AGE = 15 * 60; // 15분
+const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60; // 7일
 
 export async function signIn(formData) {
   try {
@@ -102,14 +115,22 @@ export async function signIn(formData) {
       }
     }
 
-    const token = await generateToken(user._id);
+    const { accessToken, refreshToken } = await generateTokenPair(user._id);
 
-    // 쿠키에 토큰 저장
-    cookies().set("token", token, {
+    // Access token 쿠키 설정
+    cookies().set("access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7일
+      maxAge: ACCESS_TOKEN_MAX_AGE,
+    });
+
+    // Refresh token 쿠키 설정
+    cookies().set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: REFRESH_TOKEN_MAX_AGE,
     });
 
     return {
@@ -202,14 +223,23 @@ export async function signUp(formData) {
       console.error("회원가입 후 인증 메일 전송 실패:", emailResult.error);
     }
 
-    // 토큰 생성 및 쿠키 설정 (이메일 미인증 상태로도 로그인 허용)
-    const token = await generateToken(user._id);
+    // 토큰 페어 생성 및 쿠키 설정 (이메일 미인증 상태로도 로그인 허용)
+    const { accessToken, refreshToken } = await generateTokenPair(user._id);
 
-    cookies().set("token", token, {
+    // Access token 쿠키 설정
+    cookies().set("access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7일
+      maxAge: ACCESS_TOKEN_MAX_AGE,
+    });
+
+    // Refresh token 쿠키 설정
+    cookies().set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: REFRESH_TOKEN_MAX_AGE,
     });
 
     return {
@@ -235,8 +265,26 @@ export async function signUp(formData) {
 
 export async function signOut() {
   try {
-    // 기존 쿠키 삭제
-    cookies().set("token", "", {
+    // Refresh token 가져와서 Redis에서 무효화
+    const refreshToken = cookies().get("refresh_token")?.value;
+    if (refreshToken) {
+      const payload = await verifyToken(refreshToken);
+      if (payload && payload.jti) {
+        await invalidateRefreshToken(payload.userId, payload.jti);
+      }
+    }
+
+    // Access token 쿠키 삭제
+    cookies().set("access_token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      expires: new Date(0),
+    });
+
+    // Refresh token 쿠키 삭제
+    cookies().set("refresh_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -254,15 +302,78 @@ export async function signOut() {
   }
 }
 
+/**
+ * Refresh access token using refresh token (RTR - Refresh Token Rotation)
+ * Server Action for token refresh - replaces the old /api/auth/refresh API route
+ *
+ * This function:
+ * 1. Validates the current refresh token from cookie
+ * 2. Invalidates the old refresh token in Redis
+ * 3. Generates a new access token + refresh token pair
+ * 4. Sets both tokens as HttpOnly cookies
+ *
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function refreshTokens() {
+  try {
+    // Get refresh token from cookie
+    const refreshToken = cookies().get("refresh_token")?.value;
+
+    if (!refreshToken) {
+      return {
+        success: false,
+        error: "Refresh token이 없습니다.",
+      };
+    }
+
+    // Rotate refresh token (RTR)
+    const tokenPair = await rotateRefreshToken(refreshToken);
+
+    if (!tokenPair) {
+      return {
+        success: false,
+        error: "유효하지 않거나 만료된 refresh token입니다.",
+      };
+    }
+
+    // Set new access token cookie
+    cookies().set("access_token", tokenPair.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: ACCESS_TOKEN_MAX_AGE,
+    });
+
+    // Set new refresh token cookie
+    cookies().set("refresh_token", tokenPair.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: REFRESH_TOKEN_MAX_AGE,
+    });
+
+    return {
+      success: true,
+      message: "토큰이 갱신되었습니다.",
+    };
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    return {
+      success: false,
+      error: "토큰 갱신 중 오류가 발생했습니다.",
+    };
+  }
+}
+
 export async function verifyAuth() {
   try {
-    const token = cookies().get("token")?.value;
+    const accessToken = cookies().get("access_token")?.value;
 
-    if (!token) {
+    if (!accessToken) {
       return { authenticated: false };
     }
 
-    const decoded = await verifyToken(token);
+    const decoded = await verifyAccessToken(accessToken);
     if (!decoded) {
       return { authenticated: false };
     }
@@ -501,12 +612,12 @@ export async function changePassword({
   confirmPassword,
 }) {
   try {
-    const token = cookies().get("token")?.value;
-    if (!token) {
+    const accessToken = cookies().get("access_token")?.value;
+    if (!accessToken) {
       return { error: "로그인이 필요합니다." };
     }
 
-    const decoded = await verifyToken(token);
+    const decoded = await verifyAccessToken(accessToken);
     if (!decoded) {
       return { error: "유효하지 않은 토큰입니다." };
     }
