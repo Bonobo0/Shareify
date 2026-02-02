@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getAuth } from "./lib/auth";
 
 // 인증이 필요한 경로 리스트
 const PROTECTED_ROUTES = [
@@ -36,6 +35,9 @@ const BYPASS_ROUTES = [
   "/api/auth",
 ];
 
+// Better Auth 세션 쿠키 이름
+const SESSION_COOKIE_NAME = "better-auth.session_token";
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
@@ -58,37 +60,21 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  // Better Auth 세션 확인
-  try {
-    const auth = await getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+  // Better Auth 세션 쿠키 확인
+  // Edge 런타임에서는 간단한 쿠키 존재 여부만 확인
+  // 실제 세션 검증은 서버 사이드에서 수행
+  const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
-    if (!session) {
-      // 현재 URL을 콜백 URL로 저장하여 로그인 후 돌아올 수 있도록 함
-      const signinUrl = new URL("/user/signin", request.url);
-      signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
-
-      return NextResponse.redirect(signinUrl);
-    }
-
-    // 계정 정지 상태 확인
-    if (session.user?.suspended === true) {
-      const signinUrl = new URL("/user/signin", request.url);
-      signinUrl.searchParams.set("error", "suspended");
-      return NextResponse.redirect(signinUrl);
-    }
-
-    // 인증 성공: 요청 진행
-    return NextResponse.next();
-  } catch (error) {
-    console.error("Middleware auth error:", error);
-    // 인증 오류 시 로그인 페이지로 리다이렉트
+  if (!sessionToken) {
+    // 현재 URL을 콜백 URL로 저장하여 로그인 후 돌아올 수 있도록 함
     const signinUrl = new URL("/user/signin", request.url);
     signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
+
     return NextResponse.redirect(signinUrl);
   }
+
+  // 세션 토큰이 존재하면 진행 (상세 검증은 서버 사이드에서)
+  return NextResponse.next();
 }
 
 export const config = {

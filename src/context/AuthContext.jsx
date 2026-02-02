@@ -132,11 +132,11 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Keycloak 소셜 로그인 함수
+  // Keycloak 소셜 로그인 함수 (genericOAuth 사용)
   const loginWithKeycloak = async () => {
     try {
-      const result = await authClient.signIn.social({
-        provider: "keycloak",
+      const result = await authClient.signIn.oauth2({
+        providerId: "keycloak",
         callbackURL: "/dashboard",
       });
 

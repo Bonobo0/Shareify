@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { admin } from "better-auth/plugins/admin";
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { MongoClient } from "mongodb";
 
 // MongoDB 클라이언트 싱글톤
@@ -33,6 +34,43 @@ async function createAuth() {
   
   const db = await getDatabase();
   
+  // Keycloak 설정 확인
+  const keycloakEnabled = 
+    process.env.KEYCLOAK_CLIENT_ID && 
+    process.env.KEYCLOAK_CLIENT_SECRET && 
+    process.env.KEYCLOAK_ISSUER;
+  
+  // 플러그인 목록 구성
+  const plugins = [
+    // 2FA 플러그인
+    twoFactor({
+      issuer: "Shareify",
+      otpOptions: {
+        period: 30,
+        digits: 6,
+      },
+    }),
+    // 관리자 플러그인
+    admin(),
+  ];
+  
+  // Keycloak이 설정된 경우에만 genericOAuth 플러그인 추가
+  if (keycloakEnabled) {
+    plugins.push(
+      genericOAuth({
+        config: [
+          {
+            providerId: "keycloak",
+            clientId: process.env.KEYCLOAK_CLIENT_ID,
+            clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
+            discoveryUrl: `${process.env.KEYCLOAK_ISSUER}/.well-known/openid-configuration`,
+            scopes: ["openid", "profile", "email"],
+          },
+        ],
+      })
+    );
+  }
+  
   authInstance = betterAuth({
     appName: "Shareify",
     
@@ -61,15 +99,6 @@ async function createAuth() {
       cookieCache: {
         enabled: true,
         maxAge: 60 * 5, // 5분
-      },
-    },
-    
-    // 소셜 로그인 프로바이더 - Keycloak
-    socialProviders: {
-      keycloak: {
-        clientId: process.env.KEYCLOAK_CLIENT_ID || "",
-        clientSecret: process.env.KEYCLOAK_CLIENT_SECRET || "",
-        issuer: process.env.KEYCLOAK_ISSUER || "",
       },
     },
     
@@ -113,18 +142,7 @@ async function createAuth() {
     },
     
     // 플러그인
-    plugins: [
-      // 2FA 플러그인
-      twoFactor({
-        issuer: "Shareify",
-        otpOptions: {
-          period: 30,
-          digits: 6,
-        },
-      }),
-      // 관리자 플러그인
-      admin(),
-    ],
+    plugins,
     
     // 고급 설정
     advanced: {
@@ -139,19 +157,6 @@ async function createAuth() {
   
   return authInstance;
 }
-
-// Proxy를 사용하여 lazy initialization 지원
-export const auth = new Proxy({}, {
-  get: (target, prop) => {
-    return async (...args) => {
-      const instance = await createAuth();
-      if (typeof instance[prop] === 'function') {
-        return instance[prop](...args);
-      }
-      return instance[prop];
-    };
-  }
-});
 
 // 직접 auth 인스턴스가 필요한 경우 사용
 export { createAuth as getAuth };
