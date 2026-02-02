@@ -19,7 +19,8 @@ export function getRedisClient() {
         }
         return Math.min(times * 100, 3000); // Retry delay
       },
-      lazyConnect: true,
+      // lazyConnect disabled to ensure connection is established immediately
+      // and event listeners fire as expected
     });
 
     redis.on("error", (error) => {
@@ -91,6 +92,7 @@ export async function invalidateRefreshToken(userId, jti) {
 
 /**
  * Invalidate all refresh tokens for a user (logout from all devices)
+ * Uses SCAN instead of KEYS for production safety (non-blocking)
  * @param {string} userId - User ID
  * @returns {Promise<void>}
  */
@@ -99,10 +101,21 @@ export async function invalidateAllUserRefreshTokens(userId) {
   const pattern = `refresh_token:${userId}:*`;
 
   try {
-    const keys = await client.keys(pattern);
-    if (keys.length > 0) {
-      await client.del(...keys);
-    }
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await client.scan(
+        cursor,
+        "MATCH",
+        pattern,
+        "COUNT",
+        100
+      );
+      cursor = nextCursor;
+
+      if (keys.length > 0) {
+        await client.del(...keys);
+      }
+    } while (cursor !== "0");
   } catch (error) {
     console.error("Failed to invalidate all user refresh tokens:", error);
   }
