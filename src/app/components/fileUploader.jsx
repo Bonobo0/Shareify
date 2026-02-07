@@ -166,7 +166,7 @@ export default function FileUploader({
           console.log("🚀 서버로 전송하는 데이터:", {
             filename: fileToUpload.name,
             size: fileToUpload.size,
-            mimetype: fileToUpload.type,
+            mimetype: fileToUpload.type == "" ? "application/octet-stream" : fileToUpload.type,
             directoryId: directoryId,
             isEncrypted: enableE2EE,
             originalMetadata: originalMetadata,
@@ -176,7 +176,7 @@ export default function FileUploader({
           const uploadResult = await uploadFile({
             filename: fileToUpload.name,
             size: fileToUpload.size,
-            mimetype: fileToUpload.type,
+            mimetype: fileToUpload.type == "" ? "application/octet-stream" : fileToUpload.type,
             directoryId: directoryId,
             isEncrypted: enableE2EE,
             originalMetadata: originalMetadata,

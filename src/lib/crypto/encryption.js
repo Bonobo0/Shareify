@@ -378,7 +378,7 @@ export async function decryptFile(
 
 // 미디어 파일 확인
 export function isMediaFile(mimetype) {
-  const mediaTypes = ["image/", "video/", "audio/"];
+  const mediaTypes = ["image/", "video/", "audio/", "application/pdf", "text/plain"];
   return mediaTypes.some((type) => mimetype.startsWith(type));
 }
 

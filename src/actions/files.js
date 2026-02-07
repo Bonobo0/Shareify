@@ -643,7 +643,11 @@ export async function deleteFile({ fileId }) {
   }
 }
 
-export async function getFileDownloadUrl({ fileId, shareLinkHash = null }) {
+export async function getFileDownloadUrl({
+  fileId,
+  shareLinkHash = null,
+  asPreview = false,
+}) {
   try {
     const userId = await getAuthenticatedUser();
 
@@ -735,7 +739,10 @@ export async function getFileDownloadUrl({ fileId, shareLinkHash = null }) {
     const r2Key = file.path || file.fileName;
 
     // 다운로드 URL 생성 (원본 파일명과 함께)
-    const downloadUrl = await generateDownloadUrl(r2Key, file.originalName);
+    const downloadUrl = await generateDownloadUrl(
+      r2Key,
+      asPreview ? null : file.originalName
+    );
 
     return {
       success: true,
@@ -1440,5 +1447,159 @@ export async function getSelectedFilesForDownload({ fileIds }) {
   } catch (error) {
     console.error("선택 파일 다운로드 정보 조회 오류:", error);
     return { error: "파일 정보를 조회하는 중 오류가 발생했습니다." };
+  }
+}
+
+// 파일 내용 업데이트 준비 (에디터 저장용 - presigned URL 반환)
+export async function prepareFileUpdate({ fileId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    if (!fileId) {
+      return { error: "필수 매개변수가 누락되었습니다." };
+    }
+
+    await connectToDatabase();
+
+    // 파일 조회
+    const file = await File.findOne({
+      _id: fileId,
+      deleted: { $ne: true },
+    });
+
+    if (!file) {
+      return { error: "파일을 찾을 수 없습니다." };
+    }
+
+    // 파일 소유자 또는 쓰기/관리 권한 확인
+    const isOwner = file.owner.toString() === userId;
+    const hasWriteAccess = file.shared?.some(
+      (share) =>
+        share.userId.toString() === userId &&
+        ["write", "admin"].includes(share.permission)
+    );
+
+    // 상위 디렉토리 쓰기 권한 확인
+    let hasParentWriteAccess = false;
+    if (!isOwner && !hasWriteAccess) {
+      let currentDirectory = await Directory.findById(
+        file.parentDirectory
+      ).lean();
+      while (currentDirectory && !hasParentWriteAccess) {
+        const parentDir = await Directory.findOne({
+          _id: currentDirectory._id,
+          $or: [
+            { owner: new mongoose.Types.ObjectId(userId) },
+            {
+              shared: {
+                $elemMatch: {
+                  userId: new mongoose.Types.ObjectId(userId),
+                  permission: { $in: ["write", "admin"] },
+                },
+              },
+            },
+          ],
+          deleted: { $ne: true },
+        });
+
+        if (parentDir) {
+          hasParentWriteAccess = true;
+        } else {
+          currentDirectory = currentDirectory.parent
+            ? await Directory.findById(currentDirectory.parent).lean()
+            : null;
+        }
+      }
+    }
+
+    if (!isOwner && !hasWriteAccess && !hasParentWriteAccess) {
+      return { error: "파일을 수정할 권한이 없습니다." };
+    }
+
+    // 기존 R2 키로 presigned PUT URL 생성
+    const r2Key = file.path || file.fileName;
+    const contentType = file.isEncrypted
+      ? "application/octet-stream"
+      : "application/json";
+    const uploadUrl = await generateUploadUrl(r2Key, contentType);
+
+    return {
+      success: true,
+      uploadUrl,
+      fileId: file._id.toString(),
+      currentSize: file.size,
+      isEncrypted: file.isEncrypted || false,
+      originalSize: file.originalSize || file.size,
+    };
+  } catch (error) {
+    console.error("파일 업데이트 준비 오류:", error);
+    return { error: "파일 업데이트를 준비하는 중 오류가 발생했습니다." };
+  }
+}
+
+// 파일 내용 업데이트 완료 (클라이언트가 presigned URL로 업로드 후 호출)
+export async function completeFileUpdate({ fileId, newSize, originalSize }) {
+  try {
+    const userId = await getAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    if (!fileId || newSize === undefined) {
+      return { error: "필수 매개변수가 누락되었습니다." };
+    }
+
+    await connectToDatabase();
+
+    const file = await File.findOne({
+      _id: fileId,
+      deleted: { $ne: true },
+    });
+
+    if (!file) {
+      return { error: "파일을 찾을 수 없습니다." };
+    }
+
+    // 권한 재확인
+    const isOwner = file.owner.toString() === userId;
+    const hasWriteAccess = file.shared?.some(
+      (share) =>
+        share.userId.toString() === userId &&
+        ["write", "admin"].includes(share.permission)
+    );
+
+    if (!isOwner && !hasWriteAccess) {
+      return { error: "파일을 수정할 권한이 없습니다." };
+    }
+
+    // 파일 크기 업데이트
+    const oldSize = file.size;
+    file.size = newSize;
+    if (originalSize !== undefined) {
+      file.originalSize = originalSize;
+    }
+    file.updatedAt = new Date();
+    await file.save();
+
+    // 소유자 저장소 사용량 업데이트
+    if (newSize !== oldSize) {
+      await User.findByIdAndUpdate(file.owner, {
+        $inc: { storageUsed: newSize - oldSize },
+      });
+    }
+
+    return {
+      success: true,
+      message: "파일이 저장되었습니다.",
+      size: newSize,
+    };
+  } catch (error) {
+    console.error("파일 업데이트 완료 오류:", error);
+    return { error: "파일 저장을 완료하는 중 오류가 발생했습니다." };
   }
 }

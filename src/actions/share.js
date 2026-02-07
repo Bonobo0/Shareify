@@ -139,7 +139,7 @@ export async function getSharedFileInfo({ hash }) {
   }
 }
 
-export async function downloadSharedFile({ hash }) {
+export async function downloadSharedFile({ hash, asPreview = false }) {
   try {
     if (!hash) {
       return { error: "파일 해시가 필요합니다." };
@@ -232,7 +232,10 @@ export async function downloadSharedFile({ hash }) {
     const r2Key = file.path || file.fileName;
 
     // 다운로드 URL 생성 (원본 파일명과 함께)
-    const downloadUrl = await generateDownloadUrl(r2Key, file.originalName);
+    const downloadUrl = await generateDownloadUrl(
+      r2Key,
+      asPreview ? null : file.originalName
+    );
 
     return {
       success: true,
@@ -819,7 +822,11 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
 }
 
 // 공유 디렉토리의 개별 파일 다운로드
-export async function downloadSharedDirectoryFile({ shareHash, fileId }) {
+export async function downloadSharedDirectoryFile({
+  shareHash,
+  fileId,
+  asPreview = false,
+}) {
   try {
     if (!shareHash || !fileId) {
       return { error: "필수 매개변수가 누락되었습니다." };
@@ -867,7 +874,10 @@ export async function downloadSharedDirectoryFile({ shareHash, fileId }) {
     const r2Key = file.path || file.fileName;
 
     // 다운로드 URL 생성 (원본 파일명과 함께)
-    const downloadUrl = await generateDownloadUrl(r2Key, file.originalName);
+    const downloadUrl = await generateDownloadUrl(
+      r2Key,
+      asPreview ? null : file.originalName
+    );
 
     return {
       success: true,

@@ -5,7 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { getSharedFileInfo, downloadSharedFile } from "@/actions/share";
-import { downloadAndDecrypt, decryptForPreview, decryptFile } from "@/lib/crypto/encryption";
+import { downloadAndDecrypt, decryptFile } from "@/lib/crypto/encryption";
+import { createPreviewUrl } from "@/lib/downloadUtils";
 import PreviewModal from "@/app/components/previewModal";
 import WebGLPlayer from "@/app/components/webGLPlayer";
 
@@ -68,7 +69,7 @@ export default function SharePage() {
     setPreviewLoading(true);
 
     try {
-      const result = await downloadSharedFile({ hash });
+      const result = await downloadSharedFile({ hash, asPreview: true });
 
       if (!result.success) {
         throw new Error(
@@ -76,34 +77,24 @@ export default function SharePage() {
         );
       }
 
-      let previewUrl = result.downloadUrl;
+      const previewResult = await createPreviewUrl({
+        downloadUrl: result.downloadUrl,
+        isEncrypted: file.isEncrypted,
+        password,
+        metadata: {
+          originalName: file.name,
+          originalMimetype:
+            result.originalMimetype || file.originalMimetype || file.mimetype,
+        },
+      });
 
-      // 암호화된 파일인 경우 복호화
-      if (file.isEncrypted && password) {
-        console.log("암호화된 파일 복호화 시작...");
-        try {
-          const decryptedBlob = await decryptForPreview(
-            result.downloadUrl,
-            password,
-            {
-              originalName: file.name,
-              originalMimetype:
-                result.originalMimetype ||
-                file.originalMimetype ||
-                file.mimetype,
-            }
-          );
-          previewUrl = URL.createObjectURL(decryptedBlob);
-          console.log("암호화된 파일 복호화 완료");
-        } catch (decryptError) {
-          console.error("복호화 실패:", decryptError);
-          throw new Error("복호화에 실패했습니다. 비밀번호를 확인해주세요.");
-        }
+      if (previewResult.error) {
+        throw new Error(previewResult.error);
       }
 
       setPreviewModal({
         file: file,
-        url: previewUrl,
+        url: previewResult.url,
         type: file.mimetype.split("/")[0],
         isDecrypted: file.isEncrypted && password,
       });

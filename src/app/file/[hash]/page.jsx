@@ -13,8 +13,8 @@ import { toggleFilePublic } from "@/actions/share";
 import {
   downloadAndDecrypt,
   isMediaFile,
-  decryptForPreview,
 } from "@/lib/crypto/encryption";
+import { createPreviewUrl } from "@/lib/downloadUtils";
 
 export default function FilePage() {
   const params = useParams();
@@ -165,12 +165,23 @@ export default function FilePage() {
     if (!file?.isEncrypted) {
       // 일반 파일 미리보기
       try {
-        const result = await getFileDownloadUrl({ fileId: file.id });
+        const result = await getFileDownloadUrl({
+          fileId: file.id,
+          asPreview: true,
+        });
         if (result.error) {
           showAlert(result.error);
           return;
         }
-        setPreviewModal({ file, url: result.downloadUrl });
+        const previewResult = await createPreviewUrl({
+          downloadUrl: result.downloadUrl,
+        });
+
+        if (previewResult.error) {
+          throw new Error(previewResult.error);
+        }
+
+        setPreviewModal({ file, url: previewResult.url });
       } catch (err) {
         showAlert("미리보기를 불러올 수 없습니다.");
       }
@@ -190,29 +201,31 @@ export default function FilePage() {
     setPreviewLoading(true);
 
     try {
-      const result = await getFileDownloadUrl({ fileId: file.id });
+      const result = await getFileDownloadUrl({
+        fileId: file.id,
+        asPreview: true,
+      });
       if (result.error) {
         showAlert(result.error);
         return;
       }
 
-      // 암호화된 파일 다운로드
-      const response = await fetch(result.downloadUrl);
-      const encryptedArrayBuffer = await response.arrayBuffer();
+      const previewResult = await createPreviewUrl({
+        downloadUrl: result.downloadUrl,
+        isEncrypted: true,
+        password: previewDecryptPassword,
+        metadata: {
+          originalName: file.originalName,
+          originalMimetype: file.originalMimetype,
+        },
+      });
 
-      // 복호화
-      const decryptResult = await decryptForPreview(
-        encryptedArrayBuffer,
-        previewDecryptPassword
-      );
-
-      if (decryptResult.error) {
-        showAlert(decryptResult.error);
+      if (previewResult.error) {
+        showAlert(previewResult.error);
         return;
       }
 
-      const previewUrl = URL.createObjectURL(decryptResult.blob);
-      setPreviewModal({ file, url: previewUrl });
+      setPreviewModal({ file, url: previewResult.url });
 
       // 성공 후 모달 닫기 및 초기화
       setPreviewDecryptModal(false);

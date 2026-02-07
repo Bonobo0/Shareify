@@ -19,6 +19,12 @@ const nextConfig = {
     // 빌드 시 TypeScript 오류가 있어도 빌드를 계속 진행
     ignoreBuildErrors: true,
   },
+  // Server Actions origin 검증 설정
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["localhost:3000", "*.app.github.dev"],
+    },
+  },
 };
 
 export default nextConfig;

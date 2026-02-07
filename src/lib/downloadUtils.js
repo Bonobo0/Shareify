@@ -2,7 +2,7 @@
 
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { decryptFile } from "@/lib/crypto/encryption";
+import { decryptFile, decryptForPreview } from "@/lib/crypto/encryption";
 
 // 단일 파일 다운로드 함수
 export async function downloadFile(
@@ -223,6 +223,70 @@ export async function downloadFilesAsZip(
   } catch (error) {
     console.error("ZIP 다운로드 오류:", error);
     return { error: error.message };
+  }
+}
+
+// 미리보기 URL 생성 (필요 시 복호화/Blob 변환)
+export async function createPreviewUrl({
+  downloadUrl,
+  isEncrypted = false,
+  password = null,
+  metadata = {},
+  forceBlob = false,
+}) {
+  try {
+    if (!downloadUrl) {
+      throw new Error("미리보기 URL이 유효하지 않습니다.");
+    }
+
+    if (isEncrypted) {
+      if (!password) {
+        throw new Error("복호화 키가 필요합니다.");
+      }
+
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error("파일 다운로드 실패");
+      }
+
+      const encryptedArrayBuffer = await response.arrayBuffer();
+      const decryptResult = await decryptForPreview(
+        encryptedArrayBuffer,
+        password,
+        metadata
+      );
+
+      if (!decryptResult.success || decryptResult.error) {
+        throw new Error(decryptResult.error || "복호화 실패");
+      }
+
+      return {
+        success: true,
+        url: URL.createObjectURL(decryptResult.blob),
+        revoke: true,
+      };
+    }
+
+    if (forceBlob) {
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error("파일 다운로드 실패");
+      }
+
+      const blob = await response.blob();
+      return {
+        success: true,
+        url: URL.createObjectURL(blob),
+        revoke: true,
+      };
+    }
+
+    return { success: true, url: downloadUrl, revoke: false };
+  } catch (error) {
+    console.error("미리보기 URL 생성 오류:", error);
+    return {
+      error: error.message || "미리보기 URL을 생성하는 중 오류가 발생했습니다.",
+    };
   }
 }
 

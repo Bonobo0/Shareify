@@ -12,7 +12,8 @@ import {
   downloadSharedFile,
   downloadSharedDirectoryFile,
 } from "@/actions/share";
-import { decryptForPreview, downloadAndDecrypt, decryptFile } from "@/lib/crypto/encryption";
+import { downloadAndDecrypt, decryptFile } from "@/lib/crypto/encryption";
+import { createPreviewUrl } from "@/lib/downloadUtils";
 import DeleteSharedDirectory from "@/app/components/deleteDirectory";
 import PreviewModal from "@/app/components/previewModal";
 import WebGLPlayer from "@/app/components/webGLPlayer";
@@ -242,18 +243,19 @@ export default function SharedDirectoryPage() {
         const result = await downloadSharedDirectoryFile({
           shareHash: hash,
           fileId: file.id,
+          asPreview: true,
         });
         if (result.success) {
-          const response = await fetch(result.downloadUrl);
+          const previewResult = await createPreviewUrl({
+            downloadUrl: result.downloadUrl,
+            forceBlob: true,
+          });
 
-          if (response.ok) {
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-
+          if (previewResult.success) {
             setPreviewModal({
               isOpen: true,
               file: file,
-              url: url,
+              url: previewResult.url,
               mimeType: mimeType,
               type: mimeType.split("/")[0], // image, video, audio 등
             });
@@ -283,6 +285,7 @@ export default function SharedDirectoryPage() {
       const result = await downloadSharedDirectoryFile({
         shareHash: hash,
         fileId: file.id,
+        asPreview: true,
       });
 
       if (!result.success) {
@@ -291,63 +294,26 @@ export default function SharedDirectoryPage() {
         );
       }
 
-      let previewUrl = result.downloadUrl;
+      const previewResult = await createPreviewUrl({
+        downloadUrl: result.downloadUrl,
+        isEncrypted: file.isEncrypted,
+        password: password,
+        metadata: {
+          originalName: file.name,
+          originalMimetype: file.originalMimetype || file.mimeType,
+        },
+        forceBlob: !file.isEncrypted,
+      });
 
-      // 암호화된 파일인 경우 복호화
-      if (file.isEncrypted && password) {
-        console.log("암호화된 파일 복호화 시작...");
-        try {
-          // URL에서 ArrayBuffer 가져오기
-          const response = await fetch(result.downloadUrl);
-          if (!response.ok) {
-            throw new Error("파일 다운로드 실패");
-          }
-          const encryptedArrayBuffer = await response.arrayBuffer();
-
-          const decryptResult = await decryptForPreview(
-            encryptedArrayBuffer,
-            password,
-            {
-              originalName: file.name,
-              originalMimetype: file.originalMimetype || file.mimeType,
-            }
-          );
-
-          if (decryptResult.success) {
-            previewUrl = URL.createObjectURL(decryptResult.blob);
-            console.log("암호화된 파일 복호화 완료");
-          } else {
-            throw new Error(decryptResult.error || "복호화 실패");
-          }
-        } catch (decryptError) {
-          console.error("복호화 실패:", decryptError);
-          // 더 구체적인 에러 메시지 제공
-          if (
-            decryptError.message?.includes("incorrect password") ||
-            decryptError.message?.includes("wrong password") ||
-            decryptError.message?.includes("decryption failed") ||
-            decryptError.message?.includes("Decryption failed")
-          ) {
-            throw new Error("복호화에 실패했습니다. 비밀번호를 확인해주세요.");
-          } else {
-            throw new Error(`복호화 오류: ${decryptError.message}`);
-          }
-        }
-      } else if (!file.isEncrypted) {
-        // 암호화되지 않은 파일의 경우 직접 fetch
-        const response = await fetch(result.downloadUrl);
-        if (!response.ok) {
-          throw new Error("파일 다운로드 실패");
-        }
-        const blob = await response.blob();
-        previewUrl = URL.createObjectURL(blob);
+      if (previewResult.error) {
+        throw new Error(previewResult.error);
       }
 
       const mimeType = file.originalMimetype || file.mimeType;
       setPreviewModal({
         isOpen: true,
         file: file,
-        url: previewUrl,
+        url: previewResult.url,
         mimeType: mimeType,
         type: mimeType.split("/")[0],
         isDecrypted: file.isEncrypted && password,

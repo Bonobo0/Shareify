@@ -42,3 +42,7 @@ next-env.d.ts
 
 #credentials
 scripts/.credential
+
+#dev files
+src/app/dev/page.jsx
+src/actions/dev.js

@@ -20,8 +20,8 @@ import {
 import {
   downloadAndDecrypt,
   isMediaFile,
-  decryptForPreview,
 } from "@/lib/crypto/encryption";
+import { createPreviewUrl } from "@/lib/downloadUtils";
 import DirectoryShareModal from "./directoryShareModal";
 import EditDirectoryModal from "./editDirectoryModal";
 import BulkDownloadModal from "./bulkDownloadModal";
@@ -29,6 +29,7 @@ import ShareModal from "./shareModal";
 import BulkActionHandler from "./bulkActionHandler";
 import SelectedDownloadModal from "./selectedDownloadModal";
 import Paginator from "./paginator";
+import LiveEditor from "./liveEditor";
 
 export default function FileList({
   directoryId = null,
@@ -465,6 +466,7 @@ export default function FileList({
     });
   };
 
+
   useEffect(() => {
     fetchData();
   }, [directoryId, refreshTrigger, fetchData]);
@@ -513,6 +515,7 @@ export default function FileList({
       const result = await getFileDownloadUrl({
         fileId: file.id,
         shareLinkHash,
+        asPreview: true,
       });
 
       if (result.error) {
@@ -588,12 +591,27 @@ export default function FileList({
         const result = await getFileDownloadUrl({
           fileId: file.id,
           shareLinkHash,
+          asPreview: true,
         });
         if (result.error) {
           setError(result.error);
           return;
         }
-        setPreviewModal({ file, url: result.downloadUrl });
+        const isPdfOrText =
+          file.mimetype?.startsWith("application/pdf") ||
+          file.originalMimetype?.startsWith("application/pdf") ||
+          file.mimetype?.startsWith("text/") ||
+          file.originalMimetype?.startsWith("text/");
+        const previewResult = await createPreviewUrl({
+          downloadUrl: result.downloadUrl,
+          forceBlob: isPdfOrText,
+        });
+
+        if (previewResult.error) {
+          throw new Error(previewResult.error);
+        }
+
+        setPreviewModal({ file, url: previewResult.url });
       } catch (err) {
         setError("미리보기를 불러올 수 없습니다.");
       }
@@ -618,6 +636,7 @@ export default function FileList({
       const result = await getFileDownloadUrl({
         fileId: file.id,
         shareLinkHash,
+        asPreview: true,
       });
 
       if (result.error) {
@@ -625,27 +644,22 @@ export default function FileList({
         return;
       }
 
-      // 암호화된 파일 다운로드
-      const response = await fetch(result.downloadUrl);
-      const encryptedArrayBuffer = await response.arrayBuffer();
-
-      // 복호화 (올바른 메타데이터 전달)
-      const decryptResult = await decryptForPreview(
-        encryptedArrayBuffer,
-        decryptPassword,
-        {
+      const previewResult = await createPreviewUrl({
+        downloadUrl: result.downloadUrl,
+        isEncrypted: true,
+        password: decryptPassword,
+        metadata: {
           originalName: file.originalName,
           originalMimetype: file.originalMimetype,
-        }
-      );
+        },
+      });
 
-      if (!decryptResult.success || decryptResult.error) {
-        setError(decryptResult.error || "복호화에 실패했습니다.");
+      if (previewResult.error) {
+        setError(previewResult.error || "복호화에 실패했습니다.");
         return;
       }
 
-      const previewUrl = URL.createObjectURL(decryptResult.blob);
-      setPreviewModal({ file, url: previewUrl });
+      setPreviewModal({ file, url: previewResult.url, encryptionPassword: decryptPassword });
       setDecryptModal(null);
       setDecryptPassword("");
     } catch (err) {
@@ -1403,6 +1417,20 @@ export default function FileList({
                               </button>
                             </li>
                           )}
+                          {file.originalName.endsWith(".ejtxt") && (
+                            <li>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  document.activeElement.blur();
+                                  handlePreview(file);
+                                }}
+                                disabled={actionLoading[file.id]}
+                              >
+                                ✍️ 편집하기
+                              </button>
+                            </li>
+                          )}
                           <li>
                             <button
                               onClick={(e) => {
@@ -1531,7 +1559,41 @@ export default function FileList({
               ) : previewModal.file.mimetype?.startsWith("audio/") ||
                 previewModal.file.originalMimetype?.startsWith("audio/") ? (
                 <audio src={previewModal.url} controls className="w-full" />
-              ) : (
+              ) : previewModal.file.mimetype?.startsWith("application/pdf") ||
+                previewModal.file.originalMimetype?.startsWith(
+                  "application/pdf"
+                ) ? (
+                <iframe
+                  src={previewModal.url}
+                  className="w-full h-[70vh]"
+                  title={previewModal.file.originalName}
+                >
+                  PDF를 표시할 수 없습니다.
+                </iframe>
+              ) : previewModal.file.mimetype?.startsWith("text/") ||
+                previewModal.file.originalMimetype?.startsWith("text/") ? (
+                <iframe
+                  src={previewModal.url}
+                  className="w-full h-[70vh]"
+                  title={previewModal.file.originalName}
+                >
+                  텍스트를 표시할 수 없습니다.
+                </iframe>
+              ) : previewModal.file.originalName.endsWith(".ejtxt") ? ( 
+                <LiveEditor
+                  file={previewModal.file}
+                  fileUrl={previewModal.url}
+                  encryptionPassword={previewModal.encryptionPassword || null}
+                  onClose={() => {
+                    if (previewModal.url.startsWith("blob:")) {
+                      URL.revokeObjectURL(previewModal.url);
+                    }
+                    setPreviewModal(null);
+                  }}
+                  onSaved={() => loadFiles()}
+                />
+              ) :
+               (
                 <p>미리보기를 지원하지 않는 파일 형식입니다.</p>
               )}
             </div>

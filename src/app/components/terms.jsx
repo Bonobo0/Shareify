@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-
+import LiveEditor from "./liveEditor";
 export default function Terms({ terms, setTerms, privacy, setPrivacy }) {
   return (
     <div className="form-control mt-4">
