@@ -147,7 +147,7 @@ export default function FileListModals({
                 >
                   텍스트를 표시할 수 없습니다.
                 </iframe>
-              ) : previewModal.file.originalName.endsWith(".ejtxt") ? ( 
+              ) : previewModal.file.originalName.endsWith(".ejtxt") ? (
                 <LiveEditor
                   file={previewModal.file}
                   fileUrl={previewModal.url}
@@ -160,8 +160,7 @@ export default function FileListModals({
                   }}
                   onSaved={() => fetchData()}
                 />
-              ) :
-               (
+              ) : (
                 <p>미리보기를 지원하지 않는 파일 형식입니다.</p>
               )}
             </div>
