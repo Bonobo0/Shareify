@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import { uploadFile, completeFileUpload } from "@/actions/files";
 import { encryptFile } from "@/lib/crypto/encryption";
 import { validateWebGLBuildFile } from "@/lib/webgl/validation";
+import FileProgressList from "./fileUploader/FileProgressList";
+import UploadOptions from "./fileUploader/UploadOptions";
 
 export default function FileUploader({
   onUploadComplete,
@@ -383,128 +385,20 @@ export default function FileUploader({
         )}
 
         {files.length > 0 && (
-          <div>
-            <h3 className="font-semibold mb-2">선택된 파일:</h3>
-            <ul className="list-disc pl-5">
-              {files.map((file, index) => (
-                <li key={index} className="mb-2">
-                  <div className="flex justify-between items-center">
-                    <span>
-                      {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                    </span>
-                    {progress[file.name] && (
-                      <span className="text-sm">
-                        {progress[file.name].percent}%
-                      </span>
-                    )}
-                  </div>
-
-                  {progress[file.name] && (
-                    <div className="mt-1">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span>
-                          {progress[file.name].status === "validating" &&
-                            "🔍 WebGL 빌드 검증 중..."}
-                          {progress[file.name].status === "encrypting" &&
-                            "🔒 암호화 중..."}
-                          {progress[file.name].status === "uploading" &&
-                            "📤 업로드 중..."}
-                          {progress[file.name].status === "success" &&
-                            "✅ 완료"}
-                          {progress[file.name].status === "error" &&
-                            `❌ 실패: ${
-                              progress[file.name].error || "알 수 없는 오류"
-                            }`}
-                        </span>
-                        <span>{progress[file.name].percent}%</span>
-                      </div>
-                      <progress
-                        className={`progress w-full ${
-                          progress[file.name].status === "success"
-                            ? "progress-success"
-                            : progress[file.name].status === "error"
-                            ? "progress-error"
-                            : progress[file.name].status === "encrypting"
-                            ? "progress-warning"
-                            : progress[file.name].status === "validating"
-                            ? "progress-info"
-                            : "progress-primary"
-                        }`}
-                        value={progress[file.name].percent}
-                        max="100"
-                      ></progress>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <FileProgressList files={files} progress={progress} />
         )}
 
-        {/* E2EE 옵션 */}
-        <div className="border-t pt-4">
-          <div className="form-control">
-            <label className="label cursor-pointer">
-              <span className="label-text">
-                <span className="font-semibold">종단간 암호화 (E2EE)</span>
-                <br />
-                <span className="text-sm text-gray-500">
-                  파일이 디바이스에서 암호화되어 서버에 저장됩니다
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                className="toggle toggle-primary"
-                checked={enableE2EE}
-                onChange={(e) => handleE2EEToggle(e.target.checked)}
-                disabled={uploading}
-              />
-            </label>
-          </div>
-
-          {showPasswordInput && (
-            <div className="mt-3">
-              <label className="label">
-                <span className="label-text">암호화 키</span>
-              </label>
-              <input
-                type="password"
-                className="input input-bordered w-full"
-                placeholder="암호화에 사용할 비밀번호를 입력하세요"
-                value={encryptionPassword}
-                onChange={(e) => setEncryptionPassword(e.target.value)}
-                disabled={uploading}
-              />
-              <label className="label">
-                <span className="label-text-alt text-warning">
-                  ⚠️ 이 비밀번호를 잊으면 파일을 복구할 수 없습니다
-                </span>
-              </label>
-            </div>
-          )}
-        </div>
-
-        {/* WebGL 빌드 옵션 */}
-        <div className="border-t pt-4">
-          <div className="form-control">
-            <label className="label cursor-pointer">
-              <span className="label-text">
-                <span className="font-semibold">Unity WebGL 빌드</span>
-                <br />
-                <span className="text-sm text-gray-500">
-                  이 파일이 Unity WebGL 빌드 압축 파일인 경우 체크하세요
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                className="toggle toggle-secondary"
-                checked={isWebGLBuild}
-                onChange={(e) => setIsWebGLBuild(e.target.checked)}
-                disabled={uploading}
-              />
-            </label>
-          </div>
-        </div>
+        {/* E2EE 및 WebGL 옵션 */}
+        <UploadOptions
+          enableE2EE={enableE2EE}
+          onE2EEToggle={handleE2EEToggle}
+          showPasswordInput={showPasswordInput}
+          encryptionPassword={encryptionPassword}
+          onPasswordChange={setEncryptionPassword}
+          isWebGLBuild={isWebGLBuild}
+          onWebGLToggle={setIsWebGLBuild}
+          uploading={uploading}
+        />
 
         <div className="flex gap-2">
           <button
