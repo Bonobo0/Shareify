@@ -1756,7 +1756,6 @@ export async function getEditorFiles() {
     }
 
     // 공유 디렉토리 내의 .ejtxt 파일 조회 (소유한 파일과 직접 공유 파일 제외)
-    const ownFileIds = new Set(ownFiles.map((f) => f._id.toString()));
     const directlySharedFileIds = new Set(directlySharedFiles.map((f) => f._id.toString()));
 
     let dirSharedFiles = [];
