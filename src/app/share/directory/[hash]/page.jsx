@@ -17,6 +17,24 @@ import { createPreviewUrl } from "@/lib/downloadUtils";
 import DeleteSharedDirectory from "@/app/components/deleteDirectory";
 import PreviewModal from "@/app/components/previewModal";
 import WebGLPlayer from "@/app/components/webGLPlayer";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faUser,
+  faFile,
+  faTriangleExclamation,
+  faCircleInfo,
+  faFolder,
+  faFolderOpen,
+  faBox,
+  faImage,
+  faVideo,
+  faMusic,
+  faFileLines,
+  faChartBar,
+  faLock,
+  faCircleXmark,
+  faDownload,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function SharedDirectoryPage() {
   const params = useParams();
@@ -546,7 +564,7 @@ export default function SharedDirectoryPage() {
             <div className="flex flex-col lg:text-right gap-2">
               <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">
                 <div className="btn btn-accent btn-xs gap-2 flex-shrink-0">
-                  <span>👤</span>
+                  <span><FontAwesomeIcon icon={faUser} /></span>
                   <span className="text-sm truncate max-w-32">
                     {directoryInfo?.owner?.name || directoryInfo?.owner?.email}
                     님이 공유
@@ -568,7 +586,7 @@ export default function SharedDirectoryPage() {
       <div className="container mx-auto p-4 sm:p-6 md:p-8">
         <div className="mb-6">
           {/* Information */}
-          <h2 className="text-xl font-semibold mb-4">📄 정보</h2>
+          <h2 className="text-xl font-semibold mb-4"><FontAwesomeIcon icon={faFile} /> 정보</h2>
           <div className="bg-base-200 p-4 rounded-md">
             <p className="text-sm text-gray-400">
               {directoryInfo?.description || "사용자가 설정한 설명이 없습니다."}
@@ -591,12 +609,12 @@ export default function SharedDirectoryPage() {
               {subdirectories.length}개
             </p>
             <p className="alert alert-warning mt-2">
-              ⚠️ 이 디렉토리는 공유 링크로 공개되어 있습니다. 링크를 아는 사람은{" "}
+              <FontAwesomeIcon icon={faTriangleExclamation} /> 이 디렉토리는 공유 링크로 공개되어 있습니다. 링크를 아는 사람은{" "}
               {new Date(expiresAt).toLocaleString()}까지 누구나 접근할 수
               있습니다.
             </p>
             <p className="alert alert-success mt-2">
-              ℹ️ 상위 디렉토리로의 이동은 디렉토리 명 위의 브레드크럼을 클릭하여
+              <FontAwesomeIcon icon={faCircleInfo} /> 상위 디렉토리로의 이동은 디렉토리 명 위의 브레드크럼을 클릭하여
               가능합니다.
             </p>
           </div>
@@ -605,7 +623,7 @@ export default function SharedDirectoryPage() {
         {/* Subdirectories */}
         {subdirectories.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">📁 하위 디렉토리</h2>
+            <h2 className="text-xl font-semibold mb-4"><FontAwesomeIcon icon={faFolder} /> 하위 디렉토리</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {subdirectories.map((directory) => (
                 <div
@@ -615,7 +633,7 @@ export default function SharedDirectoryPage() {
                 >
                   <div className="card-body p-4">
                     <div className="flex items-center">
-                      <span className="text-2xl mr-3 flex-shrink-0">📁</span>
+                      <span className="text-2xl mr-3 flex-shrink-0"><FontAwesomeIcon icon={faFolder} /></span>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium hover:text-blue-600 break-words word-break-all leading-tight">
                           {directory.name}
@@ -657,10 +675,10 @@ export default function SharedDirectoryPage() {
               </div>
             </div>
           )}
-          <h2 className="text-xl font-semibold mb-4">📂 파일 목록</h2>
+          <h2 className="text-xl font-semibold mb-4"><FontAwesomeIcon icon={faFolderOpen} /> 파일 목록</h2>
           {files.length === 0 ? (
             <div className="text-center py-12">
-              <div className="text-6xl mb-4">📂</div>
+              <div className="text-6xl mb-4"><FontAwesomeIcon icon={faFolderOpen} /></div>
               <p className="text-gray-600">이 디렉토리에는 파일이 없습니다.</p>
             </div>
           ) : (
@@ -718,7 +736,7 @@ export default function SharedDirectoryPage() {
                     onClick={() => setShowBulkDownloadModal(true)}
                     disabled={isDownloading}
                   >
-                    📦 전체 다운로드
+                    <FontAwesomeIcon icon={faBox} /> 전체 다운로드
                   </button>
                 )}
               </div>
@@ -763,28 +781,28 @@ export default function SharedDirectoryPage() {
                               : (
                                   file.originalMimetype || file.mimeType
                                 )?.startsWith("image/")
-                              ? "🖼️"
+                              ? <FontAwesomeIcon icon={faImage} />
                               : (
                                   file.originalMimetype || file.mimeType
                                 )?.startsWith("video/")
-                              ? "🎥"
+                              ? <FontAwesomeIcon icon={faVideo} />
                               : (
                                   file.originalMimetype || file.mimeType
                                 )?.startsWith("audio/")
-                              ? "🎵"
+                              ? <FontAwesomeIcon icon={faMusic} />
                               : (
                                   file.originalMimetype || file.mimeType
                                 )?.includes("pdf")
-                              ? "📄"
+                              ? <FontAwesomeIcon icon={faFile} />
                               : (
                                   file.originalMimetype || file.mimeType
                                 )?.includes("document")
-                              ? "📝"
+                              ? <FontAwesomeIcon icon={faFileLines} />
                               : (
                                   file.originalMimetype || file.mimeType
                                 )?.includes("spreadsheet")
-                              ? "📊"
-                              : "📄"}
+                              ? <FontAwesomeIcon icon={faChartBar} />
+                              : <FontAwesomeIcon icon={faFile} />}
                           </span>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium hover:text-blue-600 break-words word-break-all leading-tight">
@@ -792,7 +810,7 @@ export default function SharedDirectoryPage() {
                               {file.isEncrypted && (
                                 <span className="ml-2">
                                   <span className="badge badge-warning badge-sm">
-                                    🔒
+                                    <FontAwesomeIcon icon={faLock} />
                                   </span>
                                 </span>
                               )}
@@ -829,7 +847,7 @@ export default function SharedDirectoryPage() {
       {previewPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">🔒 파일 미리보기</h2>
+            <h2 className="text-xl font-bold mb-4"><FontAwesomeIcon icon={faLock} /> 파일 미리보기</h2>
 
             <p className="text-sm text-gray-600 mb-4">
               이 파일은 암호화되어 있습니다. 미리보기를 위해 복호화 비밀번호를
@@ -905,7 +923,7 @@ export default function SharedDirectoryPage() {
       {errorModal.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4 text-error">❌ 오류</h2>
+            <h2 className="text-xl font-bold mb-4 text-error"><FontAwesomeIcon icon={faCircleXmark} /> 오류</h2>
             <p className="text-sm mb-6">{errorModal.message}</p>
             <div className="flex justify-end">
               <button
@@ -983,7 +1001,7 @@ export default function SharedDirectoryPage() {
             {webGLFile.isEncrypted && (
               <div className="alert alert-warning mb-4">
                 <span className="text-sm">
-                  🔒 이 게임은 암호화되어 있습니다. 플레이하려면 복호화
+                  <FontAwesomeIcon icon={faLock} /> 이 게임은 암호화되어 있습니다. 플레이하려면 복호화
                   비밀번호가 필요합니다.
                 </span>
               </div>
@@ -996,14 +1014,14 @@ export default function SharedDirectoryPage() {
                 disabled={webGLLoading}
               >
                 {webGLFile.isEncrypted
-                  ? "🔒 복호화 후 게임 플레이"
+                  ? <><FontAwesomeIcon icon={faLock} /> 복호화 후 게임 플레이</>
                   : "🎮 게임 플레이"}
               </button>
               <button
                 className="btn btn-secondary btn-block"
                 onClick={handleWebGLDownload}
               >
-                ⬇️ 다운로드
+                <FontAwesomeIcon icon={faDownload} /> 다운로드
               </button>
               <button
                 className="btn btn-ghost btn-block"
@@ -1023,7 +1041,7 @@ export default function SharedDirectoryPage() {
       {webGLPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">🔒 게임 복호화</h2>
+            <h2 className="text-xl font-bold mb-4"><FontAwesomeIcon icon={faLock} /> 게임 복호화</h2>
 
             <p className="text-sm text-gray-600 mb-4">
               이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화
