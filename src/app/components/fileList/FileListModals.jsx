@@ -2,6 +2,7 @@
 
 import React from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 
 // LiveEditor uses @editorjs/* packages that reference browser-only 'Element' API
 // at module evaluation time, so it must be dynamically imported with ssr: false
@@ -173,6 +174,20 @@ export default function FileListModals({
               )}
             </div>
             <div className="modal-action">
+              {previewModal.file.originalName?.endsWith(".ejtxt") && previewModal.file.id && (
+                <Link
+                  href={`/editor/${previewModal.file.id}`}
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (previewModal.url.startsWith("blob:")) {
+                      URL.revokeObjectURL(previewModal.url);
+                    }
+                    setPreviewModal(null);
+                  }}
+                >
+                  에디터로 이동
+                </Link>
+              )}
               <button
                 className="btn"
                 onClick={() => {

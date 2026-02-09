@@ -17,3 +17,15 @@ body {
     text-wrap: balance;
   }
 }
+
+/* 모바일 에디터에서 시스템 기본 컨텍스트 메뉴가 에디터 포맷 툴바를 가리는 문제 방지 */
+.codex-editor,
+.codex-editor * {
+  -webkit-touch-callout: none;
+}
+
+.ce-toolbar,
+.ce-inline-toolbar {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}

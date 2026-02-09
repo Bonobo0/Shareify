@@ -1633,17 +1633,34 @@ export async function getEditorFiles() {
 
     await connectToDatabase();
 
-    const files = await File.find({
+    // 내 파일들 (parentDirectory 포함)
+    const ownFiles = await File.find({
       owner: new mongoose.Types.ObjectId(userId),
       originalName: { $regex: /\.ejtxt$/i },
       deleted: { $ne: true },
     })
+      .populate("parentDirectory", "name")
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // 공유 받은 .ejtxt 파일들
+    const sharedFiles = await File.find({
+      "shared": {
+        $elemMatch: {
+          "userId": new mongoose.Types.ObjectId(userId),
+        },
+      },
+      originalName: { $regex: /\.ejtxt$/i },
+      deleted: { $ne: true },
+    })
+      .populate("owner", "name email")
+      .populate("parentDirectory", "name")
       .sort({ updatedAt: -1 })
       .lean();
 
     return {
       success: true,
-      files: files.map((f) => ({
+      files: ownFiles.map((f) => ({
         id: f._id.toString(),
         originalName: f.originalName,
         size: f.size,
@@ -1652,11 +1669,82 @@ export async function getEditorFiles() {
         isPublic: f.isPublic || false,
         createdAt: f.createdAt?.toISOString(),
         updatedAt: f.updatedAt?.toISOString(),
+        parentDirectoryName: f.parentDirectory?.name || null,
       })),
+      sharedFiles: sharedFiles.map((f) => {
+        const userShare = f.shared.find(
+          (s) => s.userId.toString() === userId
+        );
+        return {
+          id: f._id.toString(),
+          originalName: f.originalName,
+          size: f.size,
+          hash: f.hash,
+          isEncrypted: f.isEncrypted || false,
+          isPublic: f.isPublic || false,
+          createdAt: f.createdAt?.toISOString(),
+          updatedAt: f.updatedAt?.toISOString(),
+          parentDirectoryName: f.parentDirectory?.name || null,
+          ownerName: f.owner?.name || f.owner?.email?.split("@")[0] || "알 수 없음",
+          permission: userShare?.permission || "read",
+        };
+      }),
     };
   } catch (error) {
     console.error("에디터 파일 목록 오류:", error);
     return { error: "에디터 파일 목록을 불러오는 중 오류가 발생했습니다." };
+  }
+}
+
+// 에디터 파일 단일 조회 (에디터 페이지용)
+export async function getEditorFileById({ fileId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    const file = await File.findOne({
+      _id: fileId,
+      deleted: { $ne: true },
+    }).lean();
+
+    if (!file) {
+      return { error: "파일을 찾을 수 없습니다." };
+    }
+
+    // 소유자이거나 공유 받은 사용자인지 확인
+    const isOwner = file.owner.toString() === userId;
+    const sharedEntry = file.shared?.find(
+      (s) => s.userId.toString() === userId
+    );
+    const hasAccess = isOwner || sharedEntry;
+
+    if (!hasAccess) {
+      return { error: "파일에 접근할 권한이 없습니다." };
+    }
+
+    return {
+      success: true,
+      file: {
+        id: file._id.toString(),
+        originalName: file.originalName,
+        originalMimetype: file.originalMimetype,
+        size: file.size,
+        hash: file.hash,
+        isEncrypted: file.isEncrypted || false,
+        isPublic: file.isPublic || false,
+        createdAt: file.createdAt?.toISOString(),
+        updatedAt: file.updatedAt?.toISOString(),
+        isOwner,
+        permission: isOwner ? "admin" : (sharedEntry?.permission || "read"),
+      },
+    };
+  } catch (error) {
+    console.error("에디터 파일 조회 오류:", error);
+    return { error: "파일을 불러오는 중 오류가 발생했습니다." };
   }
 }
 

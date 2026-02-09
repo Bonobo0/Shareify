@@ -23,6 +23,9 @@ const BYPASS_ROUTES = [
   "/user/forgot-password",
   "/user/reset-password",
 
+  // 토큰 갱신 API
+  "/api/auth/refresh",
+
   // 공개 접근이 필요한 페이지
   "/",
   "/about",
@@ -59,15 +62,23 @@ export async function middleware(request) {
   // 쿠키에서 access_token 가져오기
   const accessToken = request.cookies.get("access_token")?.value;
 
-  // access_token이 없거나 유효하지 않으면 로그인 페이지로 리다이렉트
-  console.log("Middleware: Verifying access token for path", pathname);
+  // access_token 검증
   const payload = await verifyAccessToken(accessToken);
 
   if (!accessToken || !payload) {
-    // 현재 URL을 콜백 URL로 저장하여 로그인 후 돌아올 수 있도록 함
-    const signinUrl = new URL("/user/signin", request.url);
-    signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
+    // access_token이 없거나 만료된 경우, refresh_token으로 갱신 시도
+    const refreshToken = request.cookies.get("refresh_token")?.value;
 
+    if (refreshToken) {
+      // refresh_token이 있으면 토큰 갱신 API로 리다이렉트
+      const refreshUrl = new URL("/api/auth/refresh", request.url);
+      refreshUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
+      return NextResponse.redirect(refreshUrl);
+    }
+
+    // refresh_token도 없으면 로그인 페이지로 리다이렉트
+    const signinUrl = new URL("/user/signin", request.url);
+    signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(signinUrl);
   }
 

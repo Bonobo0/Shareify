@@ -65,6 +65,8 @@ export default function SharePage() {
   const [showEditor, setShowEditor] = useState(false);
   const [editorFileUrl, setEditorFileUrl] = useState(null);
   const [editorLoading, setEditorLoading] = useState(false);
+  const [editorPasswordModal, setEditorPasswordModal] = useState(false);
+  const [editorPassword, setEditorPassword] = useState("");
 
   // Modal helper functions
   const showAlert = (message) => {
@@ -87,27 +89,75 @@ export default function SharePage() {
   };
 
   // .ejtxt 파일 에디터 뷰어 열기
-  const handleOpenEditor = async () => {
+  const handleOpenEditor = async (password = null) => {
     if (!file) return;
+
+    // 암호화된 파일은 비밀번호 모달 표시
+    if (file.isEncrypted && !password) {
+      setEditorPasswordModal(true);
+      return;
+    }
+
     setEditorLoading(true);
 
     try {
       const result = await downloadSharedFile({ hash, asPreview: true });
       if (!result.success) throw new Error(result.error);
 
-      const previewResult = await createPreviewUrl({
-        downloadUrl: result.downloadUrl,
-        forceBlob: true,
-      });
-      if (previewResult.error) throw new Error(previewResult.error);
+      if (file.isEncrypted && password) {
+        // 암호화된 파일 복호화
+        const response = await fetch(result.downloadUrl);
+        if (!response.ok) throw new Error("파일 다운로드 실패");
+        const encryptedBuffer = await response.arrayBuffer();
 
-      setEditorFileUrl(previewResult.url);
+        const decryptResult = await decryptFile(
+          encryptedBuffer,
+          password,
+          {
+            originalName: file.originalName || file.name,
+            originalType: file.originalMimetype || "application/json",
+          },
+        );
+
+        if (!decryptResult.success) {
+          throw new Error(decryptResult.error || "복호화에 실패했습니다. 비밀번호를 확인해주세요.");
+        }
+
+        const decryptedBlob = new Blob(
+          [await decryptResult.decryptedFile.arrayBuffer()],
+          { type: "application/json" },
+        );
+        const blobUrl = URL.createObjectURL(decryptedBlob);
+
+        setEditorFileUrl(blobUrl);
+      } else {
+        const previewResult = await createPreviewUrl({
+          downloadUrl: result.downloadUrl,
+          forceBlob: true,
+        });
+        if (previewResult.error) throw new Error(previewResult.error);
+
+        setEditorFileUrl(previewResult.url);
+      }
+
+      setEditorPasswordModal(false);
+      setEditorPassword("");
       setShowEditor(true);
     } catch (err) {
       showAlert(err.message || "문서를 열 수 없습니다.");
     } finally {
       setEditorLoading(false);
     }
+  };
+
+  const handleOpenEditorWithPassword = async () => {
+    if (!editorPassword.trim()) {
+      showAlert("복호화 비밀번호를 입력해주세요.");
+      return;
+    }
+    setEditorPasswordModal(false);
+    await handleOpenEditor(editorPassword.trim());
+    setEditorPassword("");
   };
 
   const handlePreview = async () => {
@@ -516,15 +566,19 @@ export default function SharePage() {
                       : <><FontAwesomeIcon icon={faGamepad} /> 게임 플레이</>}
                 </button>
               )}
-              {isEditorFile(file?.originalName) && !file?.isEncrypted && (
+              {isEditorFile(file?.originalName) && (
                 <button
                   className={`btn btn-secondary btn-sm sm:btn-lg flex-1 sm:flex-none ${
                     editorLoading ? "loading" : ""
                   }`}
-                  onClick={handleOpenEditor}
+                  onClick={() => handleOpenEditor()}
                   disabled={editorLoading}
                 >
-                  {editorLoading ? "로딩 중..." : <><FontAwesomeIcon icon={faFileLines} /> 문서 보기</>}
+                  {editorLoading
+                    ? "로딩 중..."
+                    : file?.isEncrypted
+                      ? <><FontAwesomeIcon icon={faLock} /> 복호화 후 문서 보기</>
+                      : <><FontAwesomeIcon icon={faFileLines} /> 문서 보기</>}
                 </button>
               )}
               {isPreviewable(file?.mimetype) && !file?.isWebGLBuild && (
@@ -840,6 +894,59 @@ export default function SharePage() {
           file={file}
           fileBlob={webGLBlob}
         />
+      )}
+
+      {/* 에디터 문서 보기용 암호화 파일 비밀번호 입력 모달 */}
+      {editorPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4"><FontAwesomeIcon icon={faLock} /> 문서 복호화</h2>
+
+            <p className="text-sm text-gray-600 mb-4">
+              이 문서는 암호화되어 있습니다. 문서를 보려면 복호화 비밀번호를
+              입력해주세요.
+            </p>
+
+            <div className="form-control mb-4">
+              <label className="label">
+                <span className="label-text">복호화 비밀번호</span>
+              </label>
+              <input
+                type="password"
+                placeholder="비밀번호를 입력하세요"
+                className="input input-bordered"
+                value={editorPassword}
+                onChange={(e) => setEditorPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleOpenEditorWithPassword();
+                  }
+                }}
+                disabled={editorLoading}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setEditorPasswordModal(false);
+                  setEditorPassword("");
+                }}
+                disabled={editorLoading}
+              >
+                취소
+              </button>
+              <button
+                className={`btn btn-primary ${editorLoading ? "loading" : ""}`}
+                onClick={handleOpenEditorWithPassword}
+                disabled={editorLoading || !editorPassword.trim()}
+              >
+                {editorLoading ? "복호화 중..." : "문서 보기"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -2,49 +2,25 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import {
   getEditorFiles,
   createEditorFile,
   completeEditorFileCreation,
-  getFileDownloadUrl,
-  toggleEditorShareLink,
 } from "@/actions/files";
-import { createPreviewUrl } from "@/lib/downloadUtils";
-import { encryptFile, decryptFile } from "@/lib/crypto/encryption";
+import { encryptFile } from "@/lib/crypto/encryption";
 import DirectoryTreePicker from "@/app/components/directoryTreePicker";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLink, faPenToSquare, faFileLines, faLock, faTriangleExclamation, faArrowLeft, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faPenToSquare, faFileLines, faLock, faTriangleExclamation, faFolder, faUser } from "@fortawesome/free-solid-svg-icons";
 
-const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex flex-col items-center justify-center py-12 gap-3">
-      <span className="loading loading-spinner loading-lg"></span>
-      <p className="text-sm opacity-60">에디터 로딩 중...</p>
-    </div>
-  ),
-});
-
-export default function EditorPage() {
+export default function EditorListPage() {
   const router = useRouter();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
 
   const [files, setFiles] = useState([]);
+  const [sharedFiles, setSharedFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // 현재 편집 중인 파일
-  const [currentFile, setCurrentFile] = useState(null);
-  const [currentFileUrl, setCurrentFileUrl] = useState(null);
-  const [currentEncryptionPassword, setCurrentEncryptionPassword] =
-    useState(null);
-
-  // 복호화 비밀번호 모달
-  const [decryptModal, setDecryptModal] = useState({ show: false, file: null });
-  const [decryptPassword, setDecryptPassword] = useState("");
-  const [decrypting, setDecrypting] = useState(false);
 
   // 새 파일 생성 모달
   const [showNewFileModal, setShowNewFileModal] = useState(false);
@@ -57,12 +33,6 @@ export default function EditorPage() {
   // Alert 모달
   const [alertModal, setAlertModal] = useState({ show: false, message: "" });
 
-  // 공유 링크 상태
-  const [shareModal, setShareModal] = useState({ show: false, file: null });
-  const [shareUrl, setShareUrl] = useState("");
-  const [sharingLoading, setSharingLoading] = useState(false);
-  const [copiedShare, setCopiedShare] = useState(false);
-
   const fetchFiles = useCallback(async () => {
     try {
       const result = await getEditorFiles();
@@ -71,6 +41,7 @@ export default function EditorPage() {
         return;
       }
       setFiles(result.files || []);
+      setSharedFiles(result.sharedFiles || []);
     } catch (err) {
       setError("파일 목록을 불러올 수 없습니다.");
     } finally {
@@ -87,168 +58,8 @@ export default function EditorPage() {
     fetchFiles();
   }, [authLoading, isAuthenticated, router, fetchFiles]);
 
-  const handleOpenFile = async (file) => {
-    // 암호화된 파일이면 비밀번호 입력 모달 표시
-    if (file.isEncrypted) {
-      setDecryptModal({ show: true, file });
-      setDecryptPassword("");
-      return;
-    }
-
-    try {
-      setError("");
-      const result = await getFileDownloadUrl({
-        fileId: file.id,
-        asPreview: true,
-      });
-      if (result.error) {
-        setAlertModal({ show: true, message: result.error });
-        return;
-      }
-
-      const previewResult = await createPreviewUrl({
-        downloadUrl: result.downloadUrl,
-        forceBlob: true,
-      });
-
-      if (previewResult.error) {
-        setAlertModal({ show: true, message: previewResult.error });
-        return;
-      }
-
-      setCurrentFile(file);
-      setCurrentFileUrl(previewResult.url);
-      setCurrentEncryptionPassword(null);
-    } catch (err) {
-      setAlertModal({ show: true, message: "파일을 열 수 없습니다." });
-    }
-  };
-
-  // 암호화된 파일 복호화 후 열기
-  const handleDecryptAndOpen = async () => {
-    if (!decryptPassword.trim()) {
-      setAlertModal({ show: true, message: "복호화 비밀번호를 입력해주세요." });
-      return;
-    }
-
-    const file = decryptModal.file;
-    setDecrypting(true);
-
-    try {
-      const result = await getFileDownloadUrl({
-        fileId: file.id,
-        asPreview: true,
-      });
-      if (result.error) {
-        setAlertModal({ show: true, message: result.error });
-        return;
-      }
-
-      // 암호화된 파일 다운로드
-      const response = await fetch(result.downloadUrl);
-      if (!response.ok) throw new Error("파일 다운로드 실패");
-      const encryptedBuffer = await response.arrayBuffer();
-
-      // 복호화
-      const decryptResult = await decryptFile(
-        encryptedBuffer,
-        decryptPassword.trim(),
-        {
-          originalName: file.originalName,
-          originalType: file.originalMimetype || "application/json",
-        },
-      );
-
-      if (!decryptResult.success) {
-        setAlertModal({
-          show: true,
-          message:
-            decryptResult.error ||
-            "복호화에 실패했습니다. 비밀번호를 확인해주세요.",
-        });
-        return;
-      }
-
-      // 복호화된 내용으로 blob URL 생성
-      const decryptedBlob = new Blob(
-        [await decryptResult.decryptedFile.arrayBuffer()],
-        {
-          type: "application/json",
-        },
-      );
-      const blobUrl = URL.createObjectURL(decryptedBlob);
-
-      setCurrentFile(file);
-      setCurrentFileUrl(blobUrl);
-      setCurrentEncryptionPassword(decryptPassword.trim());
-      setDecryptModal({ show: false, file: null });
-      setDecryptPassword("");
-    } catch (err) {
-      console.error("복호화 오류:", err);
-      setAlertModal({
-        show: true,
-        message: "복호화 중 오류가 발생했습니다. 비밀번호를 확인해주세요.",
-      });
-    } finally {
-      setDecrypting(false);
-    }
-  };
-
-  const handleCloseEditor = () => {
-    if (currentFileUrl?.startsWith("blob:")) {
-      URL.revokeObjectURL(currentFileUrl);
-    }
-    setCurrentFile(null);
-    setCurrentFileUrl(null);
-    setCurrentEncryptionPassword(null);
-    fetchFiles();
-  };
-
-  // 공유 링크 토글
-  const handleToggleShare = async (file) => {
-    setSharingLoading(true);
-    try {
-      const result = await toggleEditorShareLink({ fileId: file.id });
-      if (result.error) {
-        setAlertModal({ show: true, message: result.error });
-        return;
-      }
-
-      if (result.isPublic && result.shareUrl) {
-        setShareUrl(result.shareUrl);
-        setShareModal({ show: true, file });
-      } else {
-        // 공유 해제됨 - 파일 목록 새로고침
-        setShareModal({ show: false, file: null });
-        setShareUrl("");
-        await fetchFiles();
-        setAlertModal({ show: true, message: "공유 링크가 해제되었습니다." });
-      }
-
-      // 파일 목록에서 isPublic 상태 업데이트
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === file.id ? { ...f, isPublic: result.isPublic } : f,
-        ),
-      );
-    } catch (err) {
-      setAlertModal({
-        show: true,
-        message: "공유 설정 중 오류가 발생했습니다.",
-      });
-    } finally {
-      setSharingLoading(false);
-    }
-  };
-
-  const handleCopyShareUrl = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopiedShare(true);
-    setTimeout(() => setCopiedShare(false), 2000);
-  };
-
-  const handleOpenNewFileModal = async () => {
-    setShowNewFileModal(true);
+  const handleOpenFile = (file) => {
+    router.push(`/editor/${file.id}`);
   };
 
   const handleCloseNewFileModal = () => {
@@ -326,15 +137,10 @@ export default function EditorPage() {
         return;
       }
 
-      setShowNewFileModal(false);
-      setNewFileName("");
-      setNewFileEncrypted(false);
-      setNewFilePassword("");
-      setNewFileDirectoryId(null);
+      handleCloseNewFileModal();
 
-      // 생성된 파일 바로 열기
-      await fetchFiles();
-      await handleOpenFile(result.file);
+      // 생성된 파일 에디터 페이지로 이동
+      router.push(`/editor/${result.file.id}`);
     } catch (err) {
       setAlertModal({
         show: true,
@@ -366,99 +172,6 @@ export default function EditorPage() {
     );
   }
 
-  // 에디터 모드
-  if (currentFile && currentFileUrl) {
-    return (
-      <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={handleCloseEditor}
-            >
-              <FontAwesomeIcon icon={faArrowLeft} /> 돌아가기
-            </button>
-            <h1 className="text-lg font-bold truncate">
-              {currentFile.originalName}
-            </h1>
-          </div>
-          <button
-            className={`btn btn-sm ${currentFile.isPublic ? "btn-warning" : "btn-outline"}`}
-            onClick={() => handleToggleShare(currentFile)}
-            disabled={sharingLoading}
-            title={currentFile.isPublic ? "공유 링크 관리" : "공유 링크 생성"}
-          >
-            {sharingLoading ? (
-              <span className="loading loading-spinner loading-xs"></span>
-            ) : (
-              <><FontAwesomeIcon icon={faLink} /> {currentFile.isPublic ? "공유 중" : "공유"}</>
-            )}
-          </button>
-        </div>
-        <div className="card bg-base-200 p-4">
-          <LiveEditor
-            file={currentFile}
-            fileUrl={currentFileUrl}
-            encryptionPassword={currentEncryptionPassword}
-            onClose={handleCloseEditor}
-          />
-        </div>
-
-        {/* 공유 모달 (에디터 모드에서도 표시) */}
-        {shareModal.show && (
-          <div className="modal modal-open">
-            <div className="modal-box">
-              <h3 className="font-bold text-lg"><FontAwesomeIcon icon={faLink} /> 공유 링크</h3>
-              <p className="text-sm opacity-60 mt-1 truncate">
-                {shareModal.file?.originalName}
-              </p>
-              <div className="form-control mt-4">
-                <div className="join w-full">
-                  <input
-                    type="text"
-                    className="input input-bordered join-item flex-1"
-                    value={shareUrl}
-                    readOnly
-                  />
-                  <button
-                    className={`btn join-item ${copiedShare ? "btn-success" : "btn-primary"}`}
-                    onClick={handleCopyShareUrl}
-                  >
-                    {copiedShare ? <><FontAwesomeIcon icon={faCheck} /> 복사됨</> : "복사"}
-                  </button>
-                </div>
-                <label className="label">
-                  <span className="label-text-alt opacity-60">
-                    이 링크를 통해 누구나 문서를 읽기 전용으로 볼 수 있습니다.
-                  </span>
-                </label>
-              </div>
-              <div className="modal-action">
-                <button
-                  className="btn btn-error btn-sm"
-                  onClick={() => handleToggleShare(shareModal.file)}
-                  disabled={sharingLoading}
-                >
-                  공유 해제
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setShareModal({ show: false, file: null });
-                    setShareUrl("");
-                  }}
-                >
-                  닫기
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    );
-  }
-
-  // 파일 목록 모드
   return (
     <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-6">
@@ -470,7 +183,7 @@ export default function EditorPage() {
         </div>
         <button
           className="btn btn-primary btn-sm sm:btn-md"
-          onClick={() => handleOpenNewFileModal()}
+          onClick={() => setShowNewFileModal(true)}
         >
           <FontAwesomeIcon icon={faPenToSquare} /> 새 문서
         </button>
@@ -482,7 +195,8 @@ export default function EditorPage() {
         </div>
       )}
 
-      {files.length === 0 ? (
+      {/* 내 문서 목록 */}
+      {files.length === 0 && sharedFiles.length === 0 ? (
         <div className="card bg-base-200 p-8 text-center">
           <p className="text-lg opacity-60 mb-4">아직 문서가 없습니다</p>
           <p className="text-sm opacity-40 mb-6">
@@ -490,106 +204,96 @@ export default function EditorPage() {
           </p>
           <button
             className="btn btn-primary btn-sm mx-auto"
-            onClick={() => handleOpenNewFileModal()}
+            onClick={() => setShowNewFileModal(true)}
           >
             <FontAwesomeIcon icon={faPenToSquare} /> 첫 문서 만들기
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {files.map((file) => (
-            <div
-              key={file.id}
-              className="card bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
-              onClick={() => handleOpenFile(file)}
-            >
-              <div className="card-body p-4">
-                <h2 className="card-title text-sm sm:text-base truncate">
-                  <FontAwesomeIcon icon={faFileLines} /> {file.originalName}
-                </h2>
-                <div className="flex items-center justify-between text-xs opacity-60">
-                  <span>{formatBytes(file.size)}</span>
-                  <span>{formatDate(file.updatedAt || file.createdAt)}</span>
-                </div>
-                <div className="flex items-center gap-1 mt-1">
-                  {file.isEncrypted && (
-                    <div className="badge badge-primary badge-xs">
-                      <FontAwesomeIcon icon={faLock} /> 암호화
-                    </div>
-                  )}
-                  {file.isPublic && (
-                    <div className="badge badge-warning badge-xs">
-                      <FontAwesomeIcon icon={faLink} /> 공유 중
-                    </div>
-                  )}
-                  <div className="flex-1"></div>
-                  <button
-                    className="btn btn-ghost btn-xs"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleShare(file);
-                    }}
-                    disabled={sharingLoading}
-                    title={file.isPublic ? "공유 설정 관리" : "공유 링크 생성"}
+        <>
+          {files.length > 0 && (
+            <>
+              <h2 className="text-lg font-semibold mb-3">내 문서</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                {files.map((file) => (
+                  <div
+                    key={file.id}
+                    className="card bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
+                    onClick={() => handleOpenFile(file)}
                   >
-                    <FontAwesomeIcon icon={faLink} />
-                  </button>
-                </div>
+                    <div className="card-body p-4">
+                      <h2 className="card-title text-sm sm:text-base truncate">
+                        <FontAwesomeIcon icon={faFileLines} /> {file.originalName}
+                      </h2>
+                      <div className="flex items-center justify-between text-xs opacity-60">
+                        <span>{formatBytes(file.size)}</span>
+                        <span>{formatDate(file.updatedAt || file.createdAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {file.parentDirectoryName && (
+                          <div className="badge badge-ghost badge-xs gap-1">
+                            <FontAwesomeIcon icon={faFolder} /> {file.parentDirectoryName}
+                          </div>
+                        )}
+                        {file.isEncrypted && (
+                          <div className="badge badge-primary badge-xs">
+                            <FontAwesomeIcon icon={faLock} /> 암호화
+                          </div>
+                        )}
+                        {file.isPublic && (
+                          <div className="badge badge-warning badge-xs">
+                            <FontAwesomeIcon icon={faLink} /> 공유 중
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            </>
+          )}
 
-      {/* 공유 링크 모달 */}
-      {shareModal.show && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg"><FontAwesomeIcon icon={faLink} /> 공유 링크</h3>
-            <p className="text-sm opacity-60 mt-1 truncate">
-              {shareModal.file?.originalName}
-            </p>
-            <div className="form-control mt-4">
-              <div className="join w-full">
-                <input
-                  type="text"
-                  className="input input-bordered join-item flex-1"
-                  value={shareUrl}
-                  readOnly
-                />
-                <button
-                  className={`btn join-item ${copiedShare ? "btn-success" : "btn-primary"}`}
-                  onClick={handleCopyShareUrl}
-                >
-                  {copiedShare ? <><FontAwesomeIcon icon={faCheck} /> 복사됨</> : "복사"}
-                </button>
+          {/* 공유 받은 문서 목록 */}
+          {sharedFiles.length > 0 && (
+            <>
+              <h2 className="text-lg font-semibold mb-3">공유 받은 문서</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {sharedFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="card bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
+                    onClick={() => handleOpenFile(file)}
+                  >
+                    <div className="card-body p-4">
+                      <h2 className="card-title text-sm sm:text-base truncate">
+                        <FontAwesomeIcon icon={faFileLines} /> {file.originalName}
+                      </h2>
+                      <div className="flex items-center justify-between text-xs opacity-60">
+                        <span>{formatBytes(file.size)}</span>
+                        <span>{formatDate(file.updatedAt || file.createdAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <div className="badge badge-accent badge-xs gap-1">
+                          <FontAwesomeIcon icon={faUser} /> {file.ownerName}
+                        </div>
+                        {file.parentDirectoryName && (
+                          <div className="badge badge-ghost badge-xs gap-1">
+                            <FontAwesomeIcon icon={faFolder} /> {file.parentDirectoryName}
+                          </div>
+                        )}
+                        {file.isEncrypted && (
+                          <div className="badge badge-primary badge-xs">
+                            <FontAwesomeIcon icon={faLock} /> 암호화
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <label className="label">
-                <span className="label-text-alt opacity-60">
-                  이 링크를 통해 누구나 문서를 읽기 전용으로 볼 수 있습니다.
-                </span>
-              </label>
-            </div>
-            <div className="modal-action">
-              <button
-                className="btn btn-error btn-sm"
-                onClick={() => handleToggleShare(shareModal.file)}
-                disabled={sharingLoading}
-              >
-                공유 해제
-              </button>
-              <button
-                className="btn"
-                onClick={() => {
-                  setShareModal({ show: false, file: null });
-                  setShareUrl("");
-                }}
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          )}
+        </>
       )}
 
       {/* 새 파일 생성 모달 */}
@@ -701,54 +405,6 @@ export default function EditorPage() {
                 onClick={() => setAlertModal({ show: false, message: "" })}
               >
                 확인
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 복호화 비밀번호 모달 */}
-      {decryptModal.show && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg"><FontAwesomeIcon icon={faLock} /> 암호화된 문서</h3>
-            <p className="text-sm opacity-60 mt-1 truncate">
-              {decryptModal.file?.originalName}
-            </p>
-            <p className="text-sm mt-3">
-              이 문서는 암호화되어 있습니다. 복호화 비밀번호를 입력해주세요.
-            </p>
-            <div className="form-control mt-4">
-              <input
-                type="password"
-                className="input input-bordered"
-                placeholder="비밀번호를 입력하세요"
-                value={decryptPassword}
-                onChange={(e) => setDecryptPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleDecryptAndOpen();
-                }}
-                autoFocus
-                disabled={decrypting}
-              />
-            </div>
-            <div className="modal-action">
-              <button
-                className="btn"
-                onClick={() => {
-                  setDecryptModal({ show: false, file: null });
-                  setDecryptPassword("");
-                }}
-                disabled={decrypting}
-              >
-                취소
-              </button>
-              <button
-                className={`btn btn-primary ${decrypting ? "loading" : ""}`}
-                onClick={handleDecryptAndOpen}
-                disabled={decrypting || !decryptPassword.trim()}
-              >
-                열기
               </button>
             </div>
           </div>
