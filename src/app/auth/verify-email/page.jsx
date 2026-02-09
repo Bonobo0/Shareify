@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { verifyEmail } from "@/actions/verification";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCircleCheck, faCircleXmark } from "@fortawesome/free-solid-svg-icons";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -62,7 +64,7 @@ function VerifyEmailContent() {
         <div className="card-body text-center">
           {result?.success && !result?.error ? (
             <>
-              <div className="text-6xl mb-4">✅</div>
+              <div className="text-6xl mb-4"><FontAwesomeIcon icon={faCircleCheck} /></div>
               <h2 className="card-title justify-center text-2xl mb-4">
                 이메일 인증 완료!
               </h2>
@@ -75,7 +77,7 @@ function VerifyEmailContent() {
             </>
           ) : (
             <>
-              <div className="text-6xl mb-4">❌</div>
+              <div className="text-6xl mb-4"><FontAwesomeIcon icon={faCircleXmark} /></div>
               <h2 className="card-title justify-center text-2xl mb-4">
                 인증 실패
               </h2>

@@ -29,6 +29,8 @@ import SearchFilters from "./fileList/SearchFilters";
 import FileTable from "./fileList/FileTable";
 import FileListModals from "./fileList/FileListModals";
 import MoveModal from "./moveModal";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faHouse, faUser, faBox } from "@fortawesome/free-solid-svg-icons";
 
 export default function FileList({
   directoryId = null,
@@ -828,7 +830,7 @@ export default function FileList({
                 href="/dashboard"
                 className="text-blue-700 hover:text-blue-800"
               >
-                🏠 내 파일
+                <FontAwesomeIcon icon={faHouse} /> 내 파일
               </Link>
             </li>
             {breadcrumbs.map((crumb, index) => (
@@ -839,7 +841,7 @@ export default function FileList({
                       <span className="  font-medium">{crumb.name}</span>
                       {!crumb.isOwner && (
                         <span className="badge badge-accent badge-xs">
-                          👤 공유받음
+                          <FontAwesomeIcon icon={faUser} /> 공유받음
                         </span>
                       )}
                     </>
@@ -853,7 +855,7 @@ export default function FileList({
                       </Link>
                       {!crumb.isOwner && (
                         <span className="badge badge-accent badge-xs ml-1">
-                          👤
+                          <FontAwesomeIcon icon={faUser} />
                         </span>
                       )}
                     </>
@@ -915,7 +917,7 @@ export default function FileList({
                 onClick={handleBulkDownload}
                 className="btn btn-outline btn-sm gap-2"
               >
-                📦 전체 다운로드
+                <FontAwesomeIcon icon={faBox} /> 전체 다운로드
               </button>
             </div>
           )}

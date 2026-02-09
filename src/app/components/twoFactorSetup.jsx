@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { setup2FA, enable2FA, disable2FA } from "@/actions/verification";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 
 export default function TwoFactorSetup() {
   const { user } = useAuth();
@@ -256,7 +258,7 @@ export default function TwoFactorSetup() {
       {user?.twoFactorEnabled && step === "initial" && (
         <div className="space-y-4">
           <div className="alert alert-success">
-            <span>✅ 2단계 인증이 활성화되어 있습니다.</span>
+            <span><FontAwesomeIcon icon={faCircleCheck} /> 2단계 인증이 활성화되어 있습니다.</span>
           </div>
 
           <p className="text-gray-600">

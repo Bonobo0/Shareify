@@ -10,6 +10,8 @@ import StorageInfo from "../components/storageInfo";
 import SharedItemsPreview from "../components/sharedItemsPreview";
 import { useAuth } from "@/context/AuthContext";
 import { getStorageInfo } from "@/actions/user";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFolderOpen } from "@fortawesome/free-solid-svg-icons";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -146,7 +148,7 @@ export default function Dashboard() {
                   onClick={() => router.push("/my-uploads")}
                   className="btn btn-outline gap-2 btn-sm sm:btn-md"
                 >
-                  📂 <span className="hidden sm:inline">모든 파일 보기</span>
+                  <FontAwesomeIcon icon={faFolderOpen} /> <span className="hidden sm:inline">모든 파일 보기</span>
                   <span className="sm:hidden">모든 파일</span>
                 </button>
                 <CreateDirectory onSuccess={handleDirectoryCreated} />
