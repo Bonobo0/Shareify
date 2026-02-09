@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMagnifyingGlass, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 export default function SearchFilters({
   searchQuery,
@@ -31,11 +33,11 @@ export default function SearchFilters({
           className="btn btn-outline"
           onClick={onToggleAdvancedSearch}
         >
-          🔍 고급 검색
+          <FontAwesomeIcon icon={faMagnifyingGlass} /> 고급 검색
         </button>
         {(searchQuery || Object.values(searchFilters).some((v) => v)) && (
           <button className="btn btn-ghost" onClick={onResetSearch}>
-            ✕ 초기화
+            <FontAwesomeIcon icon={faXmark} /> 초기화
           </button>
         )}
       </div>

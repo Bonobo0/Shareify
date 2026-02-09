@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock, faEye, faEyeSlash, faTriangleExclamation, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 export default function DecryptionPasswordModal({
   isOpen,
@@ -39,14 +41,14 @@ export default function DecryptionPasswordModal({
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold">{title}</h3>
           <button onClick={handleClose} className="btn btn-ghost btn-sm">
-            ✕
+            <FontAwesomeIcon icon={faXmark} />
           </button>
         </div>
 
         <div className="mb-4">
           <div className="alert alert-info">
             <div className="flex items-center gap-2">
-              <span>🔐</span>
+              <span><FontAwesomeIcon icon={faLock} /></span>
               <div>
                 <div className="font-semibold">
                   암호화된 파일이 포함되어 있습니다
@@ -88,14 +90,14 @@ export default function DecryptionPasswordModal({
                 className="btn btn-square btn-outline"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? "🙈" : "👁️"}
+                {showPassword ? <FontAwesomeIcon icon={faEyeSlash} /> : <FontAwesomeIcon icon={faEye} />}
               </button>
             </div>
           </div>
 
           <div className="alert alert-warning mb-4">
             <div className="text-sm">
-              <div className="font-semibold">⚠️ 주의사항</div>
+              <div className="font-semibold"><FontAwesomeIcon icon={faTriangleExclamation} /> 주의사항</div>
               <ul className="list-disc list-inside mt-1 space-y-1">
                 <li>모든 암호화된 파일에 동일한 비밀번호가 사용됩니다</li>
                 <li>

@@ -22,6 +22,8 @@ import InlineCode from "@editorjs/inline-code";
 import Marker from "@editorjs/marker";
 import Table from "@editorjs/table";
 import ImageTool from "@editorjs/image";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock, faEye, faFloppyDisk, faDownload, faFileLines, faFile, faWrench, faGlobe, faCheck, faXmark, faCircle } from "@fortawesome/free-solid-svg-icons";
 
 const ReactEditorJS = createReactEditorJS();
 
@@ -313,7 +315,7 @@ function blocksToText(blocks) {
         case "checklist":
           return block.data.items
             .map(
-              (item) => `${item.checked ? "☑" : "☐"} ${stripHtml(item.text)}`,
+              (item) => `${item.checked ? "[x]" : "[ ]"} ${stripHtml(item.text)}`,
             )
             .join("\n");
         case "quote":
@@ -656,14 +658,14 @@ export default function LiveEditor({
         );
       case "saved":
         return (
-          <span className="badge badge-success gap-1 text-xs">✓ 저장됨</span>
+          <span className="badge badge-success gap-1 text-xs"><FontAwesomeIcon icon={faCheck} /> 저장됨</span>
         );
       case "unsaved":
-        return <span className="badge badge-info gap-1 text-xs">● 수정됨</span>;
+        return <span className="badge badge-info gap-1 text-xs"><FontAwesomeIcon icon={faCircle} size="2xs" /> 수정됨</span>;
       case "error":
         return (
           <span className="badge badge-error gap-1 text-xs" title={saveMessage}>
-            ✕ 오류
+            <FontAwesomeIcon icon={faXmark} /> 오류
           </span>
         );
       default:
@@ -696,10 +698,10 @@ export default function LiveEditor({
       <div className="flex items-center justify-between gap-2 px-2 py-2 border-b border-base-300 bg-base-200 rounded-t-lg">
         <div className="flex items-center gap-2">
           {file?.isEncrypted && (
-            <span className="badge badge-warning badge-xs">🔒 암호화</span>
+            <span className="badge badge-warning badge-xs"><FontAwesomeIcon icon={faLock} /> 암호화</span>
           )}
           {readOnly && (
-            <span className="badge badge-ghost badge-xs">👁 읽기 전용</span>
+            <span className="badge badge-ghost badge-xs"><FontAwesomeIcon icon={faEye} /> 읽기 전용</span>
           )}
           {!readOnly && statusBadge()}
         </div>
@@ -713,7 +715,7 @@ export default function LiveEditor({
               disabled={saveStatus === "saving" || saveStatus === "loaded"}
               title="저장 (Ctrl+S)"
             >
-              💾 저장
+              <FontAwesomeIcon icon={faFloppyDisk} /> 저장
             </button>
 
             {/* 내보내기 */}
@@ -723,7 +725,7 @@ export default function LiveEditor({
                 className="btn btn-sm btn-ghost"
                 onClick={() => setExportDropdown(!exportDropdown)}
               >
-                📥 내보내기
+                <FontAwesomeIcon icon={faDownload} /> 내보내기
               </label>
               {exportDropdown && (
                 <ul
@@ -732,22 +734,22 @@ export default function LiveEditor({
                 >
                   <li>
                     <button onClick={() => handleExport("html")}>
-                      🌐 HTML
+                      <FontAwesomeIcon icon={faGlobe} /> HTML
                     </button>
                   </li>
                   <li>
                     <button onClick={() => handleExport("markdown")}>
-                      📝 Markdown
+                      <FontAwesomeIcon icon={faFileLines} /> Markdown
                     </button>
                   </li>
                   <li>
                     <button onClick={() => handleExport("text")}>
-                      📄 텍스트
+                      <FontAwesomeIcon icon={faFile} /> 텍스트
                     </button>
                   </li>
                   <li>
                     <button onClick={() => handleExport("json")}>
-                      🔧 JSON
+                      <FontAwesomeIcon icon={faWrench} /> JSON
                     </button>
                   </li>
                 </ul>

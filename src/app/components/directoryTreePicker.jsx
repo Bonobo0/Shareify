@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { getAllDirectoriesFlat } from "@/actions/directories";
 import { createDirectory } from "@/actions/directories";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFolder, faFolderOpen, faPlus, faCaretDown, faCaretRight } from "@fortawesome/free-solid-svg-icons";
 
 /**
  * 디렉토리를 트리 구조로 빌드
@@ -62,9 +64,9 @@ function TreeNode({
               if (hasChildren) onToggle(node.id);
             }}
           >
-            {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
+            {hasChildren ? (isExpanded ? <FontAwesomeIcon icon={faCaretDown} /> : <FontAwesomeIcon icon={faCaretRight} />) : ""}
           </span>
-          <span className="flex-shrink-0">{hasChildren ? "📂" : "📁"}</span>
+          <span className="flex-shrink-0">{hasChildren ? <FontAwesomeIcon icon={faFolderOpen} /> : <FontAwesomeIcon icon={faFolder} />}</span>
           <span className="truncate">{node.name}</span>
         </button>
       </li>
@@ -187,9 +189,9 @@ export default function DirectoryTreePicker({
 
   // 현재 선택된 디렉토리 경로
   const selectedDirName = useMemo(() => {
-    if (!value) return "📁 최상위 (루트)";
+    if (!value) return <><FontAwesomeIcon icon={faFolder} /> 최상위 (루트)</>;
     const dir = flatDirs.find((d) => d.id === value);
-    return dir ? `📂 ${dir.fullPath}` : "📁 최상위 (루트)";
+    return dir ? <><FontAwesomeIcon icon={faFolderOpen} /> {dir.fullPath}</> : <><FontAwesomeIcon icon={faFolder} /> 최상위 (루트)</>;
   }, [value, flatDirs]);
 
   if (disabled || loading) {
@@ -228,7 +230,7 @@ export default function DirectoryTreePicker({
           }}
           title="새 디렉토리 만들기"
         >
-          ➕
+          <FontAwesomeIcon icon={faPlus} />
         </button>
       </div>
 
@@ -283,9 +285,9 @@ export default function DirectoryTreePicker({
               onClick={() => onChange(null)}
             >
               <span className="inline-flex items-center justify-center w-4 h-4 text-xs flex-shrink-0 opacity-0">
-                ▸
+                <FontAwesomeIcon icon={faCaretRight} />
               </span>
-              <span className="flex-shrink-0">📁</span>
+              <span className="flex-shrink-0"><FontAwesomeIcon icon={faFolder} /></span>
               <span>최상위 (루트)</span>
             </button>
           </li>
@@ -301,9 +303,9 @@ export default function DirectoryTreePicker({
                     onClick={() => onChange(dir.id)}
                   >
                     <span className="inline-flex items-center justify-center w-4 h-4 text-xs flex-shrink-0 opacity-0">
-                      ▸
+                      <FontAwesomeIcon icon={faCaretRight} />
                     </span>
-                    <span className="flex-shrink-0">📂</span>
+                    <span className="flex-shrink-0"><FontAwesomeIcon icon={faFolderOpen} /></span>
                     <span className="truncate">{dir.fullPath}</span>
                   </button>
                 </li>

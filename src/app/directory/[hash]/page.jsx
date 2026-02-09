@@ -12,6 +12,8 @@ import EditDirectoryModal from "@/app/components/editDirectoryModal";
 import BulkDownloadModal from "@/app/components/bulkDownloadModal";
 import { useAuth } from "@/context/AuthContext";
 import { getDirectoryByHash } from "@/actions/directories";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUser, faPenToSquare, faBox, faUpload, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 
 export default function DirectoryPage() {
   const params = useParams();
@@ -201,7 +203,7 @@ export default function DirectoryPage() {
           </h1>
           {directory && !directory.owner && directory.ownerInfo && (
             <div className="badge badge-accent gap-2 w-fit">
-              <span>👤</span>
+              <span><FontAwesomeIcon icon={faUser} /></span>
               <span className="text-xs sm:text-sm">
                 {directory.ownerInfo.name || directory.ownerInfo.email}님이 공유
               </span>
@@ -215,8 +217,8 @@ export default function DirectoryPage() {
               onClick={() => router.back()}
               className="btn btn-ghost btn-sm sm:btn-md"
             >
-              <span className="hidden sm:inline">← 뒤로가기</span>
-              <span className="sm:hidden">←</span>
+              <span className="hidden sm:inline"><FontAwesomeIcon icon={faArrowLeft} /> 뒤로가기</span>
+              <span className="sm:hidden"><FontAwesomeIcon icon={faArrowLeft} /></span>
             </button>
           </div>
         )}
@@ -252,8 +254,8 @@ export default function DirectoryPage() {
               onClick={handleEditDirectory}
               className="btn btn-primary gap-2 text-sm sm:text-base px-3 sm:px-4"
             >
-              <span className="hidden sm:inline">✏️</span>
-              <span className="sm:hidden">✏️</span>
+              <span className="hidden sm:inline"><FontAwesomeIcon icon={faPenToSquare} /></span>
+              <span className="sm:hidden"><FontAwesomeIcon icon={faPenToSquare} /></span>
               <span className="hidden sm:inline">수정하기</span>
               <span className="sm:hidden">수정</span>
             </button>
@@ -262,8 +264,8 @@ export default function DirectoryPage() {
             onClick={handleBulkDownload}
             className="btn btn-outline gap-2 text-sm sm:text-base px-3 sm:px-4"
           >
-            <span className="hidden sm:inline">📦</span>
-            <span className="sm:hidden">📦</span>
+            <span className="hidden sm:inline"><FontAwesomeIcon icon={faBox} /></span>
+            <span className="sm:hidden"><FontAwesomeIcon icon={faBox} /></span>
             <span className="hidden sm:inline">전체 다운로드</span>
             <span className="sm:hidden">다운로드</span>
           </button>
@@ -271,8 +273,8 @@ export default function DirectoryPage() {
             onClick={handleShareDirectory}
             className="btn btn-outline gap-2 text-sm sm:text-base px-3 sm:px-4"
           >
-            <span className="hidden sm:inline">📤</span>
-            <span className="sm:hidden">📤</span>
+            <span className="hidden sm:inline"><FontAwesomeIcon icon={faUpload} /></span>
+            <span className="sm:hidden"><FontAwesomeIcon icon={faUpload} /></span>
             <span className="hidden sm:inline">디렉토리 공유</span>
             <span className="sm:hidden">공유</span>
           </button>

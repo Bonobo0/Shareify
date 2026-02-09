@@ -8,6 +8,8 @@ import {
   calculateTotalSize,
 } from "@/lib/downloadUtils";
 import DecryptionPasswordModal from "./decryptionPasswordModal";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFolder, faLock, faCircleCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
 import MultipleDecryptionModal from "./multipleDecryptionModal";
 
 export default function BulkDownloadModal({
@@ -165,7 +167,7 @@ export default function BulkDownloadModal({
               className="btn btn-ghost btn-sm"
               disabled={step === "downloading"}
             >
-              ✕
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
 
@@ -179,7 +181,7 @@ export default function BulkDownloadModal({
           {step === "scan" && (
             <div className="text-center py-8">
               <div className="mb-4">
-                <span className="text-xl">📁</span>
+                <span className="text-xl"><FontAwesomeIcon icon={faFolder} /></span>
                 <h4 className="text-lg font-semibold mt-2">{directoryName}</h4>
                 <p className="text-gray-500 mt-2">
                   이 디렉토리의 모든 파일을 ZIP으로 다운로드합니다.
@@ -230,7 +232,7 @@ export default function BulkDownloadModal({
               {encryptedFiles.length > 0 && (
                 <div className="alert alert-warning mb-4">
                   <div className="flex items-center gap-2">
-                    <span>🔐</span>
+                    <span><FontAwesomeIcon icon={faLock} /></span>
                     <div className="flex-1">
                       <div className="font-semibold">암호화된 파일 포함</div>
                       <div className="text-sm mb-3">
@@ -282,7 +284,7 @@ export default function BulkDownloadModal({
                     >
                       <div className="flex items-center gap-2 flex-1">
                         {file.isEncrypted && (
-                          <span className="text-warning">🔐</span>
+                          <span className="text-warning"><FontAwesomeIcon icon={faLock} /></span>
                         )}
                         <span className="truncate">{file.path}</span>
                       </div>
@@ -365,7 +367,7 @@ export default function BulkDownloadModal({
           {step === "complete" && (
             <div className="text-center py-8">
               <div className="mb-4">
-                <span className="text-4xl">✅</span>
+                <span className="text-4xl"><FontAwesomeIcon icon={faCircleCheck} /></span>
               </div>
               <h4 className="text-lg font-semibold mb-2">다운로드 완료!</h4>
               <p className="text-gray-500">

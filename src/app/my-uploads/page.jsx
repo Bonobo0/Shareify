@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import FileList from "../components/fileList";
 import { useAuth } from "@/context/AuthContext";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 
 export default function MyUploadsPage() {
   const router = useRouter();
@@ -42,7 +44,7 @@ export default function MyUploadsPage() {
           </div>
 
           <button onClick={() => router.back()} className="btn btn-outline btn-sm sm:btn-md self-start">
-            ← 뒤로가기
+            <FontAwesomeIcon icon={faArrowLeft} /> 뒤로가기
           </button>
         </div>
 

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { shareFile, removeFileShare, getFileDetails } from "@/actions/files";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import {
   shareDirectory,
   removeDirectoryShare,
@@ -256,7 +258,7 @@ export default function ShareModal({
               {isFile ? "파일" : "디렉토리"} 공유
             </h3>
             <button className="btn btn-sm btn-circle" onClick={onClose}>
-              ✕
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
 

@@ -15,6 +15,8 @@ import {
   cleanupStorage,
 } from "@/actions/user";
 import { sendEmailVerification } from "@/actions/verification";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUser, faFloppyDisk, faLock } from "@fortawesome/free-solid-svg-icons";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -219,9 +221,9 @@ export default function ProfilePage() {
   }
 
   const tabs = [
-    { id: "profile", label: "프로필", icon: "👤" },
-    { id: "storage", label: "저장소", icon: "💾" },
-    { id: "security", label: "보안", icon: "🔒" },
+    { id: "profile", label: "프로필", icon: <FontAwesomeIcon icon={faUser} /> },
+    { id: "storage", label: "저장소", icon: <FontAwesomeIcon icon={faFloppyDisk} /> },
+    { id: "security", label: "보안", icon: <FontAwesomeIcon icon={faLock} /> },
   ];
 
   return (

@@ -6,6 +6,8 @@ import { encryptFile } from "@/lib/crypto/encryption";
 import { validateWebGLBuildFile } from "@/lib/webgl/validation";
 import FileProgressList from "./fileUploader/FileProgressList";
 import UploadOptions from "./fileUploader/UploadOptions";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowsRotate, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 export default function FileUploader({
   onUploadComplete,
@@ -373,7 +375,7 @@ export default function FileUploader({
               onClick={cancelUpload}
               title="선택 취소"
             >
-              ✕
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           )}
         </div>
@@ -411,7 +413,7 @@ export default function FileUploader({
 
           {retryMode && !uploading && (
             <button className="btn btn-warning" onClick={handleRetry}>
-              🔄 실패한 파일 재시도
+              <FontAwesomeIcon icon={faArrowsRotate} /> 실패한 파일 재시도
             </button>
           )}
 

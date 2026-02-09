@@ -3,6 +3,18 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getSharedItems } from "@/actions/share";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faImage,
+  faVideo,
+  faMusic,
+  faFile,
+  faFileLines,
+  faChartBar,
+  faUpload,
+  faFolder,
+  faArrowRight,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function SharedItemsPreview() {
   const [sharedFiles, setSharedFiles] = useState([]);
@@ -55,13 +67,13 @@ export default function SharedItemsPreview() {
   };
 
   const getFileIcon = (mimetype) => {
-    if (mimetype?.startsWith("image/")) return "🖼️";
-    if (mimetype?.startsWith("video/")) return "🎥";
-    if (mimetype?.startsWith("audio/")) return "🎵";
-    if (mimetype?.includes("pdf")) return "📄";
-    if (mimetype?.includes("document")) return "📝";
-    if (mimetype?.includes("spreadsheet")) return "📊";
-    return "📄";
+    if (mimetype?.startsWith("image/")) return <FontAwesomeIcon icon={faImage} />;
+    if (mimetype?.startsWith("video/")) return <FontAwesomeIcon icon={faVideo} />;
+    if (mimetype?.startsWith("audio/")) return <FontAwesomeIcon icon={faMusic} />;
+    if (mimetype?.includes("pdf")) return <FontAwesomeIcon icon={faFile} />;
+    if (mimetype?.includes("document")) return <FontAwesomeIcon icon={faFileLines} />;
+    if (mimetype?.includes("spreadsheet")) return <FontAwesomeIcon icon={faChartBar} />;
+    return <FontAwesomeIcon icon={faFile} />;
   };
 
   if (loading) {
@@ -99,7 +111,7 @@ export default function SharedItemsPreview() {
 
       {totalItems === 0 ? (
         <div className="text-center py-8">
-          <div className="text-4xl mb-2">📤</div>
+          <div className="text-4xl mb-2"><FontAwesomeIcon icon={faUpload} /></div>
           <p className="text-gray-600">공유받은 항목이 없습니다.</p>
           <Link href="/shared" className="btn btn-sm btn-outline mt-2">
             공유 페이지로 이동
@@ -115,7 +127,7 @@ export default function SharedItemsPreview() {
               className="flex items-center justify-between p-3 bg-base-100 rounded-lg hover:bg-base-300 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl">📁</span>
+                <span className="text-2xl"><FontAwesomeIcon icon={faFolder} /></span>
                 <div>
                   <div className="font-medium">{directory.name}</div>
                   <div className="text-sm text-gray-600">
@@ -169,7 +181,7 @@ export default function SharedItemsPreview() {
           {totalItems >= 5 && (
             <div className="text-center pt-2">
               <Link href="/shared" className="btn btn-sm btn-ghost">
-                더 많은 항목 보기 →
+                더 많은 항목 보기 <FontAwesomeIcon icon={faArrowRight} />
               </Link>
             </div>
           )}

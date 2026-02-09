@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { loadWebGLBuild, unloadWebGLBuild } from "@/lib/webgl/player";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLink, faXmark, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 
 // 상수 정의
 const DOUBLE_TAP_DELAY_MS = 500; // 더블 탭 인식 시간 (밀리초)
@@ -152,7 +154,7 @@ export default function WebGLPlayer({
                 onClick={handleBackClick}
                 title={showBackButton ? "뒤로가기" : "닫기"}
               >
-                {showBackButton ? "← 뒤로가기" : "✕ 닫기"}
+                {showBackButton ? <><FontAwesomeIcon icon={faArrowLeft} /> 뒤로가기</> : <><FontAwesomeIcon icon={faXmark} /> 닫기</>}
               </button>
               <h1 className="text-white text-lg font-bold hidden sm:block">
                 {file?.originalName || file?.name}
@@ -178,7 +180,7 @@ export default function WebGLPlayer({
                       onClick={onCopyShareUrl}
                       title="공유 링크 복사"
                     >
-                      <span className="hidden sm:inline">🔗 </span>링크 복사
+                      <span className="hidden sm:inline"><FontAwesomeIcon icon={faLink} /> </span>링크 복사
                     </button>
                   )}
                 </>

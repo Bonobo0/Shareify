@@ -13,6 +13,8 @@ import {
 import { toggleFilePublic } from "@/actions/share";
 import { downloadAndDecrypt, isMediaFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock, faUser, faDownload, faPenToSquare, faEye, faUpload, faTrash, faHouse, faGamepad } from "@fortawesome/free-solid-svg-icons";
 
 const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
   ssr: false,
@@ -390,12 +392,12 @@ export default function FilePage() {
             <div className="flex flex-wrap items-center gap-1 sm:gap-2">
               {file?.isEncrypted && (
                 <div className="badge badge-primary badge-xs sm:badge-sm whitespace-nowrap">
-                  🔒 암호화됨
+                  <FontAwesomeIcon icon={faLock} /> 암호화됨
                 </div>
               )}
               {file?.isWebGLBuild && (
                 <div className="badge badge-secondary badge-xs sm:badge-sm whitespace-nowrap">
-                  🎮 WebGL 게임
+                  <FontAwesomeIcon icon={faGamepad} /> WebGL 게임
                 </div>
               )}
               {file?.isPublic && (
@@ -405,7 +407,7 @@ export default function FilePage() {
               )}
               {!isOwner && file?.owner && (
                 <div className="badge badge-accent badge-xs sm:badge-sm gap-1 whitespace-nowrap">
-                  <span>👤</span>
+                  <span><FontAwesomeIcon icon={faUser} /></span>
                   <span className="truncate max-w-[80px] sm:max-w-none text-xs sm:text-sm">
                     {file.owner.name || file.owner.email}님이 공유
                   </span>
@@ -490,7 +492,7 @@ export default function FilePage() {
                 className="btn btn-accent btn-sm sm:btn-md"
                 onClick={() => router.push(`/play/${hash}`)}
               >
-                🎮 게임 플레이
+                <FontAwesomeIcon icon={faGamepad} /> 게임 플레이
               </button>
             )}
 
@@ -501,7 +503,7 @@ export default function FilePage() {
               onClick={handleDownload}
               disabled={downloadLoading}
             >
-              ⬇️ 다운로드
+              <FontAwesomeIcon icon={faDownload} /> 다운로드
             </button>
 
             {(isMediaFile(
@@ -513,8 +515,8 @@ export default function FilePage() {
                 onClick={handlePreview}
               >
                 {file?.originalName?.endsWith(".ejtxt")
-                  ? "✏️ 편집하기"
-                  : "👁️ 미리보기"}
+                  ? <><FontAwesomeIcon icon={faPenToSquare} /> 편집하기</>
+                  : <><FontAwesomeIcon icon={faEye} /> 미리보기</>}
               </button>
             )}
             {isOwner && (
@@ -522,7 +524,7 @@ export default function FilePage() {
                 className="btn btn-secondary btn-sm sm:btn-md"
                 onClick={() => setIsShareModalOpen(true)}
               >
-                📤 공유하기
+                <FontAwesomeIcon icon={faUpload} /> 공유하기
               </button>
             )}
 
@@ -531,7 +533,7 @@ export default function FilePage() {
                 className="btn btn-error btn-sm sm:btn-md"
                 onClick={handleDeleteFile}
               >
-                🗑️ 삭제
+                <FontAwesomeIcon icon={faTrash} /> 삭제
               </button>
             )}
 
@@ -539,7 +541,7 @@ export default function FilePage() {
               className="btn btn-ghost btn-sm sm:btn-md"
               onClick={() => router.push("/dashboard")}
             >
-              🏠 대시보드
+              <FontAwesomeIcon icon={faHouse} /> 대시보드
             </button>
           </div>
         </div>

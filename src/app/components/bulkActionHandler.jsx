@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { deleteFile } from "@/actions/files";
 import { deleteDirectoryRecursive } from "@/actions/directories";
 import SelectedDownloadModal from "./selectedDownloadModal";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faDownload, faFolder, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 export default function BulkActionHandler({
   selectedItems,
@@ -245,7 +247,7 @@ export default function BulkActionHandler({
               className="btn btn-xs sm:btn-sm btn-info flex-1 sm:flex-none"
               disabled={bulkActionLoading}
             >
-              📥 다운로드
+              <FontAwesomeIcon icon={faDownload} /> 다운로드
             </button>
 
             {onBulkMove && (
@@ -254,7 +256,7 @@ export default function BulkActionHandler({
                 className="btn btn-xs sm:btn-sm btn-accent flex-1 sm:flex-none"
                 disabled={bulkActionLoading}
               >
-                📁 이동
+                <FontAwesomeIcon icon={faFolder} /> 이동
               </button>
             )}
 
@@ -265,7 +267,7 @@ export default function BulkActionHandler({
               }`}
               disabled={bulkActionLoading}
             >
-              🗑️ 삭제
+              <FontAwesomeIcon icon={faTrash} /> 삭제
             </button>
           </div>
         )}

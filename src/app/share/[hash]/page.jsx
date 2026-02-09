@@ -10,6 +10,23 @@ import { downloadAndDecrypt, decryptFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
 import PreviewModal from "@/app/components/previewModal";
 import WebGLPlayer from "@/app/components/webGLPlayer";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faFileLines,
+  faImage,
+  faFile,
+  faFilm,
+  faMusic,
+  faFolder,
+  faUser,
+  faLock,
+  faEye,
+  faDownload,
+  faWandMagicSparkles,
+  faGamepad,
+  faArrowLeft,
+  faXmark,
+} from "@fortawesome/free-solid-svg-icons";
 
 const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
   ssr: false,
@@ -405,7 +422,7 @@ export default function SharePage() {
                   setEditorFileUrl(null);
                 }}
               >
-                ← 돌아가기
+                <FontAwesomeIcon icon={faArrowLeft} /> 돌아가기
               </button>
               <h2 className="text-lg font-bold truncate">
                 {file?.originalName}
@@ -436,16 +453,16 @@ export default function SharePage() {
             <div className="text-center mb-6 sm:mb-8">
               <div className="text-4xl sm:text-5xl mb-4">
                 {file?.originalName?.endsWith(".ejtxt")
-                  ? "📝"
+                  ? <FontAwesomeIcon icon={faFileLines} />
                   : file?.mimetype?.includes("image")
-                    ? "🖼️"
+                    ? <FontAwesomeIcon icon={faImage} />
                     : file?.mimetype?.includes("pdf")
-                      ? "📄"
+                      ? <FontAwesomeIcon icon={faFile} />
                       : file?.mimetype?.includes("video")
-                        ? "🎬"
+                        ? <FontAwesomeIcon icon={faFilm} />
                         : file?.mimetype?.includes("audio")
-                          ? "🎵"
-                          : "📁"}
+                          ? <FontAwesomeIcon icon={faMusic} />
+                          : <FontAwesomeIcon icon={faFolder} />}
               </div>
 
               <h2 className="text-lg sm:text-xl font-semibold mb-3 px-2 break-words">
@@ -455,7 +472,7 @@ export default function SharePage() {
               {file?.owner && (
                 <div className="flex justify-center mb-3">
                   <div className="btn btn-accent btn-xs gap-1 sm:gap-2 whitespace-nowrap">
-                    <span>👤</span>
+                    <span><FontAwesomeIcon icon={faUser} /></span>
                     <span className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">
                       {file.owner.name || file.owner.email}님이 공유
                     </span>
@@ -470,14 +487,14 @@ export default function SharePage() {
               {file?.isEncrypted && (
                 <div className="mt-4">
                   <span className="badge badge-warning badge-sm sm:badge-md whitespace-nowrap">
-                    🔒 암호화된 파일
+                    <FontAwesomeIcon icon={faLock} /> 암호화된 파일
                   </span>
                 </div>
               )}
               {file?.isWebGLBuild && (
                 <div className="mt-4">
                   <span className="badge badge-success badge-sm sm:badge-md whitespace-nowrap">
-                    🎮 WebGL 게임
+                    <FontAwesomeIcon icon={faGamepad} /> WebGL 게임
                   </span>
                 </div>
               )}
@@ -495,8 +512,8 @@ export default function SharePage() {
                   {webGLLoading
                     ? "로딩 중..."
                     : file?.isEncrypted
-                      ? "🔒 복호화 후 게임 플레이"
-                      : "🎮 게임 플레이"}
+                      ? <><FontAwesomeIcon icon={faLock} /> 복호화 후 게임 플레이</>
+                      : <><FontAwesomeIcon icon={faGamepad} /> 게임 플레이</>}
                 </button>
               )}
               {isEditorFile(file?.originalName) && !file?.isEncrypted && (
@@ -507,7 +524,7 @@ export default function SharePage() {
                   onClick={handleOpenEditor}
                   disabled={editorLoading}
                 >
-                  {editorLoading ? "로딩 중..." : "📝 문서 보기"}
+                  {editorLoading ? "로딩 중..." : <><FontAwesomeIcon icon={faFileLines} /> 문서 보기</>}
                 </button>
               )}
               {isPreviewable(file?.mimetype) && !file?.isWebGLBuild && (
@@ -521,15 +538,15 @@ export default function SharePage() {
                   {previewLoading
                     ? "로딩 중..."
                     : file?.isEncrypted
-                      ? "🔒 복호화 후 미리보기"
-                      : "👁️ 미리보기"}
+                      ? <><FontAwesomeIcon icon={faLock} /> 복호화 후 미리보기</>
+                      : <><FontAwesomeIcon icon={faEye} /> 미리보기</>}
                 </button>
               )}
               <button
                 className="btn btn-primary btn-sm sm:btn-lg flex-1 sm:flex-none"
                 onClick={handleDownload}
               >
-                {file?.isEncrypted ? "🔒 복호화 후 다운로드" : "⬇️ 다운로드"}
+                {file?.isEncrypted ? <><FontAwesomeIcon icon={faLock} /> 복호화 후 다운로드</> : <><FontAwesomeIcon icon={faDownload} /> 다운로드</>}
               </button>
             </div>
 
@@ -543,13 +560,13 @@ export default function SharePage() {
                     href="/user/signin"
                     className="btn btn-sm sm:btn-md flex-1 sm:flex-none"
                   >
-                    👤 로그인
+                    <FontAwesomeIcon icon={faUser} /> 로그인
                   </Link>
                   <Link
                     href="/user/signup"
                     className="btn btn-outline btn-sm sm:btn-md flex-1 sm:flex-none"
                   >
-                    ✨ 회원가입
+                    <FontAwesomeIcon icon={faWandMagicSparkles} /> 회원가입
                   </Link>
                 </div>
               </div>
@@ -562,7 +579,7 @@ export default function SharePage() {
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">🔒 파일 복호화</h2>
+            <h2 className="text-xl font-bold mb-4"><FontAwesomeIcon icon={faLock} /> 파일 복호화</h2>
 
             <p className="text-sm text-gray-600 mb-4">
               이 파일은 암호화되어 있습니다. 복호화를 위해 비밀번호를
@@ -617,7 +634,7 @@ export default function SharePage() {
       {previewPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">🔒 파일 미리보기</h2>
+            <h2 className="text-xl font-bold mb-4"><FontAwesomeIcon icon={faLock} /> 파일 미리보기</h2>
 
             <p className="text-sm text-gray-600 mb-4">
               이 파일은 암호화되어 있습니다. 미리보기를 위해 복호화 비밀번호를
@@ -687,7 +704,7 @@ export default function SharePage() {
                   setPreviewModal(null);
                 }}
               >
-                ✕
+                <FontAwesomeIcon icon={faXmark} />
               </button>
             </div>
 
@@ -763,7 +780,7 @@ export default function SharePage() {
       {webGLPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">🔒 게임 복호화</h2>
+            <h2 className="text-xl font-bold mb-4"><FontAwesomeIcon icon={faLock} /> 게임 복호화</h2>
 
             <p className="text-sm text-gray-600 mb-4">
               이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화
