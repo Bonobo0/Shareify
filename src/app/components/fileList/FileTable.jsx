@@ -50,7 +50,7 @@ export default function FileTable({
     // 드래그 이미지 텍스트
     const ghost = document.createElement("div");
     ghost.className = "badge badge-primary badge-lg";
-    ghost.textContent = `${type === "file" ? "File" : "Folder"} ${name}`;
+    ghost.textContent = `${type === "file" ? "파일" : "폴더"} ${name}`;
     ghost.style.position = "absolute";
     ghost.style.top = "-1000px";
     document.body.appendChild(ghost);
