@@ -13,6 +13,7 @@ import {
   faChartBar,
   faUpload,
   faFolder,
+  faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function SharedItemsPreview() {
@@ -180,7 +181,7 @@ export default function SharedItemsPreview() {
           {totalItems >= 5 && (
             <div className="text-center pt-2">
               <Link href="/shared" className="btn btn-sm btn-ghost">
-                더 많은 항목 보기 →
+                더 많은 항목 보기 <FontAwesomeIcon icon={faArrowRight} />
               </Link>
             </div>
           )}

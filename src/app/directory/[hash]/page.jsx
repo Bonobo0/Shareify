@@ -13,7 +13,7 @@ import BulkDownloadModal from "@/app/components/bulkDownloadModal";
 import { useAuth } from "@/context/AuthContext";
 import { getDirectoryByHash } from "@/actions/directories";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faPenToSquare, faBox, faUpload } from "@fortawesome/free-solid-svg-icons";
+import { faUser, faPenToSquare, faBox, faUpload, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 
 export default function DirectoryPage() {
   const params = useParams();
@@ -217,8 +217,8 @@ export default function DirectoryPage() {
               onClick={() => router.back()}
               className="btn btn-ghost btn-sm sm:btn-md"
             >
-              <span className="hidden sm:inline">← 뒤로가기</span>
-              <span className="sm:hidden">←</span>
+              <span className="hidden sm:inline"><FontAwesomeIcon icon={faArrowLeft} /> 뒤로가기</span>
+              <span className="sm:hidden"><FontAwesomeIcon icon={faArrowLeft} /></span>
             </button>
           </div>
         )}

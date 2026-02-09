@@ -15,7 +15,7 @@ import { createPreviewUrl } from "@/lib/downloadUtils";
 import { encryptFile, decryptFile } from "@/lib/crypto/encryption";
 import DirectoryTreePicker from "@/app/components/directoryTreePicker";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLink, faPenToSquare, faFileLines, faLock, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faPenToSquare, faFileLines, faLock, faTriangleExclamation, faArrowLeft, faCheck } from "@fortawesome/free-solid-svg-icons";
 
 const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
   ssr: false,
@@ -376,7 +376,7 @@ export default function EditorPage() {
               className="btn btn-ghost btn-sm"
               onClick={handleCloseEditor}
             >
-              ← 돌아가기
+              <FontAwesomeIcon icon={faArrowLeft} /> 돌아가기
             </button>
             <h1 className="text-lg font-bold truncate">
               {currentFile.originalName}
@@ -424,7 +424,7 @@ export default function EditorPage() {
                     className={`btn join-item ${copiedShare ? "btn-success" : "btn-primary"}`}
                     onClick={handleCopyShareUrl}
                   >
-                    {copiedShare ? "✓ 복사됨" : "복사"}
+                    {copiedShare ? <><FontAwesomeIcon icon={faCheck} /> 복사됨</> : "복사"}
                   </button>
                 </div>
                 <label className="label">
@@ -561,7 +561,7 @@ export default function EditorPage() {
                   className={`btn join-item ${copiedShare ? "btn-success" : "btn-primary"}`}
                   onClick={handleCopyShareUrl}
                 >
-                  {copiedShare ? "✓ 복사됨" : "복사"}
+                  {copiedShare ? <><FontAwesomeIcon icon={faCheck} /> 복사됨</> : "복사"}
                 </button>
               </div>
               <label className="label">

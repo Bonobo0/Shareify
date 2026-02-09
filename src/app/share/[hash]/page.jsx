@@ -23,6 +23,9 @@ import {
   faEye,
   faDownload,
   faWandMagicSparkles,
+  faGamepad,
+  faArrowLeft,
+  faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
 const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
@@ -419,7 +422,7 @@ export default function SharePage() {
                   setEditorFileUrl(null);
                 }}
               >
-                ← 돌아가기
+                <FontAwesomeIcon icon={faArrowLeft} /> 돌아가기
               </button>
               <h2 className="text-lg font-bold truncate">
                 {file?.originalName}
@@ -491,7 +494,7 @@ export default function SharePage() {
               {file?.isWebGLBuild && (
                 <div className="mt-4">
                   <span className="badge badge-success badge-sm sm:badge-md whitespace-nowrap">
-                    🎮 WebGL 게임
+                    <FontAwesomeIcon icon={faGamepad} /> WebGL 게임
                   </span>
                 </div>
               )}
@@ -510,7 +513,7 @@ export default function SharePage() {
                     ? "로딩 중..."
                     : file?.isEncrypted
                       ? <><FontAwesomeIcon icon={faLock} /> 복호화 후 게임 플레이</>
-                      : "🎮 게임 플레이"}
+                      : <><FontAwesomeIcon icon={faGamepad} /> 게임 플레이</>}
                 </button>
               )}
               {isEditorFile(file?.originalName) && !file?.isEncrypted && (
@@ -701,7 +704,7 @@ export default function SharePage() {
                   setPreviewModal(null);
                 }}
               >
-                ✕
+                <FontAwesomeIcon icon={faXmark} />
               </button>
             </div>
 

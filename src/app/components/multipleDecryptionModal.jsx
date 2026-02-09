@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock, faEye, faEyeSlash, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faLock, faEye, faEyeSlash, faTriangleExclamation, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 export default function MultipleDecryptionModal({
   isOpen,
@@ -87,7 +87,7 @@ export default function MultipleDecryptionModal({
             className="btn btn-ghost btn-sm"
             disabled={loading}
           >
-            ✕
+            <FontAwesomeIcon icon={faXmark} />
           </button>
         </div>
 

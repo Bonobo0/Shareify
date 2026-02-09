@@ -14,6 +14,9 @@ import {
   faLock,
   faDownload,
   faEye,
+  faGamepad,
+  faSortUp,
+  faSortDown,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function FileTable({
@@ -128,26 +131,26 @@ export default function FileTable({
             <th className="cursor-pointer" onClick={() => onSort("name")}>
               이름
               {sortBy === "name" && (
-                <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                <span className="ml-1">{sortOrder === "asc" ? <FontAwesomeIcon icon={faSortUp} /> : <FontAwesomeIcon icon={faSortDown} />}</span>
               )}
             </th>
             {mode === "my-uploads" && <th>위치</th>}
             <th className="cursor-pointer" onClick={() => onSort("size")}>
               크기
               {sortBy === "size" && (
-                <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                <span className="ml-1">{sortOrder === "asc" ? <FontAwesomeIcon icon={faSortUp} /> : <FontAwesomeIcon icon={faSortDown} />}</span>
               )}
             </th>
             <th className="cursor-pointer" onClick={() => onSort("mimetype")}>
               유형
               {sortBy === "mimetype" && (
-                <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                <span className="ml-1">{sortOrder === "asc" ? <FontAwesomeIcon icon={faSortUp} /> : <FontAwesomeIcon icon={faSortDown} />}</span>
               )}
             </th>
             <th className="cursor-pointer" onClick={() => onSort("createdAt")}>
               생성 일시
               {sortBy === "createdAt" && (
-                <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                <span className="ml-1">{sortOrder === "asc" ? <FontAwesomeIcon icon={faSortUp} /> : <FontAwesomeIcon icon={faSortDown} />}</span>
               )}
             </th>
             <th>작업</th>
@@ -324,7 +327,7 @@ export default function FileTable({
                       )}
                       {file.isWebGLBuild && (
                         <div className="badge badge-secondary badge-xs sm:badge-sm whitespace-nowrap">
-                          🎮 WebGL 게임
+                          <FontAwesomeIcon icon={faGamepad} /> WebGL 게임
                         </div>
                       )}
                       {file.isPublic && (
@@ -423,7 +426,7 @@ export default function FileTable({
                             router.push(`/play/${file.hash}`);
                           }}
                         >
-                          🎮 게임 플레이
+                          <FontAwesomeIcon icon={faGamepad} /> 게임 플레이
                         </button>
                       </li>
                     )}

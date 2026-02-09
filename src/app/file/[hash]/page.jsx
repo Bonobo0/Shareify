@@ -14,7 +14,7 @@ import { toggleFilePublic } from "@/actions/share";
 import { downloadAndDecrypt, isMediaFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock, faUser, faDownload, faPenToSquare, faEye, faUpload, faTrash, faHouse } from "@fortawesome/free-solid-svg-icons";
+import { faLock, faUser, faDownload, faPenToSquare, faEye, faUpload, faTrash, faHouse, faGamepad } from "@fortawesome/free-solid-svg-icons";
 
 const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
   ssr: false,
@@ -397,7 +397,7 @@ export default function FilePage() {
               )}
               {file?.isWebGLBuild && (
                 <div className="badge badge-secondary badge-xs sm:badge-sm whitespace-nowrap">
-                  🎮 WebGL 게임
+                  <FontAwesomeIcon icon={faGamepad} /> WebGL 게임
                 </div>
               )}
               {file?.isPublic && (
@@ -492,7 +492,7 @@ export default function FilePage() {
                 className="btn btn-accent btn-sm sm:btn-md"
                 onClick={() => router.push(`/play/${hash}`)}
               >
-                🎮 게임 플레이
+                <FontAwesomeIcon icon={faGamepad} /> 게임 플레이
               </button>
             )}
 

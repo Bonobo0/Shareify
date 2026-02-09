@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { getAllDirectoriesFlat } from "@/actions/directories";
 import { createDirectory } from "@/actions/directories";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolder, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
+import { faFolder, faFolderOpen, faPlus, faCaretDown, faCaretRight } from "@fortawesome/free-solid-svg-icons";
 
 /**
  * 디렉토리를 트리 구조로 빌드
@@ -64,7 +64,7 @@ function TreeNode({
               if (hasChildren) onToggle(node.id);
             }}
           >
-            {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
+            {hasChildren ? (isExpanded ? <FontAwesomeIcon icon={faCaretDown} /> : <FontAwesomeIcon icon={faCaretRight} />) : ""}
           </span>
           <span className="flex-shrink-0">{hasChildren ? <FontAwesomeIcon icon={faFolderOpen} /> : <FontAwesomeIcon icon={faFolder} />}</span>
           <span className="truncate">{node.name}</span>
@@ -230,7 +230,7 @@ export default function DirectoryTreePicker({
           }}
           title="새 디렉토리 만들기"
         >
-          ➕
+          <FontAwesomeIcon icon={faPlus} />
         </button>
       </div>
 
@@ -285,7 +285,7 @@ export default function DirectoryTreePicker({
               onClick={() => onChange(null)}
             >
               <span className="inline-flex items-center justify-center w-4 h-4 text-xs flex-shrink-0 opacity-0">
-                ▸
+                <FontAwesomeIcon icon={faCaretRight} />
               </span>
               <span className="flex-shrink-0"><FontAwesomeIcon icon={faFolder} /></span>
               <span>최상위 (루트)</span>
@@ -303,7 +303,7 @@ export default function DirectoryTreePicker({
                     onClick={() => onChange(dir.id)}
                   >
                     <span className="inline-flex items-center justify-center w-4 h-4 text-xs flex-shrink-0 opacity-0">
-                      ▸
+                      <FontAwesomeIcon icon={faCaretRight} />
                     </span>
                     <span className="flex-shrink-0"><FontAwesomeIcon icon={faFolderOpen} /></span>
                     <span className="truncate">{dir.fullPath}</span>

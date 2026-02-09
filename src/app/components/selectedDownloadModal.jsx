@@ -9,7 +9,7 @@ import {
 } from "@/lib/downloadUtils";
 import DecryptionPasswordModal from "./decryptionPasswordModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboard, faLock, faCircleCheck } from "@fortawesome/free-solid-svg-icons";
+import { faClipboard, faLock, faCircleCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
 import MultipleDecryptionModal from "./multipleDecryptionModal";
 
 const SelectedDownloadModal = memo(function SelectedDownloadModal({
@@ -180,7 +180,7 @@ const SelectedDownloadModal = memo(function SelectedDownloadModal({
               className="btn btn-ghost btn-sm"
               disabled={step === "downloading"}
             >
-              ✕
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
 

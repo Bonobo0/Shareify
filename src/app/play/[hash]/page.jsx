@@ -7,6 +7,8 @@ import { getFileDetails, getFileDownloadUrl } from "@/actions/files";
 import { decryptFile } from "@/lib/crypto/encryption";
 import { toggleFilePublic } from "@/actions/share";
 import WebGLPlayer from "@/app/components/webGLPlayer";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faGamepad } from "@fortawesome/free-solid-svg-icons";
 
 export default function PlayPage() {
   const params = useParams();
@@ -278,7 +280,7 @@ export default function PlayPage() {
                   className="btn btn-primary"
                   onClick={() => setDecryptModal(true)}
                 >
-                  🎮 게임 시작
+                  <FontAwesomeIcon icon={faGamepad} /> 게임 시작
                 </button>
               </>
             ) : (
@@ -286,7 +288,7 @@ export default function PlayPage() {
                 className="btn btn-primary"
                 onClick={() => loadGame()}
               >
-                🎮 게임 시작
+                <FontAwesomeIcon icon={faGamepad} /> 게임 시작
               </button>
             )}
           </div>

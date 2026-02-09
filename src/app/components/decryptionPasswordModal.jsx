@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock, faEye, faEyeSlash, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faLock, faEye, faEyeSlash, faTriangleExclamation, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 export default function DecryptionPasswordModal({
   isOpen,
@@ -41,7 +41,7 @@ export default function DecryptionPasswordModal({
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold">{title}</h3>
           <button onClick={handleClose} className="btn btn-ghost btn-sm">
-            ✕
+            <FontAwesomeIcon icon={faXmark} />
           </button>
         </div>
 

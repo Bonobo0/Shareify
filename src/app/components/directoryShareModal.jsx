@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import {
   createDirectoryShareLink,
   getDirectoryShareLinks,
@@ -214,7 +216,7 @@ export default function DirectoryShareModal({
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-bold text-lg">디렉토리 공유</h3>
           <button className="btn btn-sm btn-circle" onClick={onClose}>
-            ✕
+            <FontAwesomeIcon icon={faXmark} />
           </button>
         </div>
 

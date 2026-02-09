@@ -23,7 +23,7 @@ import Marker from "@editorjs/marker";
 import Table from "@editorjs/table";
 import ImageTool from "@editorjs/image";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock, faEye, faFloppyDisk, faDownload, faFileLines, faFile, faWrench } from "@fortawesome/free-solid-svg-icons";
+import { faLock, faEye, faFloppyDisk, faDownload, faFileLines, faFile, faWrench, faGlobe, faCheck, faXmark, faCircle } from "@fortawesome/free-solid-svg-icons";
 
 const ReactEditorJS = createReactEditorJS();
 
@@ -315,7 +315,7 @@ function blocksToText(blocks) {
         case "checklist":
           return block.data.items
             .map(
-              (item) => `${item.checked ? "☑" : "☐"} ${stripHtml(item.text)}`,
+              (item) => `${item.checked ? "[x]" : "[ ]"} ${stripHtml(item.text)}`,
             )
             .join("\n");
         case "quote":
@@ -658,14 +658,14 @@ export default function LiveEditor({
         );
       case "saved":
         return (
-          <span className="badge badge-success gap-1 text-xs">✓ 저장됨</span>
+          <span className="badge badge-success gap-1 text-xs"><FontAwesomeIcon icon={faCheck} /> 저장됨</span>
         );
       case "unsaved":
-        return <span className="badge badge-info gap-1 text-xs">● 수정됨</span>;
+        return <span className="badge badge-info gap-1 text-xs"><FontAwesomeIcon icon={faCircle} style={{fontSize: '0.5em'}} /> 수정됨</span>;
       case "error":
         return (
           <span className="badge badge-error gap-1 text-xs" title={saveMessage}>
-            ✕ 오류
+            <FontAwesomeIcon icon={faXmark} /> 오류
           </span>
         );
       default:
@@ -734,7 +734,7 @@ export default function LiveEditor({
                 >
                   <li>
                     <button onClick={() => handleExport("html")}>
-                      🌐 HTML
+                      <FontAwesomeIcon icon={faGlobe} /> HTML
                     </button>
                   </li>
                   <li>

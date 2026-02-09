@@ -7,7 +7,7 @@ import { validateWebGLBuildFile } from "@/lib/webgl/validation";
 import FileProgressList from "./fileUploader/FileProgressList";
 import UploadOptions from "./fileUploader/UploadOptions";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsRotate } from "@fortawesome/free-solid-svg-icons";
+import { faArrowsRotate, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 export default function FileUploader({
   onUploadComplete,
@@ -375,7 +375,7 @@ export default function FileUploader({
               onClick={cancelUpload}
               title="선택 취소"
             >
-              ✕
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           )}
         </div>

@@ -9,7 +9,7 @@ import {
 } from "@/lib/downloadUtils";
 import DecryptionPasswordModal from "./decryptionPasswordModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolder, faLock, faCircleCheck } from "@fortawesome/free-solid-svg-icons";
+import { faFolder, faLock, faCircleCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
 import MultipleDecryptionModal from "./multipleDecryptionModal";
 
 export default function BulkDownloadModal({
@@ -167,7 +167,7 @@ export default function BulkDownloadModal({
               className="btn btn-ghost btn-sm"
               disabled={step === "downloading"}
             >
-              ✕
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
 

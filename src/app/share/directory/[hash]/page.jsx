@@ -34,6 +34,7 @@ import {
   faLock,
   faCircleXmark,
   faDownload,
+  faGamepad,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function SharedDirectoryPage() {
@@ -777,7 +778,7 @@ export default function SharedDirectoryPage() {
                           )}
                           <span className="text-2xl mr-3 flex-shrink-0">
                             {file.isWebGLBuild
-                              ? "🎮"
+                              ? <FontAwesomeIcon icon={faGamepad} />
                               : (
                                   file.originalMimetype || file.mimeType
                                 )?.startsWith("image/")
@@ -988,7 +989,7 @@ export default function SharedDirectoryPage() {
       {showWebGLModal && webGLFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-base-100 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">🎮 WebGL 게임</h2>
+            <h2 className="text-xl font-bold mb-4"><FontAwesomeIcon icon={faGamepad} /> WebGL 게임</h2>
 
             <p className="text-sm text-gray-600 mb-2">
               <strong>{webGLFile.name}</strong>
@@ -1015,7 +1016,7 @@ export default function SharedDirectoryPage() {
               >
                 {webGLFile.isEncrypted
                   ? <><FontAwesomeIcon icon={faLock} /> 복호화 후 게임 플레이</>
-                  : "🎮 게임 플레이"}
+                  : <><FontAwesomeIcon icon={faGamepad} /> 게임 플레이</>}
               </button>
               <button
                 className="btn btn-secondary btn-block"

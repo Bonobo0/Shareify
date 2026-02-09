@@ -1,5 +1,8 @@
 "use client";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
+
 export default function PreviewModal({
   isOpen,
   onClose,
@@ -33,7 +36,7 @@ export default function PreviewModal({
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">{file.name}</h2>
           <button className="btn btn-ghost btn-sm" onClick={handleClose}>
-            ✕
+            <FontAwesomeIcon icon={faXmark} />
           </button>
         </div>
 

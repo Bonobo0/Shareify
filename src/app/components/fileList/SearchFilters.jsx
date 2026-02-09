@@ -2,7 +2,7 @@
 
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faMagnifyingGlass, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 export default function SearchFilters({
   searchQuery,
@@ -37,7 +37,7 @@ export default function SearchFilters({
         </button>
         {(searchQuery || Object.values(searchFilters).some((v) => v)) && (
           <button className="btn btn-ghost" onClick={onResetSearch}>
-            ✕ 초기화
+            <FontAwesomeIcon icon={faXmark} /> 초기화
           </button>
         )}
       </div>
