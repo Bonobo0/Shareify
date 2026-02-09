@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { getAllDirectoriesFlat } from "@/actions/directories";
 import { moveFile, bulkMoveFiles } from "@/actions/files";
 import { moveDirectory, bulkMoveDirectories } from "@/actions/directories";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFolder, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
 
 /**
  * MoveModal - 단일 이동 및 벌크 이동 모두 지원
@@ -204,7 +206,7 @@ export default function MoveModal({
                   className={`${selectedDirId === null ? "active" : ""}`}
                   onClick={() => setSelectedDirId(null)}
                 >
-                  📁 최상위 (루트)
+                  <FontAwesomeIcon icon={faFolder} /> 최상위 (루트)
                 </button>
               </li>
               {filteredDirs.map((dir) => (
@@ -213,7 +215,7 @@ export default function MoveModal({
                     className={`${selectedDirId === dir.id ? "active" : ""}`}
                     onClick={() => setSelectedDirId(dir.id)}
                   >
-                    📂 {dir.fullPath}
+                    <FontAwesomeIcon icon={faFolderOpen} /> {dir.fullPath}
                   </button>
                 </li>
               ))}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock, faEye, faEyeSlash, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 
 export default function MultipleDecryptionModal({
   isOpen,
@@ -91,7 +93,7 @@ export default function MultipleDecryptionModal({
 
         <div className="alert alert-info mb-6">
           <div className="flex items-center gap-2">
-            <span>🔐</span>
+            <span><FontAwesomeIcon icon={faLock} /></span>
             <div>
               <div className="font-semibold">
                 암호화된 파일별 복호화 키 입력
@@ -108,7 +110,7 @@ export default function MultipleDecryptionModal({
           {encryptedFiles.map((file, index) => (
             <div key={file.id} className="border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-warning">🔐</span>
+                <span className="text-warning"><FontAwesomeIcon icon={faLock} /></span>
                 <div className="flex-1">
                   <div className="font-medium text-sm">
                     {file.originalName || file.name}
@@ -141,7 +143,7 @@ export default function MultipleDecryptionModal({
                   onClick={() => togglePasswordVisibility(file.id)}
                   disabled={loading}
                 >
-                  {showPasswords[file.id] ? "🙈" : "👁️"}
+                  {showPasswords[file.id] ? <FontAwesomeIcon icon={faEyeSlash} /> : <FontAwesomeIcon icon={faEye} />}
                 </button>
               </div>
 
@@ -154,7 +156,7 @@ export default function MultipleDecryptionModal({
 
         <div className="alert alert-warning mb-6">
           <div className="flex items-center gap-2">
-            <span>⚠️</span>
+            <span><FontAwesomeIcon icon={faTriangleExclamation} /></span>
             <div className="text-sm">
               <div className="font-semibold">보안 주의사항</div>
               <ul className="list-disc list-inside mt-1 space-y-1">
