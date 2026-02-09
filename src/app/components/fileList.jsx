@@ -16,10 +16,7 @@ import {
   deleteDirectoryRecursive,
   getDirectoryBreadcrumbs,
 } from "@/actions/directories";
-import {
-  downloadAndDecrypt,
-  isMediaFile,
-} from "@/lib/crypto/encryption";
+import { downloadAndDecrypt, isMediaFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
 import DirectoryShareModal from "./directoryShareModal";
 import EditDirectoryModal from "./editDirectoryModal";
@@ -31,6 +28,7 @@ import Paginator from "./paginator";
 import SearchFilters from "./fileList/SearchFilters";
 import FileTable from "./fileList/FileTable";
 import FileListModals from "./fileList/FileListModals";
+import MoveModal from "./moveModal";
 
 export default function FileList({
   directoryId = null,
@@ -107,6 +105,14 @@ export default function FileList({
     isOpen: false,
     directoryId: null,
     directoryName: "",
+  });
+
+  // 이동 모달 상태
+  const [moveModal, setMoveModal] = useState({
+    isOpen: false,
+    item: null,
+    itemType: null,
+    bulkItems: null,
   });
 
   // 헬퍼 함수들
@@ -252,7 +258,7 @@ export default function FileList({
         const result = await getFileDetails({ fileId });
         if (result.success && result.file) {
           setFiles((prevFiles) =>
-            prevFiles.map((file) => (file.id === fileId ? result.file : file))
+            prevFiles.map((file) => (file.id === fileId ? result.file : file)),
           );
         }
       } catch (error) {
@@ -261,7 +267,7 @@ export default function FileList({
         await fetchData();
       }
     },
-    [fetchData]
+    [fetchData],
   );
 
   // 개별 디렉토리 업데이트 함수 (깜빡임 방지)
@@ -272,8 +278,8 @@ export default function FileList({
         if (result.success && result.directory) {
           setDirectories((prevDirs) =>
             prevDirs.map((dir) =>
-              dir.id === directoryId ? result.directory : dir
-            )
+              dir.id === directoryId ? result.directory : dir,
+            ),
           );
         }
       } catch (error) {
@@ -282,7 +288,7 @@ export default function FileList({
         await fetchData();
       }
     },
-    [fetchData]
+    [fetchData],
   );
 
   // BulkActionHandler 초기화
@@ -294,6 +300,14 @@ export default function FileList({
     onShowConfirm: showConfirm,
     files: filteredFiles,
     directories: filteredDirectories,
+    onBulkMove: (items) => {
+      setMoveModal({
+        isOpen: true,
+        item: null,
+        itemType: null,
+        bulkItems: items,
+      });
+    },
   });
 
   // 파일 타입 자동완성 옵션 생성
@@ -322,10 +336,10 @@ export default function FileList({
       filtered_files = filtered_files.filter(
         (file) =>
           nameQueryRegex.test(file.originalName?.toLowerCase()) ||
-          nameQueryRegex.test(file.name?.toLowerCase())
+          nameQueryRegex.test(file.name?.toLowerCase()),
       );
       filtered_directories = filtered_directories.filter((dir) =>
-        nameQueryRegex.test(dir.name?.toLowerCase())
+        nameQueryRegex.test(dir.name?.toLowerCase()),
       );
     }
 
@@ -333,10 +347,10 @@ export default function FileList({
     if (searchFilters.dateFrom) {
       const fromDate = new Date(searchFilters.dateFrom);
       filtered_files = filtered_files.filter(
-        (file) => new Date(file.createdAt) >= fromDate
+        (file) => new Date(file.createdAt) >= fromDate,
       );
       filtered_directories = filtered_directories.filter(
-        (dir) => new Date(dir.createdAt) >= fromDate
+        (dir) => new Date(dir.createdAt) >= fromDate,
       );
     }
 
@@ -344,10 +358,10 @@ export default function FileList({
       const toDate = new Date(searchFilters.dateTo);
       toDate.setHours(23, 59, 59, 999); // 해당 날짜 끝까지
       filtered_files = filtered_files.filter(
-        (file) => new Date(file.createdAt) <= toDate
+        (file) => new Date(file.createdAt) <= toDate,
       );
       filtered_directories = filtered_directories.filter(
-        (dir) => new Date(dir.createdAt) <= toDate
+        (dir) => new Date(dir.createdAt) <= toDate,
       );
     }
 
@@ -435,7 +449,7 @@ export default function FileList({
         } finally {
           setActionLoading((prev) => ({ ...prev, [directoryId]: false }));
         }
-      }
+      },
     );
   };
 
@@ -467,6 +481,62 @@ export default function FileList({
     });
   };
 
+  // 파일 이동 핸들러
+  const handleMoveFile = (file) => {
+    setMoveModal({ isOpen: true, item: file, itemType: "file" });
+  };
+
+  // 디렉토리 이동 핸들러
+  const handleMoveDirectory = (directory) => {
+    setMoveModal({ isOpen: true, item: directory, itemType: "directory" });
+  };
+
+  // 이동 완료 핸들러
+  const handleMoved = () => {
+    setMoveModal({
+      isOpen: false,
+      item: null,
+      itemType: null,
+      bulkItems: null,
+    });
+    setSelectedItems(new Set());
+    fetchData();
+  };
+
+  // 드래그 앤 드롭 이동 핸들러
+  const handleDragDrop = async (dragType, dragId, targetDirId) => {
+    try {
+      // targetDirId가 현재 디렉토리와 같으면 무시
+      if (targetDirId === directoryId) return;
+
+      let result;
+      if (dragType === "file") {
+        const { moveFile } = await import("@/actions/files");
+        result = await moveFile({
+          fileId: dragId,
+          targetDirectoryId: targetDirId,
+        });
+      } else {
+        const { moveDirectory } = await import("@/actions/directories");
+        result = await moveDirectory({
+          directoryId: dragId,
+          targetParentId: targetDirId,
+        });
+      }
+
+      if (result.error) {
+        showAlert(result.error);
+        return;
+      }
+
+      showAlert(
+        `${dragType === "file" ? "파일" : "디렉토리"}이(가) 이동되었습니다.`,
+      );
+      await fetchData();
+    } catch {
+      showAlert("이동 중 오류가 발생했습니다.");
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -568,7 +638,7 @@ export default function FileList({
       const downloadResult = await downloadAndDecrypt(
         result.downloadUrl,
         decryptPassword,
-        metadata
+        metadata,
       );
 
       if (downloadResult.error) {
@@ -602,7 +672,8 @@ export default function FileList({
           file.mimetype?.startsWith("application/pdf") ||
           file.originalMimetype?.startsWith("application/pdf") ||
           file.mimetype?.startsWith("text/") ||
-          file.originalMimetype?.startsWith("text/");
+          file.originalMimetype?.startsWith("text/") ||
+          file.originalName?.endsWith(".ejtxt");
         const previewResult = await createPreviewUrl({
           downloadUrl: result.downloadUrl,
           forceBlob: isPdfOrText,
@@ -660,13 +731,17 @@ export default function FileList({
         return;
       }
 
-      setPreviewModal({ file, url: previewResult.url, encryptionPassword: decryptPassword });
+      setPreviewModal({
+        file,
+        url: previewResult.url,
+        encryptionPassword: decryptPassword,
+      });
       setDecryptModal(null);
       setDecryptPassword("");
     } catch (err) {
       console.error("미리보기 복호화 오류:", err);
       setError(
-        "미리보기 생성 중 오류가 발생했습니다. 복호화 키가 올바른지 확인해주세요."
+        "미리보기 생성 중 오류가 발생했습니다. 복호화 키가 올바른지 확인해주세요.",
       );
     } finally {
       setActionLoading((prev) => ({ ...prev, [file.id]: false }));
@@ -696,7 +771,7 @@ export default function FileList({
         const newTotalItems = Math.max(0, totalItems - 1);
         const newTotalPages = Math.max(
           1,
-          Math.ceil(newTotalItems / itemsPerPage)
+          Math.ceil(newTotalItems / itemsPerPage),
         );
         setTotalPages(newTotalPages);
 
@@ -795,7 +870,9 @@ export default function FileList({
         searchQuery={searchQuery}
         onSimpleSearch={handleSimpleSearch}
         showAdvancedSearch={showAdvancedSearch}
-        onToggleAdvancedSearch={() => setShowAdvancedSearch(!showAdvancedSearch)}
+        onToggleAdvancedSearch={() =>
+          setShowAdvancedSearch(!showAdvancedSearch)
+        }
         searchFilters={searchFilters}
         onUpdateFilter={(key, value) =>
           setSearchFilters((prev) => ({ ...prev, [key]: value }))
@@ -856,12 +933,14 @@ export default function FileList({
             onDownload={handleDownload}
             onPreview={handlePreview}
             onDelete={handleDelete}
-            onShareFile={(fileId) =>
-              setShareModal({ isOpen: true, fileId })
-            }
+            onShareFile={(fileId) => setShareModal({ isOpen: true, fileId })}
             onEditDirectory={handleEditDirectory}
             onShareDirectory={handleShareDirectory}
             onRecursiveDelete={handleRecursiveDelete}
+            onMoveFile={handleMoveFile}
+            onMoveDirectory={handleMoveDirectory}
+            onDragDrop={handleDragDrop}
+            currentDirectoryId={directoryId}
           />
           {/* 페이지네이터 */}
           <Paginator
@@ -909,6 +988,24 @@ export default function FileList({
         EditDirectoryModal={EditDirectoryModal}
         BulkDownloadModal={BulkDownloadModal}
         SelectedDownloadModal={SelectedDownloadModal}
+      />
+      {/* 이동 모달 */}
+      <MoveModal
+        isOpen={moveModal.isOpen}
+        onClose={() =>
+          setMoveModal({
+            isOpen: false,
+            item: null,
+            itemType: null,
+            bulkItems: null,
+          })
+        }
+        item={moveModal.item}
+        itemType={moveModal.itemType}
+        onMoved={handleMoved}
+        bulkItems={moveModal.bulkItems}
+        files={filteredFiles}
+        directories={filteredDirectories}
       />
     </div>
   );

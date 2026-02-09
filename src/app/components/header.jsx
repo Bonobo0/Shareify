@@ -50,16 +50,40 @@ export default function Header() {
           {isAuthenticated && (
             <div className="dropdown lg:hidden">
               <label tabIndex={0} className="btn btn-ghost btn-sm">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
                 </svg>
               </label>
-              <ul tabIndex={0} className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
-                <li><Link href="/dashboard">대시보드</Link></li>
-                <li><Link href="/shared">공유된 파일</Link></li>
-                <li><Link href="/my-uploads">내 업로드</Link></li>
+              <ul
+                tabIndex={0}
+                className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52"
+              >
+                <li>
+                  <Link href="/dashboard">대시보드</Link>
+                </li>
+                <li>
+                  <Link href="/editor">에디터</Link>
+                </li>
+                <li>
+                  <Link href="/shared">공유된 파일</Link>
+                </li>
+                <li>
+                  <Link href="/my-uploads">내 업로드</Link>
+                </li>
                 {user?.role === "admin" && (
-                  <li><Link href="/admin">관리자 페이지</Link></li>
+                  <li>
+                    <Link href="/admin">관리자 페이지</Link>
+                  </li>
                 )}
               </ul>
             </div>
@@ -77,6 +101,9 @@ export default function Header() {
               >
                 대시보드
               </Link>
+              <Link href="/editor" className="btn btn-ghost btn-sm lg:btn-md">
+                에디터
+              </Link>
               <Link href="/shared" className="btn btn-ghost btn-sm lg:btn-md">
                 공유된 파일
               </Link>
@@ -87,10 +114,7 @@ export default function Header() {
                 내 업로드
               </Link>
               {user?.role === "admin" && (
-                <Link
-                  href="/admin"
-                  className="btn btn-ghost btn-sm lg:btn-md"
-                >
+                <Link href="/admin" className="btn btn-ghost btn-sm lg:btn-md">
                   관리자
                 </Link>
               )}

@@ -56,6 +56,32 @@ const EDITOR_JS_TOOLS = {
   },
 };
 
+// HTML 내보내기용 CSS 스타일
+function getExportStyles() {
+  return `
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+      h1, h2, h3, h4, h5, h6 { margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+      p { margin: 0.8em 0; }
+      table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+      th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+      th { background-color: #f5f5f5; font-weight: 600; }
+      tr:nth-child(even) { background-color: #fafafa; }
+      blockquote { border-left: 4px solid #ddd; margin: 1em 0; padding: 0.5em 1em; color: #666; background: #f9f9f9; }
+      blockquote cite { display: block; margin-top: 0.5em; font-style: italic; color: #999; }
+      pre { background: #f4f4f4; border: 1px solid #ddd; border-radius: 4px; padding: 12px; overflow-x: auto; }
+      code { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.9em; }
+      pre code { background: none; padding: 0; }
+      :not(pre) > code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+      hr { border: none; border-top: 2px solid #eee; margin: 2em 0; }
+      ul, ol { padding-left: 1.5em; margin: 0.8em 0; }
+      li { margin: 0.3em 0; }
+      .checklist-item { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+      .checklist-item input[type="checkbox"] { width: 16px; height: 16px; }
+    </style>
+  `;
+}
+
 // 에디터 블록 → HTML 변환
 function blocksToHtml(blocks) {
   return blocks
@@ -68,31 +94,49 @@ function blocksToHtml(blocks) {
         case "list": {
           const tag = block.data.style === "ordered" ? "ol" : "ul";
           const items = block.data.items
-            .map((item) => `<li>${typeof item === "string" ? item : item.content || item.text || ""}</li>`)
+            .map(
+              (item) =>
+                `<li>${typeof item === "string" ? item : item.content || item.text || ""}</li>`,
+            )
             .join("");
           return `<${tag}>${items}</${tag}>`;
         }
         case "checklist":
-          return block.data.items
+          return `<div class="checklist">${block.data.items
             .map(
               (item) =>
-                `<div><input type="checkbox" ${item.checked ? "checked" : ""} disabled /> ${item.text}</div>`
+                `<div class="checklist-item"><input type="checkbox" ${item.checked ? "checked" : ""} disabled /><span>${item.text}</span></div>`,
             )
-            .join("");
+            .join("")}</div>`;
         case "quote":
-          return `<blockquote><p>${block.data.text}</p><cite>${block.data.caption || ""}</cite></blockquote>`;
+          return `<blockquote><p>${block.data.text}</p>${block.data.caption ? `<cite>— ${block.data.caption}</cite>` : ""}</blockquote>`;
         case "code":
           return `<pre><code>${block.data.code}</code></pre>`;
         case "delimiter":
           return "<hr />";
         case "table": {
-          const rows = block.data.content
-            .map(
-              (row) =>
-                `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`
-            )
-            .join("");
-          return `<table>${rows}</table>`;
+          if (!block.data.content || block.data.content.length === 0) return "";
+          const withHeadings = block.data.withHeadings !== false;
+          let html = "<table>";
+          if (withHeadings && block.data.content.length > 0) {
+            html += `<thead><tr>${block.data.content[0].map((cell) => `<th>${cell}</th>`).join("")}</tr></thead>`;
+            html += "<tbody>";
+            for (let i = 1; i < block.data.content.length; i++) {
+              html += `<tr>${block.data.content[i].map((cell) => `<td>${cell}</td>`).join("")}</tr>`;
+            }
+            html += "</tbody>";
+          } else {
+            html += "<tbody>";
+            html += block.data.content
+              .map(
+                (row) =>
+                  `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`,
+              )
+              .join("");
+            html += "</tbody>";
+          }
+          html += "</table>";
+          return html;
         }
         default:
           return `<p>${JSON.stringify(block.data)}</p>`;
@@ -113,7 +157,10 @@ function blocksToMarkdown(blocks) {
         case "list":
           return block.data.items
             .map((item, i) => {
-              const text = typeof item === "string" ? item : item.content || item.text || "";
+              const text =
+                typeof item === "string"
+                  ? item
+                  : item.content || item.text || "";
               return block.data.style === "ordered"
                 ? `${i + 1}. ${stripHtml(text)}`
                 : `- ${stripHtml(text)}`;
@@ -123,7 +170,7 @@ function blocksToMarkdown(blocks) {
           return block.data.items
             .map(
               (item) =>
-                `- [${item.checked ? "x" : " "}] ${stripHtml(item.text)}`
+                `- [${item.checked ? "x" : " "}] ${stripHtml(item.text)}`,
             )
             .join("\n");
         case "quote":
@@ -133,14 +180,11 @@ function blocksToMarkdown(blocks) {
         case "delimiter":
           return "---";
         case "table": {
-          if (!block.data.content || block.data.content.length === 0)
-            return "";
+          if (!block.data.content || block.data.content.length === 0) return "";
           const headerRow = block.data.content[0]
             .map((cell) => stripHtml(cell))
             .join(" | ");
-          const separator = block.data.content[0]
-            .map(() => "---")
-            .join(" | ");
+          const separator = block.data.content[0].map(() => "---").join(" | ");
           const bodyRows = block.data.content
             .slice(1)
             .map((row) => row.map((cell) => stripHtml(cell)).join(" | "))
@@ -165,15 +209,17 @@ function blocksToText(blocks) {
         case "list":
           return block.data.items
             .map((item) => {
-              const text = typeof item === "string" ? item : item.content || item.text || "";
+              const text =
+                typeof item === "string"
+                  ? item
+                  : item.content || item.text || "";
               return `• ${stripHtml(text)}`;
             })
             .join("\n");
         case "checklist":
           return block.data.items
             .map(
-              (item) =>
-                `${item.checked ? "☑" : "☐"} ${stripHtml(item.text)}`
+              (item) => `${item.checked ? "☑" : "☐"} ${stripHtml(item.text)}`,
             )
             .join("\n");
         case "quote":
@@ -384,21 +430,18 @@ export default function LiveEditor({
   }, [file, encryptionPassword, getEditorData, saveStatus, onSaved]);
 
   // 에디터 내용 변경 시 자동 저장 (30초 디바운스)
-  const handleChange = useCallback(
-    async () => {
-      setSaveStatus("unsaved");
-      setSaveMessage("");
+  const handleChange = useCallback(async () => {
+    setSaveStatus("unsaved");
+    setSaveMessage("");
 
-      if (autoSaveTimer.current) {
-        clearTimeout(autoSaveTimer.current);
-      }
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+    }
 
-      autoSaveTimer.current = setTimeout(() => {
-        handleSave();
-      }, 30000);
-    },
-    [handleSave]
-  );
+    autoSaveTimer.current = setTimeout(() => {
+      handleSave();
+    }, 30000);
+  }, [handleSave]);
 
   // Ctrl+S 키보드 단축키
   useEffect(() => {
@@ -428,7 +471,8 @@ export default function LiveEditor({
       switch (format) {
         case "html": {
           const htmlBody = blocksToHtml(data.blocks);
-          content = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>${file?.originalName || "document"}</title></head>\n<body>\n${htmlBody}\n</body>\n</html>`;
+          const styles = getExportStyles();
+          content = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>${file?.originalName || "document"}</title>${styles}</head>\n<body>\n${htmlBody}\n</body>\n</html>`;
           mimeType = "text/html";
           extension = "html";
           break;
@@ -459,14 +503,15 @@ export default function LiveEditor({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const baseName = file?.originalName?.replace(/\.ejtxt$/, "") || "document";
+      const baseName =
+        file?.originalName?.replace(/\.ejtxt$/, "") || "document";
       a.download = `${baseName}.${extension}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     },
-    [getEditorData, file]
+    [getEditorData, file],
   );
 
   // 저장 상태 뱃지 색상
@@ -480,7 +525,9 @@ export default function LiveEditor({
           </span>
         );
       case "saved":
-        return <span className="badge badge-success gap-1 text-xs">✓ 저장됨</span>;
+        return (
+          <span className="badge badge-success gap-1 text-xs">✓ 저장됨</span>
+        );
       case "unsaved":
         return <span className="badge badge-info gap-1 text-xs">● 수정됨</span>;
       case "error":
@@ -518,9 +565,6 @@ export default function LiveEditor({
       {/* 툴바 */}
       <div className="flex items-center justify-between gap-2 px-2 py-2 border-b border-base-300 bg-base-200 rounded-t-lg">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate max-w-[200px]">
-            {file?.originalName}
-          </span>
           {file?.isEncrypted && (
             <span className="badge badge-warning badge-xs">🔒 암호화</span>
           )}
@@ -553,9 +597,7 @@ export default function LiveEditor({
                 className="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-44"
               >
                 <li>
-                  <button onClick={() => handleExport("html")}>
-                    🌐 HTML
-                  </button>
+                  <button onClick={() => handleExport("html")}>🌐 HTML</button>
                 </li>
                 <li>
                   <button onClick={() => handleExport("markdown")}>
@@ -568,9 +610,7 @@ export default function LiveEditor({
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => handleExport("json")}>
-                    🔧 JSON
-                  </button>
+                  <button onClick={() => handleExport("json")}>🔧 JSON</button>
                 </li>
               </ul>
             )}

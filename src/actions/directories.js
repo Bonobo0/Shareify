@@ -390,7 +390,7 @@ export async function deleteDirectory(directoryId) {
     const isOwner = directory.owner.toString() === userId;
     const hasDirectAdminAccess = directory.shared?.some(
       (share) =>
-        share.userId.toString() === userId && share.permission === "admin"
+        share.userId.toString() === userId && share.permission === "admin",
     );
 
     // 상위 디렉토리 권한 확인
@@ -511,7 +511,7 @@ export async function shareDirectory({
 
     // 이미 공유된 사용자인지 확인
     const existingShare = directory.shared.find(
-      (share) => share.userId.toString() === targetUser._id.toString()
+      (share) => share.userId.toString() === targetUser._id.toString(),
     );
 
     if (existingShare) {
@@ -578,7 +578,7 @@ export async function unshareDirectory({ directoryId, targetUserId }) {
     console.log("디렉토리 공유 대상 사용자 목록:", directory.shared);
     // 공유 제거
     directory.shared = directory.shared.filter(
-      (share) => share.userId.toString() !== targetUserId
+      (share) => share.userId.toString() !== targetUserId,
     );
 
     await directory.save();
@@ -793,7 +793,7 @@ export async function getDirectoryByHash({ hash }) {
       if (
         parentDirectory.owner._id.toString() === userId ||
         parentDirectory.shared.some(
-          (share) => share.userId._id.toString() === userId
+          (share) => share.userId._id.toString() === userId,
         )
       ) {
         if (
@@ -801,7 +801,7 @@ export async function getDirectoryByHash({ hash }) {
           parentDirectory.shared.some(
             (share) =>
               share.userId._id.toString() === userId &&
-              share.permission === "admin"
+              share.permission === "admin",
           )
         ) {
           hasParentAdminAccess = true; // 상위 디렉토리에서 admin 권한이 있는 경우
@@ -902,7 +902,7 @@ export async function deleteDirectoryRecursive(directoryId) {
         directory.shared.some(
           (share) =>
             share.userId.toString() === userId &&
-            (share.permission === "admin" || share.permission === "write")
+            (share.permission === "admin" || share.permission === "write"),
         )
       ) {
         permissionCheck = true;
@@ -913,7 +913,7 @@ export async function deleteDirectoryRecursive(directoryId) {
         let currentDirectory = directory;
         while (currentDirectory.parent) {
           const parentDirectory = await Directory.findById(
-            currentDirectory.parent
+            currentDirectory.parent,
           );
           if (!parentDirectory) {
             return { error: "상위 디렉토리를 찾을 수 없습니다." };
@@ -924,7 +924,8 @@ export async function deleteDirectoryRecursive(directoryId) {
               parentDirectory.shared.some(
                 (share) =>
                   share.userId.toString() === userId &&
-                  (share.permission === "admin" || share.permission === "write")
+                  (share.permission === "admin" ||
+                    share.permission === "write"),
               ))
           ) {
             permissionCheck = true;
@@ -1036,7 +1037,7 @@ export async function createDirectoryShareLink({
       directory.owner.toString() === userId ||
       directory.shared.some(
         (share) =>
-          share.userId.toString() === userId && share.permission === "admin"
+          share.userId.toString() === userId && share.permission === "admin",
       );
 
     if (!hasPermission) {
@@ -1098,7 +1099,7 @@ export async function getDirectoryShareLinks({ directoryId }) {
       directory.owner.toString() === userId ||
       directory.shared.some(
         (share) =>
-          share.userId.toString() === userId && share.permission === "admin"
+          share.userId.toString() === userId && share.permission === "admin",
       );
 
     if (!hasPermission) {
@@ -1153,7 +1154,7 @@ export async function deleteDirectoryShareLink({ directoryId, shareHash }) {
       directory.owner.toString() === userId ||
       directory.shared.some(
         (share) =>
-          share.userId.toString() === userId && share.permission === "admin"
+          share.userId.toString() === userId && share.permission === "admin",
       );
 
     if (!hasPermission) {
@@ -1162,7 +1163,7 @@ export async function deleteDirectoryShareLink({ directoryId, shareHash }) {
 
     // 공유 링크 제거
     directory.shareLinks = (directory.shareLinks || []).filter(
-      (link) => link.hash !== shareHash
+      (link) => link.hash !== shareHash,
     );
 
     await directory.save();
@@ -1193,7 +1194,7 @@ export async function getSharedDirectory({ shareHash }) {
 
     // 해당 공유 링크 찾기
     const shareLink = directory.shareLinks.find(
-      (link) => link.hash === shareHash
+      (link) => link.hash === shareHash,
     );
 
     if (!shareLink) {
@@ -1260,7 +1261,7 @@ export async function getSharedDirectoryFiles({
 
     // 해당 공유 링크 찾기
     const shareLink = directory.shareLinks.find(
-      (link) => link.hash === shareHash
+      (link) => link.hash === shareHash,
     );
 
     if (!shareLink) {
@@ -1351,7 +1352,7 @@ export async function removeDirectoryShare({ directoryId, shareId }) {
     const isOwner = directory.owner.toString() === userId;
     const hasAdminPermission = directory.shared.some(
       (share) =>
-        share.userId.toString() === userId && share.permission === "admin"
+        share.userId.toString() === userId && share.permission === "admin",
     );
 
     if (!isOwner && !hasAdminPermission) {
@@ -1397,7 +1398,7 @@ export async function getDirectoryBreadcrumbs({ directoryId }) {
       // 접근 권한 확인
       const isOwner = directory.owner._id.toString() === userId;
       const isShared = directory.shared?.some(
-        (share) => share.userId.toString() === userId
+        (share) => share.userId.toString() === userId,
       );
 
       if (!isOwner && !isShared) {
@@ -1423,5 +1424,198 @@ export async function getDirectoryBreadcrumbs({ directoryId }) {
   } catch (error) {
     console.error("breadcrumbs 조회 오류:", error);
     return { error: "경로 정보를 가져오는 중 오류가 발생했습니다." };
+  }
+}
+
+// 디렉토리 이동 (상위 디렉토리 변경)
+export async function moveDirectory({ directoryId, targetParentId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+
+    await connectToDatabase();
+
+    const directory = await Directory.findOne({
+      _id: directoryId,
+      owner: new mongoose.Types.ObjectId(userId),
+      deleted: { $ne: true },
+    });
+    if (!directory) return { error: "디렉토리를 찾을 수 없습니다." };
+
+    // 자기 자신으로 이동 방지
+    if (targetParentId && targetParentId === directoryId) {
+      return { error: "디렉토리를 자기 자신 안으로 이동할 수 없습니다." };
+    }
+
+    // 하위 디렉토리로 이동 방지 (순환 참조)
+    if (targetParentId) {
+      let currentId = targetParentId;
+      while (currentId) {
+        if (currentId === directoryId) {
+          return { error: "하위 디렉토리로 이동할 수 없습니다." };
+        }
+        const parentDir = await Directory.findById(currentId);
+        currentId = parentDir?.parent?.toString() || null;
+      }
+
+      const targetDir = await Directory.findOne({
+        _id: targetParentId,
+        owner: new mongoose.Types.ObjectId(userId),
+        deleted: { $ne: true },
+      });
+      if (!targetDir) return { error: "대상 디렉토리를 찾을 수 없습니다." };
+      directory.parent = new mongoose.Types.ObjectId(targetParentId);
+    } else {
+      directory.parent = null;
+    }
+
+    directory.updatedAt = new Date();
+    await directory.save();
+
+    return { success: true, message: "디렉토리가 이동되었습니다." };
+  } catch (error) {
+    console.error("디렉토리 이동 오류:", error);
+    return { error: "디렉토리 이동 중 오류가 발생했습니다." };
+  }
+}
+
+// 사용자의 모든 디렉토리 목록 (이동 대상 선택용)
+export async function getAllDirectoriesFlat() {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+
+    await connectToDatabase();
+
+    const directories = await Directory.find({
+      owner: new mongoose.Types.ObjectId(userId),
+      deleted: { $ne: true },
+    })
+      .sort({ name: 1 })
+      .lean();
+
+    // 경로 생성을 위한 맵
+    const dirMap = new Map();
+    directories.forEach((d) => {
+      dirMap.set(d._id.toString(), d);
+    });
+
+    const getFullPath = (dir) => {
+      const parts = [dir.name];
+      let current = dir;
+      while (current.parent) {
+        const parent = dirMap.get(current.parent.toString());
+        if (!parent) break;
+        parts.unshift(parent.name);
+        current = parent;
+      }
+      return parts.join(" / ");
+    };
+
+    return {
+      success: true,
+      directories: directories.map((d) => ({
+        id: d._id.toString(),
+        name: d.name,
+        parentId: d.parent?.toString() || null,
+        fullPath: getFullPath(d),
+      })),
+    };
+  } catch (error) {
+    console.error("전체 디렉토리 목록 오류:", error);
+    return { error: "디렉토리 목록을 불러오는 중 오류가 발생했습니다." };
+  }
+}
+
+// 벌크 디렉토리 이동
+export async function bulkMoveDirectories({ directoryIds, targetParentId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+    if (!directoryIds || directoryIds.length === 0)
+      return { error: "이동할 디렉토리를 선택해주세요." };
+
+    await connectToDatabase();
+
+    // 대상 디렉토리 검증
+    if (targetParentId) {
+      const targetDir = await Directory.findOne({
+        _id: targetParentId,
+        owner: new mongoose.Types.ObjectId(userId),
+        deleted: { $ne: true },
+      });
+      if (!targetDir) return { error: "대상 디렉토리를 찾을 수 없습니다." };
+    }
+
+    // 모든 디렉토리를 가져와서 순환 참조 체크에 사용
+    const allDirs = await Directory.find({
+      owner: new mongoose.Types.ObjectId(userId),
+      deleted: { $ne: true },
+    }).lean();
+
+    const dirMap = new Map();
+    allDirs.forEach((d) => dirMap.set(d._id.toString(), d));
+
+    // 순환 참조 체크 헬퍼
+    const wouldCreateCycle = (dirId, newParentId) => {
+      if (!newParentId) return false;
+      let current = newParentId;
+      while (current) {
+        if (current === dirId) return true;
+        const parent = dirMap.get(current);
+        current = parent?.parent?.toString() || null;
+      }
+      return false;
+    };
+
+    const results = { success: 0, failed: 0, errors: [] };
+
+    for (const directoryId of directoryIds) {
+      try {
+        const dir = await Directory.findOne({
+          _id: directoryId,
+          owner: new mongoose.Types.ObjectId(userId),
+          deleted: { $ne: true },
+        });
+        if (!dir) {
+          results.failed++;
+          results.errors.push(`디렉토리를 찾을 수 없음: ${directoryId}`);
+          continue;
+        }
+
+        // 자기 자신으로 이동 불가
+        if (targetParentId === directoryId) {
+          results.failed++;
+          results.errors.push(`자기 자신으로 이동 불가: ${dir.name}`);
+          continue;
+        }
+
+        // 순환 참조 체크
+        if (wouldCreateCycle(directoryId, targetParentId)) {
+          results.failed++;
+          results.errors.push(`순환 참조 오류: ${dir.name}`);
+          continue;
+        }
+
+        dir.parent = targetParentId
+          ? new mongoose.Types.ObjectId(targetParentId)
+          : null;
+        dir.updatedAt = new Date();
+        await dir.save();
+        results.success++;
+      } catch (err) {
+        results.failed++;
+        results.errors.push(`오류: ${directoryId}`);
+      }
+    }
+
+    return {
+      success: true,
+      message: `${results.success}개 디렉토리 이동 완료${results.failed > 0 ? `, ${results.failed}개 실패` : ""}`,
+      results,
+    };
+  } catch (error) {
+    console.error("벌크 디렉토리 이동 오류:", error);
+    return { error: "디렉토리 이동 중 오류가 발생했습니다." };
   }
 }

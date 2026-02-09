@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // react-editor-js가 React Strict Mode의 이중 마운트를 처리하지 못해
+  // 개발 환경에서 에디터가 로드되지 않는 문제 방지
+  reactStrictMode: false,
   // Production 환경에서 console 제거
   compiler: {
     removeConsole:

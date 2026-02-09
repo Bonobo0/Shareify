@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import ShareModal from "@/app/components/shareModal";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -10,11 +11,18 @@ import {
   deleteFile,
 } from "@/actions/files";
 import { toggleFilePublic } from "@/actions/share";
-import {
-  downloadAndDecrypt,
-  isMediaFile,
-} from "@/lib/crypto/encryption";
+import { downloadAndDecrypt, isMediaFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
+
+const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col items-center justify-center py-12 gap-3">
+      <span className="loading loading-spinner loading-lg"></span>
+      <p className="text-sm opacity-60">에디터 로딩 중...</p>
+    </div>
+  ),
+});
 
 export default function FilePage() {
   const params = useParams();
@@ -144,7 +152,7 @@ export default function FilePage() {
       const downloadResult = await downloadAndDecrypt(
         result.downloadUrl,
         decryptPassword,
-        metadata
+        metadata,
       );
 
       if (downloadResult.error) {
@@ -173,8 +181,15 @@ export default function FilePage() {
           showAlert(result.error);
           return;
         }
+        const isPdfOrTextOrEjtxt =
+          file.mimetype?.startsWith("application/pdf") ||
+          file.originalMimetype?.startsWith("application/pdf") ||
+          file.mimetype?.startsWith("text/") ||
+          file.originalMimetype?.startsWith("text/") ||
+          file.originalName?.endsWith(".ejtxt");
         const previewResult = await createPreviewUrl({
           downloadUrl: result.downloadUrl,
+          forceBlob: isPdfOrTextOrEjtxt,
         });
 
         if (previewResult.error) {
@@ -408,7 +423,7 @@ export default function FilePage() {
                 <li>
                   <strong>크기:</strong>{" "}
                   {formatBytes(
-                    file?.isEncrypted ? file?.originalSize : file?.size
+                    file?.isEncrypted ? file?.originalSize : file?.size,
                   )}
                 </li>
                 <li>
@@ -478,7 +493,7 @@ export default function FilePage() {
                 🎮 게임 플레이
               </button>
             )}
-            
+
             <button
               className={`btn btn-primary btn-sm sm:btn-md ${
                 downloadLoading ? "loading" : ""
@@ -489,14 +504,17 @@ export default function FilePage() {
               ⬇️ 다운로드
             </button>
 
-            {isMediaFile(
-              file?.isEncrypted ? file?.originalMimetype : file?.mimetype
-            ) && (
+            {(isMediaFile(
+              file?.isEncrypted ? file?.originalMimetype : file?.mimetype,
+            ) ||
+              file?.originalName?.endsWith(".ejtxt")) && (
               <button
                 className="btn btn-secondary btn-sm sm:btn-md"
                 onClick={handlePreview}
               >
-                👁️ 미리보기
+                {file?.originalName?.endsWith(".ejtxt")
+                  ? "✏️ 편집하기"
+                  : "👁️ 미리보기"}
               </button>
             )}
             {isOwner && (
@@ -670,6 +688,39 @@ export default function FilePage() {
               ) : previewModal.file.mimetype?.startsWith("audio/") ||
                 previewModal.file.originalMimetype?.startsWith("audio/") ? (
                 <audio src={previewModal.url} controls className="w-full" />
+              ) : previewModal.file.mimetype?.startsWith("application/pdf") ||
+                previewModal.file.originalMimetype?.startsWith(
+                  "application/pdf",
+                ) ? (
+                <iframe
+                  src={previewModal.url}
+                  className="w-full h-[70vh]"
+                  title={previewModal.file.originalName}
+                >
+                  PDF를 표시할 수 없습니다.
+                </iframe>
+              ) : previewModal.file.originalName?.endsWith(".ejtxt") ? (
+                <LiveEditor
+                  file={previewModal.file}
+                  fileUrl={previewModal.url}
+                  encryptionPassword={previewModal.encryptionPassword || null}
+                  onClose={() => {
+                    if (previewModal.url.startsWith("blob:")) {
+                      URL.revokeObjectURL(previewModal.url);
+                    }
+                    setPreviewModal(null);
+                    fetchFileDetails();
+                  }}
+                />
+              ) : previewModal.file.mimetype?.startsWith("text/") ||
+                previewModal.file.originalMimetype?.startsWith("text/") ? (
+                <iframe
+                  src={previewModal.url}
+                  className="w-full h-[70vh]"
+                  title={previewModal.file.originalName}
+                >
+                  텍스트를 표시할 수 없습니다.
+                </iframe>
               ) : (
                 <p>미리보기를 지원하지 않는 파일 형식입니다.</p>
               )}
@@ -678,10 +729,13 @@ export default function FilePage() {
               <button
                 className="btn"
                 onClick={() => {
+                  const isEjtxt =
+                    previewModal.file.originalName?.endsWith(".ejtxt");
                   if (previewModal.url.startsWith("blob:")) {
                     URL.revokeObjectURL(previewModal.url);
                   }
                   setPreviewModal(null);
+                  if (isEjtxt) fetchFileDetails();
                 }}
               >
                 닫기

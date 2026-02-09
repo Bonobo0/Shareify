@@ -13,6 +13,7 @@ export default function BulkActionHandler({
   onShowConfirm,
   files = [],
   directories = [],
+  onBulkMove,
 }) {
   const [selectMode, setSelectMode] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -114,7 +115,7 @@ export default function BulkActionHandler({
 
           // 에러 확인
           const errors = results.filter(
-            (result) => !result.success || result.error
+            (result) => !result.success || result.error,
           );
 
           setDeleteProgress({
@@ -126,11 +127,11 @@ export default function BulkActionHandler({
 
           if (errors.length > 0) {
             onShowAlert(
-              `일부 항목 삭제 실패: ${errors[0].error || "알 수 없는 오류"}`
+              `일부 항목 삭제 실패: ${errors[0].error || "알 수 없는 오류"}`,
             );
           } else {
             onShowAlert(
-              `${selectedItems.size}개 항목이 성공적으로 삭제되었습니다.`
+              `${selectedItems.size}개 항목이 성공적으로 삭제되었습니다.`,
             );
           }
 
@@ -148,7 +149,7 @@ export default function BulkActionHandler({
         } finally {
           setBulkActionLoading(false);
         }
-      }
+      },
     );
   };
 
@@ -168,7 +169,7 @@ export default function BulkActionHandler({
     if (selectedFiles.length === 0) {
       console.log("다운로드할 파일이 없음");
       onShowAlert(
-        "다운로드할 파일을 선택해주세요. (디렉토리는 지원되지 않습니다)"
+        "다운로드할 파일을 선택해주세요. (디렉토리는 지원되지 않습니다)",
       );
       return;
     }
@@ -247,6 +248,16 @@ export default function BulkActionHandler({
               📥 다운로드
             </button>
 
+            {onBulkMove && (
+              <button
+                onClick={() => onBulkMove(selectedItems)}
+                className="btn btn-xs sm:btn-sm btn-accent flex-1 sm:flex-none"
+                disabled={bulkActionLoading}
+              >
+                📁 이동
+              </button>
+            )}
+
             <button
               onClick={handleBulkDelete}
               className={`btn btn-xs sm:btn-sm btn-error flex-1 sm:flex-none ${
@@ -320,7 +331,7 @@ export default function BulkActionHandler({
                 ></progress>
                 <div className="text-center text-sm mt-1 text-gray-600">
                   {Math.round(
-                    (deleteProgress.current / deleteProgress.total) * 100
+                    (deleteProgress.current / deleteProgress.total) * 100,
                   )}
                   %
                 </div>

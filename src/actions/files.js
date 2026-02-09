@@ -98,7 +98,7 @@ export async function getFileList({
         if (
           parentDirectory.owner._id.toString() === userId ||
           parentDirectory.shared.some(
-            (share) => share.userId._id.toString() === userId
+            (share) => share.userId._id.toString() === userId,
           )
         ) {
           hasParentAccess = true;
@@ -197,7 +197,7 @@ export async function getFileList({
         isEncrypted: f.isEncrypted,
         originalSize: f.originalSize,
         originalMimetype: f.originalMimetype,
-      }))
+      })),
     );
 
     // 총 파일 수
@@ -369,7 +369,7 @@ export async function uploadFile({
 
           if (sharedDirectory) {
             const shareLink = sharedDirectory.shareLinks.find(
-              (link) => link.hash === shareHash
+              (link) => link.hash === shareHash,
             );
 
             // 링크가 유효하고 업로드 권한이 있으며 만료되지 않은 경우
@@ -575,13 +575,13 @@ export async function deleteFile({ fileId }) {
     const isOwner = file.owner.toString() === userId;
     const hasDirectAdminAccess = file.shared?.some(
       (share) =>
-        share.userId.toString() === userId && share.permission === "admin"
+        share.userId.toString() === userId && share.permission === "admin",
     );
 
     // 상위 디렉토리 권한 확인
     let hasParentAdminAccess = false;
     let currentDirectory = await Directory.findById(
-      file.parentDirectory
+      file.parentDirectory,
     ).lean();
     while (currentDirectory && !hasParentAdminAccess) {
       const parentDirectory = await Directory.findOne({
@@ -670,7 +670,7 @@ export async function getFileDownloadUrl({
     // 파일 접근 권한 확인
     const isOwner = file.owner.toString() === userId;
     const isDirectlyShared = file.shared?.some(
-      (share) => share.userId.toString() === userId
+      (share) => share.userId.toString() === userId,
     );
     // 현재 디렉토리 권한 확인
     let hasAccess = false;
@@ -741,7 +741,7 @@ export async function getFileDownloadUrl({
     // 다운로드 URL 생성 (원본 파일명과 함께)
     const downloadUrl = await generateDownloadUrl(
       r2Key,
-      asPreview ? null : file.originalName
+      asPreview ? null : file.originalName,
     );
 
     return {
@@ -789,13 +789,13 @@ export async function shareFile({ fileId, email, permission = "read" }) {
     const isOwner = file.owner.toString() === userId;
     const hasDirectAdminAccess = file.shared?.some(
       (share) =>
-        share.userId.toString() === userId && share.permission === "admin"
+        share.userId.toString() === userId && share.permission === "admin",
     );
 
     // 상위 디렉토리 권한 확인
     let hasParentAdminAccess = false;
     let currentDirectory = await Directory.findById(
-      file.parentDirectory
+      file.parentDirectory,
     ).lean();
     while (currentDirectory && !hasParentAdminAccess) {
       const parentDirectory = await Directory.findOne({
@@ -839,7 +839,7 @@ export async function shareFile({ fileId, email, permission = "read" }) {
 
     // 이미 공유된 사용자인지 확인
     const existingShare = file.shared.find(
-      (share) => share.userId.toString() === targetUser._id.toString()
+      (share) => share.userId.toString() === targetUser._id.toString(),
     );
 
     if (existingShare) {
@@ -904,7 +904,7 @@ export async function getFileDetails({ hash, fileId }) {
     // 접근 권한 확인
     const isOwner = file.owner._id.toString() === userId;
     const isShared = file.shared.some(
-      (share) => share.userId._id.toString() === userId
+      (share) => share.userId._id.toString() === userId,
     );
     let permission = "none"; // 기본 권한은 없음
     // 최상위 디렉토리 권한 확인
@@ -925,7 +925,7 @@ export async function getFileDetails({ hash, fileId }) {
       }
       if (
         parentDirectory.shared.some(
-          (share) => share.userId._id.toString() === userId
+          (share) => share.userId._id.toString() === userId,
         )
       ) {
         permission = "read"; // 상위 디렉토리에서 공유받은 경우
@@ -945,7 +945,7 @@ export async function getFileDetails({ hash, fileId }) {
       permission = "admin";
     } else if (isShared && permission === "none") {
       const userShare = file.shared.find(
-        (share) => share.userId._id.toString() === userId
+        (share) => share.userId._id.toString() === userId,
       );
       permission = userShare ? userShare.permission : "read";
     }
@@ -1011,7 +1011,7 @@ export async function getSharedFileDownloadUrl({ fileId, shareHash }) {
 
     // 해당 공유 링크 찾기
     const shareLink = directory.shareLinks.find(
-      (link) => link.hash === shareHash
+      (link) => link.hash === shareHash,
     );
 
     if (!shareLink) {
@@ -1201,13 +1201,13 @@ export async function removeFileShare({ fileId, shareId }) {
     const isOwner = file.owner.toString() === userId;
     const hasAdminPermission = file.shared.some(
       (share) =>
-        share.userId.toString() === userId && share.permission === "admin"
+        share.userId.toString() === userId && share.permission === "admin",
     );
 
     // 상위 디렉토리 권한 확인
     let hasParentAdminAccess = false;
     let currentDirectory = await Directory.findById(
-      file.parentDirectory
+      file.parentDirectory,
     ).lean();
     while (currentDirectory && !hasParentAdminAccess) {
       const parentDirectory = await Directory.findOne({
@@ -1300,7 +1300,7 @@ export async function getAllFilesForDownload({ directoryId }) {
         // 파일 접근 권한 확인
         const isOwner = file.owner.toString() === userId;
         const isDirectlyShared = file.shared?.some(
-          (share) => share.userId.toString() === userId
+          (share) => share.userId.toString() === userId,
         );
 
         // 상위 디렉토리 권한 확인 (이미 디렉토리 권한을 확인했으므로 생략 가능)
@@ -1308,7 +1308,7 @@ export async function getAllFilesForDownload({ directoryId }) {
           const r2Key = file.path || file.fileName;
           const downloadUrl = await generateDownloadUrl(
             r2Key,
-            file.originalName
+            file.originalName,
           );
 
           files.push({
@@ -1345,7 +1345,7 @@ export async function getAllFilesForDownload({ directoryId }) {
         const subPath = path ? `${path}/${subDir.name}` : subDir.name;
         const subFiles = await getFilesRecursively(
           subDir._id.toString(),
-          subPath
+          subPath,
         );
         files.push(...subFiles);
       }
@@ -1396,7 +1396,7 @@ export async function getSelectedFilesForDownload({ fileIds }) {
       // 파일 접근 권한 확인
       const isOwner = file.owner.toString() === userId;
       const isDirectlyShared = file.shared?.some(
-        (share) => share.userId.toString() === userId
+        (share) => share.userId.toString() === userId,
       );
 
       // 상위 디렉토리 권한 확인
@@ -1480,14 +1480,14 @@ export async function prepareFileUpdate({ fileId }) {
     const hasWriteAccess = file.shared?.some(
       (share) =>
         share.userId.toString() === userId &&
-        ["write", "admin"].includes(share.permission)
+        ["write", "admin"].includes(share.permission),
     );
 
     // 상위 디렉토리 쓰기 권한 확인
     let hasParentWriteAccess = false;
     if (!isOwner && !hasWriteAccess) {
       let currentDirectory = await Directory.findById(
-        file.parentDirectory
+        file.parentDirectory,
       ).lean();
       while (currentDirectory && !hasParentWriteAccess) {
         const parentDir = await Directory.findOne({
@@ -1570,7 +1570,7 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
     const hasWriteAccess = file.shared?.some(
       (share) =>
         share.userId.toString() === userId &&
-        ["write", "admin"].includes(share.permission)
+        ["write", "admin"].includes(share.permission),
     );
 
     if (!isOwner && !hasWriteAccess) {
@@ -1601,5 +1601,264 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
   } catch (error) {
     console.error("파일 업데이트 완료 오류:", error);
     return { error: "파일 저장을 완료하는 중 오류가 발생했습니다." };
+  }
+}
+
+// 에디터 파일(.ejtxt) 목록 가져오기
+export async function getEditorFiles() {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    const files = await File.find({
+      owner: new mongoose.Types.ObjectId(userId),
+      originalName: { $regex: /\.ejtxt$/i },
+      deleted: { $ne: true },
+    })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    return {
+      success: true,
+      files: files.map((f) => ({
+        id: f._id.toString(),
+        originalName: f.originalName,
+        size: f.size,
+        hash: f.hash,
+        isEncrypted: f.isEncrypted || false,
+        createdAt: f.createdAt?.toISOString(),
+        updatedAt: f.updatedAt?.toISOString(),
+      })),
+    };
+  } catch (error) {
+    console.error("에디터 파일 목록 오류:", error);
+    return { error: "에디터 파일 목록을 불러오는 중 오류가 발생했습니다." };
+  }
+}
+
+// 새 에디터 파일(.ejtxt) 생성
+export async function createEditorFile({
+  filename,
+  directoryId = null,
+  isEncrypted = false,
+  encryptionPassword = null,
+}) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    if (!filename) {
+      return { error: "파일 이름을 입력해주세요." };
+    }
+
+    // .ejtxt 확장자 보장
+    const finalName = filename.endsWith(".ejtxt")
+      ? filename
+      : `${filename}.ejtxt`;
+
+    await connectToDatabase();
+
+    const user = await User.findById(userId);
+    if (!user) return { error: "사용자를 찾을 수 없습니다." };
+    if (user.suspended) return { error: "정지된 사용자입니다." };
+    if (!user.isVerified) return { error: "이메일 인증이 필요합니다." };
+
+    // 디렉토리 검증
+    if (directoryId) {
+      const dir = await Directory.findOne({
+        _id: directoryId,
+        owner: new mongoose.Types.ObjectId(userId),
+        deleted: { $ne: true },
+      });
+      if (!dir) return { error: "디렉토리를 찾을 수 없습니다." };
+    }
+
+    // 빈 에디터 데이터 생성
+    const emptyData = JSON.stringify({
+      time: Date.now(),
+      blocks: [{ type: "paragraph", data: { text: "" } }],
+    });
+    const dataBlob = Buffer.from(emptyData, "utf-8");
+    const fileSize = dataBlob.length;
+
+    // 저장소 용량 확인
+    if (user.storageUsed + fileSize > user.storageLimit) {
+      return { error: "저장소 용량이 부족합니다." };
+    }
+
+    const uniqueFilename = generateUniqueFilename(finalName);
+    const fileHash = generateFileHash();
+    const mimetype = isEncrypted
+      ? "application/octet-stream"
+      : "application/json";
+    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype);
+
+    const file = new File({
+      originalName: finalName,
+      fileName: uniqueFilename,
+      size: fileSize,
+      mimetype,
+      hash: fileHash,
+      path: uniqueFilename,
+      owner: userId,
+      parentDirectory: directoryId
+        ? new mongoose.Types.ObjectId(directoryId)
+        : null,
+      uploaded: false,
+      isEncrypted: isEncrypted || false,
+      originalSize: isEncrypted ? fileSize : null,
+      originalMimetype: isEncrypted ? "application/json" : null,
+    });
+
+    await file.save();
+
+    return {
+      success: true,
+      file: {
+        id: file._id.toString(),
+        originalName: file.originalName,
+        hash: file.hash,
+        size: fileSize,
+        isEncrypted: file.isEncrypted,
+        createdAt: file.createdAt?.toISOString(),
+        updatedAt: file.updatedAt?.toISOString(),
+      },
+      uploadUrl,
+      initialData: emptyData,
+    };
+  } catch (error) {
+    console.error("에디터 파일 생성 오류:", error);
+    return { error: "파일 생성 중 오류가 발생했습니다." };
+  }
+}
+
+// 새 에디터 파일 업로드 완료
+export async function completeEditorFileCreation({ fileId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+
+    await connectToDatabase();
+
+    const file = await File.findOne({ _id: fileId, deleted: { $ne: true } });
+    if (!file) return { error: "파일을 찾을 수 없습니다." };
+    if (file.owner.toString() !== userId) return { error: "권한이 없습니다." };
+
+    file.uploaded = true;
+    await file.save();
+
+    // 저장소 사용량 업데이트
+    await User.findByIdAndUpdate(userId, {
+      $inc: { storageUsed: file.size },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("에디터 파일 생성 완료 오류:", error);
+    return { error: "파일 생성을 완료하는 중 오류가 발생했습니다." };
+  }
+}
+
+// 파일 이동 (디렉토리 변경)
+export async function moveFile({ fileId, targetDirectoryId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+
+    await connectToDatabase();
+
+    const file = await File.findOne({ _id: fileId, deleted: { $ne: true } });
+    if (!file) return { error: "파일을 찾을 수 없습니다." };
+    if (file.owner.toString() !== userId)
+      return { error: "파일 이동 권한이 없습니다." };
+
+    // 대상 디렉토리 검증 (null이면 루트로 이동)
+    if (targetDirectoryId) {
+      const targetDir = await Directory.findOne({
+        _id: targetDirectoryId,
+        owner: new mongoose.Types.ObjectId(userId),
+        deleted: { $ne: true },
+      });
+      if (!targetDir) return { error: "대상 디렉토리를 찾을 수 없습니다." };
+      file.parentDirectory = new mongoose.Types.ObjectId(targetDirectoryId);
+    } else {
+      file.parentDirectory = null;
+    }
+
+    file.updatedAt = new Date();
+    await file.save();
+
+    return { success: true, message: "파일이 이동되었습니다." };
+  } catch (error) {
+    console.error("파일 이동 오류:", error);
+    return { error: "파일 이동 중 오류가 발생했습니다." };
+  }
+}
+
+// 벌크 파일 이동
+export async function bulkMoveFiles({ fileIds, targetDirectoryId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+    if (!fileIds || fileIds.length === 0)
+      return { error: "이동할 파일을 선택해주세요." };
+
+    await connectToDatabase();
+
+    // 대상 디렉토리 검증
+    if (targetDirectoryId) {
+      const targetDir = await Directory.findOne({
+        _id: targetDirectoryId,
+        owner: new mongoose.Types.ObjectId(userId),
+        deleted: { $ne: true },
+      });
+      if (!targetDir) return { error: "대상 디렉토리를 찾을 수 없습니다." };
+    }
+
+    const results = { success: 0, failed: 0, errors: [] };
+
+    for (const fileId of fileIds) {
+      try {
+        const file = await File.findOne({
+          _id: fileId,
+          deleted: { $ne: true },
+        });
+        if (!file) {
+          results.failed++;
+          results.errors.push(`파일을 찾을 수 없음: ${fileId}`);
+          continue;
+        }
+        if (file.owner.toString() !== userId) {
+          results.failed++;
+          results.errors.push(`권한 없음: ${file.originalName}`);
+          continue;
+        }
+
+        file.parentDirectory = targetDirectoryId
+          ? new mongoose.Types.ObjectId(targetDirectoryId)
+          : null;
+        file.updatedAt = new Date();
+        await file.save();
+        results.success++;
+      } catch (err) {
+        results.failed++;
+        results.errors.push(`오류: ${fileId}`);
+      }
+    }
+
+    return {
+      success: true,
+      message: `${results.success}개 파일 이동 완료${results.failed > 0 ? `, ${results.failed}개 실패` : ""}`,
+      results,
+    };
+  } catch (error) {
+    console.error("벌크 파일 이동 오류:", error);
+    return { error: "파일 이동 중 오류가 발생했습니다." };
   }
 }

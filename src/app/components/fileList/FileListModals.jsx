@@ -5,7 +5,15 @@ import dynamic from "next/dynamic";
 
 // LiveEditor uses @editorjs/* packages that reference browser-only 'Element' API
 // at module evaluation time, so it must be dynamically imported with ssr: false
-const LiveEditor = dynamic(() => import("../liveEditor"), { ssr: false });
+const LiveEditor = dynamic(() => import("../liveEditor"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col items-center justify-center py-12 gap-3">
+      <span className="loading loading-spinner loading-lg"></span>
+      <p className="text-sm opacity-60">에디터 로딩 중...</p>
+    </div>
+  ),
+});
 
 export default function FileListModals({
   decryptModal,
@@ -129,7 +137,7 @@ export default function FileListModals({
                 <audio src={previewModal.url} controls className="w-full" />
               ) : previewModal.file.mimetype?.startsWith("application/pdf") ||
                 previewModal.file.originalMimetype?.startsWith(
-                  "application/pdf"
+                  "application/pdf",
                 ) ? (
                 <iframe
                   src={previewModal.url}
@@ -137,15 +145,6 @@ export default function FileListModals({
                   title={previewModal.file.originalName}
                 >
                   PDF를 표시할 수 없습니다.
-                </iframe>
-              ) : previewModal.file.mimetype?.startsWith("text/") ||
-                previewModal.file.originalMimetype?.startsWith("text/") ? (
-                <iframe
-                  src={previewModal.url}
-                  className="w-full h-[70vh]"
-                  title={previewModal.file.originalName}
-                >
-                  텍스트를 표시할 수 없습니다.
                 </iframe>
               ) : previewModal.file.originalName.endsWith(".ejtxt") ? (
                 <LiveEditor
@@ -157,9 +156,18 @@ export default function FileListModals({
                       URL.revokeObjectURL(previewModal.url);
                     }
                     setPreviewModal(null);
+                    fetchData();
                   }}
-                  onSaved={() => fetchData()}
                 />
+              ) : previewModal.file.mimetype?.startsWith("text/") ||
+                previewModal.file.originalMimetype?.startsWith("text/") ? (
+                <iframe
+                  src={previewModal.url}
+                  className="w-full h-[70vh]"
+                  title={previewModal.file.originalName}
+                >
+                  텍스트를 표시할 수 없습니다.
+                </iframe>
               ) : (
                 <p>미리보기를 지원하지 않는 파일 형식입니다.</p>
               )}
@@ -168,10 +176,13 @@ export default function FileListModals({
               <button
                 className="btn"
                 onClick={() => {
+                  const isEjtxt =
+                    previewModal.file.originalName?.endsWith(".ejtxt");
                   if (previewModal.url.startsWith("blob:")) {
                     URL.revokeObjectURL(previewModal.url);
                   }
                   setPreviewModal(null);
+                  if (isEjtxt) fetchData();
                 }}
               >
                 닫기
@@ -283,8 +294,8 @@ export default function FileListModals({
               prevDirs.map((dir) =>
                 dir.id === editDirectoryModal.directoryId
                   ? { ...dir, ...updatedDirectory }
-                  : dir
-              )
+                  : dir,
+              ),
             );
           } else {
             fetchData();
