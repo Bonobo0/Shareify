@@ -9,6 +9,7 @@ import {
   deleteFile,
   getFileDetails,
   getMyUploadedFiles,
+  renameFile,
 } from "@/actions/files";
 import {
   getDirectoryList,
@@ -116,6 +117,11 @@ export default function FileList({
     itemType: null,
     bulkItems: null,
   });
+
+  // 이름 변경 모달 상태
+  const [renameModal, setRenameModal] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameLoading, setRenameLoading] = useState(false);
 
   // 헬퍼 함수들
   const showAlert = (message) => {
@@ -503,6 +509,47 @@ export default function FileList({
     });
     setSelectedItems(new Set());
     fetchData();
+  };
+
+  // 파일 이름 변경 핸들러
+  const handleRenameFile = (file) => {
+    setRenameModal(file);
+    setRenameValue(file.originalName);
+  };
+
+  // 파일 이름 변경 실행
+  const handleRenameSubmit = async () => {
+    if (!renameModal || !renameValue.trim()) return;
+
+    setRenameLoading(true);
+    try {
+      const result = await renameFile({
+        fileId: renameModal.id,
+        newName: renameValue.trim(),
+      });
+
+      if (result.error) {
+        showAlert(result.error);
+        return;
+      }
+
+      // 파일 목록에서 이름 업데이트
+      setFiles((prevFiles) =>
+        prevFiles.map((f) =>
+          f.id === renameModal.id
+            ? { ...f, originalName: result.file.originalName }
+            : f,
+        ),
+      );
+
+      setRenameModal(null);
+      setRenameValue("");
+      showAlert("파일 이름이 변경되었습니다.");
+    } catch (err) {
+      showAlert("파일 이름 변경 중 오류가 발생했습니다.");
+    } finally {
+      setRenameLoading(false);
+    }
   };
 
   // 드래그 앤 드롭 이동 핸들러
@@ -943,6 +990,7 @@ export default function FileList({
             onMoveDirectory={handleMoveDirectory}
             onDragDrop={handleDragDrop}
             currentDirectoryId={directoryId}
+            onRenameFile={handleRenameFile}
           />
           {/* 페이지네이터 */}
           <Paginator
@@ -990,6 +1038,12 @@ export default function FileList({
         EditDirectoryModal={EditDirectoryModal}
         BulkDownloadModal={BulkDownloadModal}
         SelectedDownloadModal={SelectedDownloadModal}
+        renameModal={renameModal}
+        setRenameModal={setRenameModal}
+        renameValue={renameValue}
+        setRenameValue={setRenameValue}
+        onRenameSubmit={handleRenameSubmit}
+        renameLoading={renameLoading}
       />
       {/* 이동 모달 */}
       <MoveModal

@@ -1623,6 +1623,58 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
   }
 }
 
+// 파일 이름 변경
+export async function renameFile({ fileId, newName }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    if (!newName || !newName.trim()) {
+      return { error: "파일 이름을 입력해주세요." };
+    }
+
+    const trimmedName = newName.trim();
+
+    if (trimmedName.length > 255) {
+      return { error: "파일 이름은 255자 이내로 입력해주세요." };
+    }
+
+    await connectToDatabase();
+
+    const file = await File.findOne({
+      _id: fileId,
+      deleted: { $ne: true },
+    });
+
+    if (!file) {
+      return { error: "파일을 찾을 수 없습니다." };
+    }
+
+    // 소유자만 이름 변경 가능
+    if (file.owner.toString() !== userId) {
+      return { error: "파일 이름을 변경할 권한이 없습니다." };
+    }
+
+    file.originalName = trimmedName;
+    file.updatedAt = new Date();
+    await file.save();
+
+    return {
+      success: true,
+      message: "파일 이름이 변경되었습니다.",
+      file: {
+        id: file._id.toString(),
+        originalName: file.originalName,
+      },
+    };
+  } catch (error) {
+    console.error("파일 이름 변경 오류:", error);
+    return { error: "파일 이름을 변경하는 중 오류가 발생했습니다." };
+  }
+}
+
 // 에디터 파일(.ejtxt) 목록 가져오기
 export async function getEditorFiles() {
   try {
@@ -1643,8 +1695,8 @@ export async function getEditorFiles() {
       .sort({ updatedAt: -1 })
       .lean();
 
-    // 공유 받은 .ejtxt 파일들
-    const sharedFiles = await File.find({
+    // 직접 공유 받은 .ejtxt 파일들
+    const directlySharedFiles = await File.find({
       "shared": {
         $elemMatch: {
           "userId": new mongoose.Types.ObjectId(userId),
@@ -1657,6 +1709,77 @@ export async function getEditorFiles() {
       .populate("parentDirectory", "name")
       .sort({ updatedAt: -1 })
       .lean();
+
+    // 디렉토리 공유를 통해 접근 가능한 .ejtxt 파일들
+    // 사용자에게 공유된 디렉토리 찾기
+    const sharedDirectories = await Directory.find({
+      "shared": {
+        $elemMatch: {
+          "userId": new mongoose.Types.ObjectId(userId),
+        },
+      },
+      deleted: { $ne: true },
+    }).lean();
+
+    // 공유된 디렉토리와 모든 하위 디렉토리의 ID 수집
+    const sharedDirIds = new Set(sharedDirectories.map((d) => d._id.toString()));
+    const sharedDirPermissions = {};
+    sharedDirectories.forEach((d) => {
+      const dirShare = d.shared?.find(
+        (s) => (s.userId._id || s.userId).toString() === userId
+      );
+      sharedDirPermissions[d._id.toString()] = dirShare?.permission || "read";
+    });
+
+    if (sharedDirIds.size > 0) {
+      // 하위 디렉토리를 재귀적으로 찾기
+      let parentIds = [...sharedDirIds];
+      while (parentIds.length > 0) {
+        const childDirs = await Directory.find({
+          parent: { $in: parentIds.map((id) => new mongoose.Types.ObjectId(id)) },
+          deleted: { $ne: true },
+        }).lean();
+
+        const newParentIds = [];
+        childDirs.forEach((d) => {
+          const idStr = d._id.toString();
+          if (!sharedDirIds.has(idStr)) {
+            sharedDirIds.add(idStr);
+            newParentIds.push(idStr);
+            // 하위 디렉토리는 부모의 권한을 상속
+            const parentId = d.parent.toString();
+            sharedDirPermissions[idStr] = sharedDirPermissions[parentId] || "read";
+          }
+        });
+        parentIds = newParentIds;
+      }
+    }
+
+    // 공유 디렉토리 내의 .ejtxt 파일 조회 (소유한 파일과 직접 공유 파일 제외)
+    const ownFileIds = new Set(ownFiles.map((f) => f._id.toString()));
+    const directlySharedFileIds = new Set(directlySharedFiles.map((f) => f._id.toString()));
+
+    let dirSharedFiles = [];
+    if (sharedDirIds.size > 0) {
+      dirSharedFiles = await File.find({
+        parentDirectory: { $in: [...sharedDirIds].map((id) => new mongoose.Types.ObjectId(id)) },
+        originalName: { $regex: /\.ejtxt$/i },
+        deleted: { $ne: true },
+        owner: { $ne: new mongoose.Types.ObjectId(userId) },
+      })
+        .populate("owner", "name email")
+        .populate("parentDirectory", "name")
+        .sort({ updatedAt: -1 })
+        .lean();
+
+      // 이미 직접 공유된 파일은 제외
+      dirSharedFiles = dirSharedFiles.filter(
+        (f) => !directlySharedFileIds.has(f._id.toString())
+      );
+    }
+
+    // 공유 파일 합치기
+    const allSharedFiles = [...directlySharedFiles, ...dirSharedFiles];
 
     return {
       success: true,
@@ -1671,10 +1794,13 @@ export async function getEditorFiles() {
         updatedAt: f.updatedAt?.toISOString(),
         parentDirectoryName: f.parentDirectory?.name || null,
       })),
-      sharedFiles: sharedFiles.map((f) => {
-        const userShare = f.shared.find(
-          (s) => s.userId.toString() === userId
+      sharedFiles: allSharedFiles.map((f) => {
+        const userShare = f.shared?.find(
+          (s) => (s.userId._id || s.userId).toString() === userId
         );
+        const dirPermission = f.parentDirectory
+          ? sharedDirPermissions[f.parentDirectory._id?.toString() || f.parentDirectory.toString()]
+          : null;
         return {
           id: f._id.toString(),
           originalName: f.originalName,
@@ -1686,7 +1812,7 @@ export async function getEditorFiles() {
           updatedAt: f.updatedAt?.toISOString(),
           parentDirectoryName: f.parentDirectory?.name || null,
           ownerName: f.owner?.name || f.owner?.email?.split("@")[0] || "알 수 없음",
-          permission: userShare?.permission || "read",
+          permission: userShare?.permission || dirPermission || "read",
         };
       }),
     };
@@ -1720,10 +1846,52 @@ export async function getEditorFileById({ fileId }) {
     const sharedEntry = file.shared?.find(
       (s) => s.userId.toString() === userId
     );
-    const hasAccess = isOwner || sharedEntry;
+
+    // 상위 디렉토리 공유 권한 확인
+    let hasDirectoryAccess = false;
+    let directoryPermission = null;
+    if (!isOwner && !sharedEntry && file.parentDirectory) {
+      let currentDirectory = await Directory.findOne({
+        _id: file.parentDirectory,
+        deleted: { $ne: true },
+      }).lean();
+
+      while (currentDirectory) {
+        const isDirOwner = currentDirectory.owner.toString() === userId;
+        const dirShare = currentDirectory.shared?.find(
+          (s) => (s.userId._id || s.userId).toString() === userId
+        );
+
+        if (isDirOwner || dirShare) {
+          hasDirectoryAccess = true;
+          directoryPermission = isDirOwner ? "admin" : (dirShare?.permission || "read");
+          break;
+        }
+
+        if (currentDirectory.parent) {
+          currentDirectory = await Directory.findOne({
+            _id: currentDirectory.parent,
+            deleted: { $ne: true },
+          }).lean();
+        } else {
+          break;
+        }
+      }
+    }
+
+    const hasAccess = isOwner || sharedEntry || hasDirectoryAccess;
 
     if (!hasAccess) {
       return { error: "파일에 접근할 권한이 없습니다." };
+    }
+
+    let permission = "read";
+    if (isOwner) {
+      permission = "admin";
+    } else if (sharedEntry) {
+      permission = sharedEntry.permission || "read";
+    } else if (directoryPermission) {
+      permission = directoryPermission;
     }
 
     return {
@@ -1739,7 +1907,7 @@ export async function getEditorFileById({ fileId }) {
         createdAt: file.createdAt?.toISOString(),
         updatedAt: file.updatedAt?.toISOString(),
         isOwner,
-        permission: isOwner ? "admin" : (sharedEntry?.permission || "read"),
+        permission,
       },
     };
   } catch (error) {

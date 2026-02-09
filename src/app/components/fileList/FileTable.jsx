@@ -17,6 +17,7 @@ import {
   faGamepad,
   faSortUp,
   faSortDown,
+  faICursor,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function FileTable({
@@ -40,6 +41,7 @@ export default function FileTable({
   onMoveDirectory,
   onDragDrop,
   currentDirectoryId,
+  onRenameFile,
 }) {
   const router = useRouter();
   const [dragOverId, setDragOverId] = useState(null);
@@ -455,6 +457,20 @@ export default function FileTable({
                           disabled={actionLoading[file.id]}
                         >
                           <FontAwesomeIcon icon={faPenToSquare} /> 편집하기
+                        </button>
+                      </li>
+                    )}
+                    {onRenameFile && (
+                      <li>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            document.activeElement.blur();
+                            onRenameFile(file);
+                          }}
+                          disabled={!file.owner}
+                        >
+                          <FontAwesomeIcon icon={faICursor} /> 이름 변경
                         </button>
                       </li>
                     )}

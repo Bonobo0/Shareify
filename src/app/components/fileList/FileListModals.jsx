@@ -50,6 +50,12 @@ export default function FileListModals({
   EditDirectoryModal: EditDirectoryModalComponent,
   BulkDownloadModal: BulkDownloadModalComponent,
   SelectedDownloadModal: SelectedDownloadModalComponent,
+  renameModal,
+  setRenameModal,
+  renameValue,
+  setRenameValue,
+  onRenameSubmit,
+  renameLoading,
 }) {
   return (
     <>
@@ -347,6 +353,53 @@ export default function FileListModals({
           bulkHandler.setSelectMode && bulkHandler.setSelectMode(false);
         }}
       />
+
+      {/* 파일 이름 변경 모달 */}
+      {renameModal && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">파일 이름 변경</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              현재 이름: {renameModal.originalName}
+            </p>
+            <div className="form-control mt-4">
+              <label className="label">
+                <span className="label-text">새 파일 이름</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered"
+                placeholder="새 파일 이름을 입력하세요"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onRenameSubmit();
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setRenameModal(null);
+                  setRenameValue("");
+                }}
+                disabled={renameLoading}
+              >
+                취소
+              </button>
+              <button
+                className={`btn btn-primary ${renameLoading ? "loading" : ""}`}
+                onClick={onRenameSubmit}
+                disabled={renameLoading || !renameValue.trim()}
+              >
+                변경
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
