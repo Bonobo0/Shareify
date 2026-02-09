@@ -72,13 +72,13 @@ export async function middleware(request) {
     if (refreshToken) {
       // refresh_token이 있으면 토큰 갱신 API로 리다이렉트
       const refreshUrl = new URL("/api/auth/refresh", request.url);
-      refreshUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
+      refreshUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
       return NextResponse.redirect(refreshUrl);
     }
 
     // refresh_token도 없으면 로그인 페이지로 리다이렉트
     const signinUrl = new URL("/user/signin", request.url);
-    signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
+    signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(signinUrl);
   }
 

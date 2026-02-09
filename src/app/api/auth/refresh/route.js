@@ -2,12 +2,23 @@ import { NextResponse } from "next/server";
 import { rotateRefreshToken, setTokenCookies } from "@/lib/auth/jwt";
 
 /**
+ * Validate that a callback URL is a safe internal path (not an open redirect).
+ * Only allows relative paths starting with '/'.
+ */
+function getSafeCallbackUrl(callbackUrl) {
+  if (!callbackUrl || typeof callbackUrl !== "string") return "/dashboard";
+  // Only allow relative paths (prevent open redirect)
+  if (!callbackUrl.startsWith("/") || callbackUrl.startsWith("//")) return "/dashboard";
+  return callbackUrl;
+}
+
+/**
  * Token refresh API endpoint
  * Called by middleware when access token is expired but refresh token exists.
  * Performs RTR (Refresh Token Rotation) and redirects back to the original URL.
  */
 export async function GET(request) {
-  const callbackUrl = request.nextUrl.searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = getSafeCallbackUrl(request.nextUrl.searchParams.get("callbackUrl"));
 
   try {
     const refreshToken = request.cookies.get("refresh_token")?.value;
