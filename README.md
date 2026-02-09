@@ -5,7 +5,7 @@
 **익명으로 파일을 자유롭게 공유할 수 있는 서비스입니다.**
 
 해당 프로젝트의 기능 구현 및 디버깅에 있어,
-**생성형 AI(GitHub Copilot Agent - Claude Sonnet 4, OpenAI GPT-5 Codex)**
+**생성형 AI(GitHub Copilot Agent - Claude Sonnet 4, OpenAI GPT-5 Codex, Claude Opus 4.6)**
 의 도움을 받았습니다.
 
 기획과 설계를 제외한 부분에서는 프로젝트가 대부분 **AI driven development** 형식으로 진행되어, 코드의 퀄리티가 많이 떨어질 수 있습니다.
@@ -61,7 +61,6 @@
 #### WebGL 호스팅
 - **Unity WebGL 빌드 업로드 및 브라우저 내 플레이**
 - **WebGL 빌드 자동 검증** (ZIP 내 필수 파일 확인)
-- **브라우저 내 캐싱** (IndexedDB)
 - **암호화된 WebGL 빌드 지원**
 
 #### 관리자 기능
