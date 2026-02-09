@@ -506,17 +506,23 @@ export default function FilePage() {
               <FontAwesomeIcon icon={faDownload} /> 다운로드
             </button>
 
+            {file?.originalName?.endsWith(".ejtxt") && (
+              <button
+                className="btn btn-secondary btn-sm sm:btn-md"
+                onClick={() => router.push(`/editor/${file.id}`)}
+              >
+                <FontAwesomeIcon icon={faPenToSquare} /> 편집하기
+              </button>
+            )}
             {(isMediaFile(
               file?.isEncrypted ? file?.originalMimetype : file?.mimetype,
-            ) ||
-              file?.originalName?.endsWith(".ejtxt")) && (
+            ) &&
+              !file?.originalName?.endsWith(".ejtxt")) && (
               <button
                 className="btn btn-secondary btn-sm sm:btn-md"
                 onClick={handlePreview}
               >
-                {file?.originalName?.endsWith(".ejtxt")
-                  ? <><FontAwesomeIcon icon={faPenToSquare} /> 편집하기</>
-                  : <><FontAwesomeIcon icon={faEye} /> 미리보기</>}
+                <FontAwesomeIcon icon={faEye} /> 미리보기
               </button>
             )}
             {isOwner && (
