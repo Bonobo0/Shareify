@@ -1,6 +1,14 @@
 "use client";
 
 import React from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faMagnifyingGlass,
+  faLock,
+  faUpload,
+  faCircleCheck,
+  faCircleXmark,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function FileProgressList({ files, progress }) {
   if (files.length === 0) return null;
@@ -27,17 +35,15 @@ export default function FileProgressList({ files, progress }) {
                 <div className="flex justify-between text-xs text-gray-600 mb-1">
                   <span>
                     {progress[file.name].status === "validating" &&
-                      "🔍 WebGL 빌드 검증 중..."}
+                      <><FontAwesomeIcon icon={faMagnifyingGlass} /> WebGL 빌드 검증 중...</>}
                     {progress[file.name].status === "encrypting" &&
-                      "🔒 암호화 중..."}
+                      <><FontAwesomeIcon icon={faLock} /> 암호화 중...</>}
                     {progress[file.name].status === "uploading" &&
-                      "📤 업로드 중..."}
+                      <><FontAwesomeIcon icon={faUpload} /> 업로드 중...</>}
                     {progress[file.name].status === "success" &&
-                      "✅ 완료"}
+                      <><FontAwesomeIcon icon={faCircleCheck} /> 완료</>}
                     {progress[file.name].status === "error" &&
-                      `❌ 실패: ${
-                        progress[file.name].error || "알 수 없는 오류"
-                      }`}
+                      <><FontAwesomeIcon icon={faCircleXmark} /> 실패: {progress[file.name].error || "알 수 없는 오류"}</>}
                   </span>
                   <span>{progress[file.name].percent}%</span>
                 </div>

@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 
 export default function UploadOptions({
   enableE2EE,
@@ -50,7 +52,7 @@ export default function UploadOptions({
             />
             <label className="label">
               <span className="label-text-alt text-warning">
-                ⚠️ 이 비밀번호를 잊으면 파일을 복구할 수 없습니다
+                <FontAwesomeIcon icon={faTriangleExclamation} /> 이 비밀번호를 잊으면 파일을 복구할 수 없습니다
               </span>
             </label>
           </div>

@@ -3,6 +3,18 @@
 import React, { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { formatBytes, formatDate, getFileIcon, isPreviewable } from "./utils";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faFolderOpen,
+  faFolder,
+  faUser,
+  faPenToSquare,
+  faUpload,
+  faTrash,
+  faLock,
+  faDownload,
+  faEye,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function FileTable({
   filteredDirectories,
@@ -38,7 +50,7 @@ export default function FileTable({
     // 드래그 이미지 텍스트
     const ghost = document.createElement("div");
     ghost.className = "badge badge-primary badge-lg";
-    ghost.textContent = `${type === "file" ? "📄" : "📁"} ${name}`;
+    ghost.textContent = `${type === "file" ? "File" : "Folder"} ${name}`;
     ghost.style.position = "absolute";
     ghost.style.top = "-1000px";
     document.body.appendChild(ghost);
@@ -103,7 +115,7 @@ export default function FileTable({
         >
           {dragOverId === "__current__" && (
             <span className="text-primary font-medium">
-              📂 현재 디렉토리에 놓기
+              <FontAwesomeIcon icon={faFolderOpen} /> 현재 디렉토리에 놓기
             </span>
           )}
         </div>
@@ -177,7 +189,7 @@ export default function FileTable({
                 onClick: (e) => e.stopPropagation(),
               })}
               <td className="flex items-center gap-2 min-w-0">
-                <span className="text-xl flex-shrink-0">📁</span>
+                <span className="text-xl flex-shrink-0"><FontAwesomeIcon icon={faFolder} /></span>
                 <div className="min-w-0 flex-1">
                   <div className="font-medium break-words">
                     {directory.name}
@@ -185,7 +197,7 @@ export default function FileTable({
                   {!directory.owner && directory.ownerInfo && (
                     <div className="flex items-center gap-1 mt-1">
                       <div className="badge badge-accent badge-xs sm:badge-sm gap-1 text-xs whitespace-nowrap">
-                        <span>👤</span>
+                        <span><FontAwesomeIcon icon={faUser} /></span>
                         <span className="truncate max-w-[100px] sm:max-w-none">
                           {directory.ownerInfo.name ||
                             directory.ownerInfo.email}
@@ -225,7 +237,7 @@ export default function FileTable({
                         }}
                         disabled={!directory.owner}
                       >
-                        ✏️ 수정하기
+                        <FontAwesomeIcon icon={faPenToSquare} /> 수정하기
                       </button>
                     </li>
                     <li>
@@ -236,7 +248,7 @@ export default function FileTable({
                           onShareDirectory(directory.id, directory.name);
                         }}
                       >
-                        📤 공유하기
+                        <FontAwesomeIcon icon={faUpload} /> 공유하기
                       </button>
                     </li>
                     {onMoveDirectory && (
@@ -249,7 +261,7 @@ export default function FileTable({
                           }}
                           disabled={!directory.owner}
                         >
-                          📁 이동
+                          <FontAwesomeIcon icon={faFolder} /> 이동
                         </button>
                       </li>
                     )}
@@ -263,7 +275,7 @@ export default function FileTable({
                         className="text-red-500"
                         disabled={actionLoading[directory.id]}
                       >
-                        🗑️ 삭제 (모든 하위 항목 포함)
+                        <FontAwesomeIcon icon={faTrash} /> 삭제 (모든 하위 항목 포함)
                       </button>
                     </li>
                   </ul>
@@ -307,7 +319,7 @@ export default function FileTable({
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       {file.isEncrypted && (
                         <div className="badge badge-primary badge-xs sm:badge-sm whitespace-nowrap">
-                          🔒 암호화됨
+                          <FontAwesomeIcon icon={faLock} /> 암호화됨
                         </div>
                       )}
                       {file.isWebGLBuild && (
@@ -322,7 +334,7 @@ export default function FileTable({
                       )}
                       {!file.owner && file.ownerInfo && (
                         <div className="badge badge-accent badge-xs sm:badge-sm gap-1 whitespace-nowrap">
-                          <span>👤</span>
+                          <span><FontAwesomeIcon icon={faUser} /></span>
                           <span className="truncate max-w-[80px] sm:max-w-none">
                             {file.ownerInfo.name || file.ownerInfo.email}
                             님이 공유
@@ -334,7 +346,7 @@ export default function FileTable({
                         file.parentDirectoryInfo?.owner.id !==
                           file.ownerInfo.id && (
                           <div className="badge badge-info badge-xs sm:badge-sm gap-1 whitespace-nowrap">
-                            <span>📁</span>
+                            <span><FontAwesomeIcon icon={faFolder} /></span>
                             <span className="truncate max-w-[100px] sm:max-w-none">
                               {file.parentDirectoryInfo?.owner.name ||
                                 file.parentDirectoryInfo?.owner.email}
@@ -349,7 +361,7 @@ export default function FileTable({
               {mode === "my-uploads" && (
                 <td>
                   <div className="badge badge-info badge-xs sm:badge-sm gap-1 whitespace-nowrap">
-                    <span>📁</span>
+                    <span><FontAwesomeIcon icon={faFolder} /></span>
                     <span className="truncate max-w-[100px] sm:max-w-none">
                       {file.parentDirectoryInfo?.owner?.name ||
                         file.parentDirectoryInfo?.owner?.email ||
@@ -399,7 +411,7 @@ export default function FileTable({
                         disabled={actionLoading[file.id]}
                         className={actionLoading[file.id] ? "loading" : ""}
                       >
-                        ⬇️ 다운로드
+                        <FontAwesomeIcon icon={faDownload} /> 다운로드
                       </button>
                     </li>
                     {file.isWebGLBuild && (
@@ -425,7 +437,7 @@ export default function FileTable({
                           }}
                           disabled={actionLoading[file.id]}
                         >
-                          👁️ 미리보기
+                          <FontAwesomeIcon icon={faEye} /> 미리보기
                         </button>
                       </li>
                     )}
@@ -439,7 +451,7 @@ export default function FileTable({
                           }}
                           disabled={actionLoading[file.id]}
                         >
-                          ✍️ 편집하기
+                          <FontAwesomeIcon icon={faPenToSquare} /> 편집하기
                         </button>
                       </li>
                     )}
@@ -451,7 +463,7 @@ export default function FileTable({
                           onShareFile(file.id);
                         }}
                       >
-                        📤 공유하기
+                        <FontAwesomeIcon icon={faUpload} /> 공유하기
                       </button>
                     </li>
                     {onMoveFile && (
@@ -464,7 +476,7 @@ export default function FileTable({
                           }}
                           disabled={!file.owner}
                         >
-                          📁 이동
+                          <FontAwesomeIcon icon={faFolder} /> 이동
                         </button>
                       </li>
                     )}
@@ -478,7 +490,7 @@ export default function FileTable({
                         className="text-red-500"
                         disabled={actionLoading[file.id]}
                       >
-                        🗑️ 삭제
+                        <FontAwesomeIcon icon={faTrash} /> 삭제
                       </button>
                     </li>
                   </ul>

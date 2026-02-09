@@ -1,6 +1,16 @@
 "use client";
 
 import { isMediaFile } from "@/lib/crypto/encryption";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faImage,
+  faFilm,
+  faMusic,
+  faFile,
+  faFileLines,
+  faChartBar,
+  faFileZipper,
+} from "@fortawesome/free-solid-svg-icons";
 
 export const formatBytes = (bytes, decimals = 2) => {
   if (!bytes) return "0 Bytes";
@@ -24,17 +34,17 @@ export const isPreviewable = (file) => {
 
 export const getFileIcon = (file) => {
   const mimetype = file.isEncrypted ? file.originalMimetype : file.mimetype;
-  if (mimetype?.includes("image")) return "🖼️";
-  if (mimetype?.includes("video")) return "🎬";
-  if (mimetype?.includes("audio")) return "🎵";
-  if (mimetype?.includes("pdf")) return "📄";
+  if (mimetype?.includes("image")) return <FontAwesomeIcon icon={faImage} />;
+  if (mimetype?.includes("video")) return <FontAwesomeIcon icon={faFilm} />;
+  if (mimetype?.includes("audio")) return <FontAwesomeIcon icon={faMusic} />;
+  if (mimetype?.includes("pdf")) return <FontAwesomeIcon icon={faFile} />;
   if (mimetype?.includes("word") || mimetype?.includes("document"))
-    return "📝";
+    return <FontAwesomeIcon icon={faFileLines} />;
   if (mimetype?.includes("spreadsheet") || mimetype?.includes("excel"))
-    return "📊";
+    return <FontAwesomeIcon icon={faChartBar} />;
   if (mimetype?.includes("presentation") || mimetype?.includes("powerpoint"))
-    return "📽️";
+    return <FontAwesomeIcon icon={faFilm} />;
   if (mimetype?.includes("zip") || mimetype?.includes("compressed"))
-    return "🗜️";
-  return "📄";
+    return <FontAwesomeIcon icon={faFileZipper} />;
+  return <FontAwesomeIcon icon={faFile} />;
 };

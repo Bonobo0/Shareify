@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSun, faMoon } from "@fortawesome/free-solid-svg-icons";
 
 export default function ThemeSelector({ compact = false }) {
   const [currentTheme, setCurrentTheme] = useState("light");
@@ -116,12 +118,12 @@ export default function ThemeSelector({ compact = false }) {
           <span className="label-text flex items-center gap-2">
             {currentTheme === "light" ? (
               <>
-                <span>☀️</span>
+                <span><FontAwesomeIcon icon={faSun} /></span>
                 <span>라이트 모드</span>
               </>
             ) : (
               <>
-                <span>🌙</span>
+                <span><FontAwesomeIcon icon={faMoon} /></span>
                 <span>다크 모드</span>
               </>
             )}
