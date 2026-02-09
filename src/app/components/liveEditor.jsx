@@ -661,7 +661,7 @@ export default function LiveEditor({
           <span className="badge badge-success gap-1 text-xs"><FontAwesomeIcon icon={faCheck} /> 저장됨</span>
         );
       case "unsaved":
-        return <span className="badge badge-info gap-1 text-xs"><FontAwesomeIcon icon={faCircle} style={{fontSize: '0.5em'}} /> 수정됨</span>;
+        return <span className="badge badge-info gap-1 text-xs"><FontAwesomeIcon icon={faCircle} size="2xs" /> 수정됨</span>;
       case "error":
         return (
           <span className="badge badge-error gap-1 text-xs" title={saveMessage}>
