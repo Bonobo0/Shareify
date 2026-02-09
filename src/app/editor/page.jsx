@@ -14,6 +14,8 @@ import {
 import { createPreviewUrl } from "@/lib/downloadUtils";
 import { encryptFile, decryptFile } from "@/lib/crypto/encryption";
 import DirectoryTreePicker from "@/app/components/directoryTreePicker";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLink, faPenToSquare, faFileLines, faLock, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 
 const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
   ssr: false,
@@ -389,7 +391,7 @@ export default function EditorPage() {
             {sharingLoading ? (
               <span className="loading loading-spinner loading-xs"></span>
             ) : (
-              <>🔗 {currentFile.isPublic ? "공유 중" : "공유"}</>
+              <><FontAwesomeIcon icon={faLink} /> {currentFile.isPublic ? "공유 중" : "공유"}</>
             )}
           </button>
         </div>
@@ -406,7 +408,7 @@ export default function EditorPage() {
         {shareModal.show && (
           <div className="modal modal-open">
             <div className="modal-box">
-              <h3 className="font-bold text-lg">🔗 공유 링크</h3>
+              <h3 className="font-bold text-lg"><FontAwesomeIcon icon={faLink} /> 공유 링크</h3>
               <p className="text-sm opacity-60 mt-1 truncate">
                 {shareModal.file?.originalName}
               </p>
@@ -470,7 +472,7 @@ export default function EditorPage() {
           className="btn btn-primary btn-sm sm:btn-md"
           onClick={() => handleOpenNewFileModal()}
         >
-          ✏️ 새 문서
+          <FontAwesomeIcon icon={faPenToSquare} /> 새 문서
         </button>
       </div>
 
@@ -490,7 +492,7 @@ export default function EditorPage() {
             className="btn btn-primary btn-sm mx-auto"
             onClick={() => handleOpenNewFileModal()}
           >
-            ✏️ 첫 문서 만들기
+            <FontAwesomeIcon icon={faPenToSquare} /> 첫 문서 만들기
           </button>
         </div>
       ) : (
@@ -503,7 +505,7 @@ export default function EditorPage() {
             >
               <div className="card-body p-4">
                 <h2 className="card-title text-sm sm:text-base truncate">
-                  📝 {file.originalName}
+                  <FontAwesomeIcon icon={faFileLines} /> {file.originalName}
                 </h2>
                 <div className="flex items-center justify-between text-xs opacity-60">
                   <span>{formatBytes(file.size)}</span>
@@ -512,12 +514,12 @@ export default function EditorPage() {
                 <div className="flex items-center gap-1 mt-1">
                   {file.isEncrypted && (
                     <div className="badge badge-primary badge-xs">
-                      🔒 암호화
+                      <FontAwesomeIcon icon={faLock} /> 암호화
                     </div>
                   )}
                   {file.isPublic && (
                     <div className="badge badge-warning badge-xs">
-                      🔗 공유 중
+                      <FontAwesomeIcon icon={faLink} /> 공유 중
                     </div>
                   )}
                   <div className="flex-1"></div>
@@ -530,7 +532,7 @@ export default function EditorPage() {
                     disabled={sharingLoading}
                     title={file.isPublic ? "공유 설정 관리" : "공유 링크 생성"}
                   >
-                    🔗
+                    <FontAwesomeIcon icon={faLink} />
                   </button>
                 </div>
               </div>
@@ -543,7 +545,7 @@ export default function EditorPage() {
       {shareModal.show && (
         <div className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">🔗 공유 링크</h3>
+            <h3 className="font-bold text-lg"><FontAwesomeIcon icon={faLink} /> 공유 링크</h3>
             <p className="text-sm opacity-60 mt-1 truncate">
               {shareModal.file?.originalName}
             </p>
@@ -638,7 +640,7 @@ export default function EditorPage() {
                     if (!e.target.checked) setNewFilePassword("");
                   }}
                 />
-                <span className="label-text">🔒 암호화</span>
+                <span className="label-text"><FontAwesomeIcon icon={faLock} /> 암호화</span>
               </label>
             </div>
 
@@ -657,7 +659,7 @@ export default function EditorPage() {
                 />
                 <label className="label">
                   <span className="label-text-alt text-warning">
-                    ⚠️ 비밀번호를 분실하면 파일을 복구할 수 없습니다
+                    <FontAwesomeIcon icon={faTriangleExclamation} /> 비밀번호를 분실하면 파일을 복구할 수 없습니다
                   </span>
                 </label>
               </div>
@@ -709,7 +711,7 @@ export default function EditorPage() {
       {decryptModal.show && (
         <div className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">🔒 암호화된 문서</h3>
+            <h3 className="font-bold text-lg"><FontAwesomeIcon icon={faLock} /> 암호화된 문서</h3>
             <p className="text-sm opacity-60 mt-1 truncate">
               {decryptModal.file?.originalName}
             </p>

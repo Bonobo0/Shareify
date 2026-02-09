@@ -6,6 +6,8 @@ import Link from "next/link";
 
 import { useAuth } from "@/context/AuthContext";
 import { getSharedItems } from "@/actions/share";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faImage, faFilm, faMusic, faFile, faFileLines, faChartBar, faFileZipper, faFolder, faUpload } from "@fortawesome/free-solid-svg-icons";
 
 export default function SharedPage() {
   const router = useRouter();
@@ -70,19 +72,19 @@ export default function SharedPage() {
     router.push(`/directory/${directoryId}`);
   };
   const getFileTypeIcon = (mimetype) => {
-    if (mimetype?.includes("image")) return "🖼️";
-    if (mimetype?.includes("video")) return "🎬";
-    if (mimetype?.includes("audio")) return "🎵";
-    if (mimetype?.includes("pdf")) return "📄";
+    if (mimetype?.includes("image")) return <FontAwesomeIcon icon={faImage} />;
+    if (mimetype?.includes("video")) return <FontAwesomeIcon icon={faFilm} />;
+    if (mimetype?.includes("audio")) return <FontAwesomeIcon icon={faMusic} />;
+    if (mimetype?.includes("pdf")) return <FontAwesomeIcon icon={faFile} />;
     if (mimetype?.includes("word") || mimetype?.includes("document"))
-      return "📝";
+      return <FontAwesomeIcon icon={faFileLines} />;
     if (mimetype?.includes("spreadsheet") || mimetype?.includes("excel"))
-      return "📊";
+      return <FontAwesomeIcon icon={faChartBar} />;
     if (mimetype?.includes("presentation") || mimetype?.includes("powerpoint"))
-      return "📽️";
+      return <FontAwesomeIcon icon={faFilm} />;
     if (mimetype?.includes("zip") || mimetype?.includes("compressed"))
-      return "🗜️";
-    return "📄";
+      return <FontAwesomeIcon icon={faFileZipper} />;
+    return <FontAwesomeIcon icon={faFile} />;
   };
 
   if (authLoading || loading) {
@@ -108,7 +110,7 @@ export default function SharedPage() {
         {sharedDirectories.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl sm:text-2xl font-semibold mb-4">
-              📁 공유된 디렉토리
+              <FontAwesomeIcon icon={faFolder} /> 공유된 디렉토리
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {sharedDirectories.map((directory) => (
@@ -119,7 +121,7 @@ export default function SharedPage() {
                 >
                   <div className="card-body p-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-3xl flex-shrink-0">📁</span>
+                      <span className="text-3xl flex-shrink-0"><FontAwesomeIcon icon={faFolder} /></span>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium break-words">
                           {directory.name}
@@ -159,7 +161,7 @@ export default function SharedPage() {
         {/* 공유된 파일 섹션 */}
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold mb-4">
-            📄 공유된 파일
+            <FontAwesomeIcon icon={faFile} /> 공유된 파일
           </h2>
           {sharedFiles.length === 0 ? (
             <div className="text-center p-6 bg-base-200 rounded-lg">
@@ -231,7 +233,7 @@ export default function SharedPage() {
         {/* 공유된 항목이 없는 경우 */}
         {sharedFiles.length === 0 && sharedDirectories.length === 0 && (
           <div className="text-center p-12 bg-base-200 rounded-lg">
-            <div className="text-6xl mb-4">📤</div>
+            <div className="text-6xl mb-4"><FontAwesomeIcon icon={faUpload} /></div>
             <h3 className="text-xl font-semibold mb-2">
               공유된 항목이 없습니다
             </h3>
