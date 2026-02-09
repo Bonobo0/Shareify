@@ -684,6 +684,13 @@
   resolved "https://registry.npmjs.org/@editorjs/helpers/-/helpers-1.0.1.tgz"
   integrity sha512-Lmr8ImoQvoROXtzhsIJsA1ZtXzH46DmE6O8hMjn9/AvQq62UfjREjn+Ewi6KxjIZMay2PsgDEbLlsVyNJGEaxw==
 
+"@editorjs/image@^2.10.3":
+  version "2.10.3"
+  resolved "https://registry.yarnpkg.com/@editorjs/image/-/image-2.10.3.tgz#c97d8aa54f344a0288fd6216f1cbc162cf413b9b"
+  integrity sha512-ekCsGICZOIdghF/U2T34H7CItqaWAoJDXbkRD+x8l/LIo/7Ozf7KovYm21qz+CluArgV4RurVFHqwlz+O0vfJA==
+  dependencies:
+    "@codexteam/icons" "^0.3.0"
+
 "@editorjs/inline-code@^1.5.2":
   version "1.5.2"
   resolved "https://registry.npmjs.org/@editorjs/inline-code/-/inline-code-1.5.2.tgz"

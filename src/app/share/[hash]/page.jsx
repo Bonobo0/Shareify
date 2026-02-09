@@ -3,12 +3,23 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import { getSharedFileInfo, downloadSharedFile } from "@/actions/share";
 import { downloadAndDecrypt, decryptFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
 import PreviewModal from "@/app/components/previewModal";
 import WebGLPlayer from "@/app/components/webGLPlayer";
+
+const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col items-center justify-center py-12 gap-3">
+      <span className="loading loading-spinner loading-lg"></span>
+      <p className="text-sm opacity-60">에디터 로딩 중...</p>
+    </div>
+  ),
+});
 
 export default function SharePage() {
   const params = useParams();
@@ -33,6 +44,11 @@ export default function SharePage() {
   const [webGLPassword, setWebGLPassword] = useState("");
   const [webGLLoading, setWebGLLoading] = useState(false);
 
+  // 에디터 읽기 전용 뷰 상태
+  const [showEditor, setShowEditor] = useState(false);
+  const [editorFileUrl, setEditorFileUrl] = useState(null);
+  const [editorLoading, setEditorLoading] = useState(false);
+
   // Modal helper functions
   const showAlert = (message) => {
     setAlertModal({ show: true, message });
@@ -47,6 +63,34 @@ export default function SharePage() {
         mimetype === "text/plain") &&
       file.size < 100 * 1024 * 1024 // 100MB 이하
     );
+  };
+
+  const isEditorFile = (filename) => {
+    return filename?.toLowerCase().endsWith(".ejtxt");
+  };
+
+  // .ejtxt 파일 에디터 뷰어 열기
+  const handleOpenEditor = async () => {
+    if (!file) return;
+    setEditorLoading(true);
+
+    try {
+      const result = await downloadSharedFile({ hash, asPreview: true });
+      if (!result.success) throw new Error(result.error);
+
+      const previewResult = await createPreviewUrl({
+        downloadUrl: result.downloadUrl,
+        forceBlob: true,
+      });
+      if (previewResult.error) throw new Error(previewResult.error);
+
+      setEditorFileUrl(previewResult.url);
+      setShowEditor(true);
+    } catch (err) {
+      showAlert(err.message || "문서를 열 수 없습니다.");
+    } finally {
+      setEditorLoading(false);
+    }
   };
 
   const handlePreview = async () => {
@@ -73,7 +117,7 @@ export default function SharePage() {
 
       if (!result.success) {
         throw new Error(
-          result.error || "미리보기 URL을 생성하는 중 오류가 발생했습니다."
+          result.error || "미리보기 URL을 생성하는 중 오류가 발생했습니다.",
         );
       }
 
@@ -141,7 +185,7 @@ export default function SharePage() {
 
       if (!result.success) {
         throw new Error(
-          result.error || "다운로드 URL을 생성하는 중 오류가 발생했습니다."
+          result.error || "다운로드 URL을 생성하는 중 오류가 발생했습니다.",
         );
       }
 
@@ -161,14 +205,15 @@ export default function SharePage() {
           // 복호화
           const metadata = {
             originalName: result.filename || file.originalName,
-            originalType: result.originalMimetype || file.originalMimetype || file.mimetype,
+            originalType:
+              result.originalMimetype || file.originalMimetype || file.mimetype,
             originalSize: result.originalSize || file.originalSize || file.size,
           };
 
           const decryptResult = await decryptFile(
             encryptedArrayBuffer,
             password,
-            metadata
+            metadata,
           );
 
           if (!decryptResult.success || decryptResult.error) {
@@ -180,7 +225,10 @@ export default function SharePage() {
           console.log("암호화된 WebGL 빌드 복호화 완료");
         } catch (decryptError) {
           console.error("복호화 실패:", decryptError);
-          throw new Error(decryptError.message || "복호화에 실패했습니다. 비밀번호를 확인해주세요.");
+          throw new Error(
+            decryptError.message ||
+              "복호화에 실패했습니다. 비밀번호를 확인해주세요.",
+          );
         }
       } else {
         // 일반 파일 다운로드
@@ -218,7 +266,7 @@ export default function SharePage() {
 
       if (!result.success) {
         throw new Error(
-          result.error || "파일 정보를 불러오는 중 오류가 발생했습니다."
+          result.error || "파일 정보를 불러오는 중 오류가 발생했습니다.",
         );
       }
 
@@ -249,7 +297,7 @@ export default function SharePage() {
 
       if (!result.success) {
         throw new Error(
-          result.error || "다운로드 URL을 생성하는 중 오류가 발생했습니다."
+          result.error || "다운로드 URL을 생성하는 중 오류가 발생했습니다.",
         );
       }
 
@@ -273,7 +321,7 @@ export default function SharePage() {
 
       if (!result.success) {
         throw new Error(
-          result.error || "다운로드 URL을 생성하는 중 오류가 발생했습니다."
+          result.error || "다운로드 URL을 생성하는 중 오류가 발생했습니다.",
         );
       }
 
@@ -343,120 +391,171 @@ export default function SharePage() {
   return (
     <>
       <main className="flex min-h-screen flex-col items-center p-6 sm:p-8 md:p-10">
-        <div className="card bg-base-200 p-4 sm:p-6 max-w-xl w-full">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
-            공유된 파일
-          </h1>
+        {/* 에디터 읽기 전용 뷰 */}
+        {showEditor && editorFileUrl && (
+          <div className="w-full max-w-4xl mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  if (editorFileUrl?.startsWith("blob:")) {
+                    URL.revokeObjectURL(editorFileUrl);
+                  }
+                  setShowEditor(false);
+                  setEditorFileUrl(null);
+                }}
+              >
+                ← 돌아가기
+              </button>
+              <h2 className="text-lg font-bold truncate">
+                {file?.originalName}
+              </h2>
+            </div>
+            <div className="card bg-base-200 p-4">
+              <LiveEditor
+                file={{
+                  id: file?.id,
+                  originalName: file?.originalName,
+                  isEncrypted: false,
+                  hash: file?.hash,
+                }}
+                fileUrl={editorFileUrl}
+                readOnly={true}
+              />
+            </div>
+          </div>
+        )}
 
-          <div className="text-center mb-6 sm:mb-8">
-            <div className="text-4xl sm:text-5xl mb-4">
-              {file?.mimetype?.includes("image")
-                ? "🖼️"
-                : file?.mimetype?.includes("pdf")
-                ? "📄"
-                : file?.mimetype?.includes("video")
-                ? "🎬"
-                : file?.mimetype?.includes("audio")
-                ? "🎵"
-                : "📁"}
+        {/* 파일 정보 카드 */}
+        {!showEditor && (
+          <div className="card bg-base-200 p-4 sm:p-6 max-w-xl w-full">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
+              공유된 파일
+            </h1>
+
+            <div className="text-center mb-6 sm:mb-8">
+              <div className="text-4xl sm:text-5xl mb-4">
+                {file?.originalName?.endsWith(".ejtxt")
+                  ? "📝"
+                  : file?.mimetype?.includes("image")
+                    ? "🖼️"
+                    : file?.mimetype?.includes("pdf")
+                      ? "📄"
+                      : file?.mimetype?.includes("video")
+                        ? "🎬"
+                        : file?.mimetype?.includes("audio")
+                          ? "🎵"
+                          : "📁"}
+              </div>
+
+              <h2 className="text-lg sm:text-xl font-semibold mb-3 px-2 break-words">
+                {file?.originalName}
+              </h2>
+
+              {file?.owner && (
+                <div className="flex justify-center mb-3">
+                  <div className="btn btn-accent btn-xs gap-1 sm:gap-2 whitespace-nowrap">
+                    <span>👤</span>
+                    <span className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">
+                      {file.owner.name || file.owner.email}님이 공유
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-gray-500 mt-2 text-sm sm:text-base">
+                {formatBytes(file?.originalSize || file?.size)}
+              </p>
+
+              {file?.isEncrypted && (
+                <div className="mt-4">
+                  <span className="badge badge-warning badge-sm sm:badge-md whitespace-nowrap">
+                    🔒 암호화된 파일
+                  </span>
+                </div>
+              )}
+              {file?.isWebGLBuild && (
+                <div className="mt-4">
+                  <span className="badge badge-success badge-sm sm:badge-md whitespace-nowrap">
+                    🎮 WebGL 게임
+                  </span>
+                </div>
+              )}
             </div>
 
-            <h2 className="text-lg sm:text-xl font-semibold mb-3 px-2 break-words">
-              {file?.originalName}
-            </h2>
+            <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4">
+              {file?.isWebGLBuild && (
+                <button
+                  className={`btn btn-success btn-sm sm:btn-lg flex-1 sm:flex-none ${
+                    webGLLoading ? "loading" : ""
+                  }`}
+                  onClick={handlePlayGame}
+                  disabled={webGLLoading}
+                >
+                  {webGLLoading
+                    ? "로딩 중..."
+                    : file?.isEncrypted
+                      ? "🔒 복호화 후 게임 플레이"
+                      : "🎮 게임 플레이"}
+                </button>
+              )}
+              {isEditorFile(file?.originalName) && !file?.isEncrypted && (
+                <button
+                  className={`btn btn-secondary btn-sm sm:btn-lg flex-1 sm:flex-none ${
+                    editorLoading ? "loading" : ""
+                  }`}
+                  onClick={handleOpenEditor}
+                  disabled={editorLoading}
+                >
+                  {editorLoading ? "로딩 중..." : "📝 문서 보기"}
+                </button>
+              )}
+              {isPreviewable(file?.mimetype) && !file?.isWebGLBuild && (
+                <button
+                  className={`btn btn-secondary btn-sm sm:btn-lg flex-1 sm:flex-none ${
+                    previewLoading ? "loading" : ""
+                  }`}
+                  onClick={handlePreview}
+                  disabled={previewLoading}
+                >
+                  {previewLoading
+                    ? "로딩 중..."
+                    : file?.isEncrypted
+                      ? "🔒 복호화 후 미리보기"
+                      : "👁️ 미리보기"}
+                </button>
+              )}
+              <button
+                className="btn btn-primary btn-sm sm:btn-lg flex-1 sm:flex-none"
+                onClick={handleDownload}
+              >
+                {file?.isEncrypted ? "🔒 복호화 후 다운로드" : "⬇️ 다운로드"}
+              </button>
+            </div>
 
-            {file?.owner && (
-              <div className="flex justify-center mb-3">
-                <div className="btn btn-accent btn-xs gap-1 sm:gap-2 whitespace-nowrap">
-                  <span>👤</span>
-                  <span className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">
-                    {file.owner.name || file.owner.email}님이 공유
-                  </span>
+            {!user && (
+              <div className="text-center mt-6 sm:mt-8 pt-4 border-t">
+                <p className="text-sm sm:text-base">
+                  더 많은 파일을 공유하고 관리하세요
+                </p>
+                <div className="flex flex-col sm:flex-row justify-center gap-2 mt-2">
+                  <Link
+                    href="/user/signin"
+                    className="btn btn-sm sm:btn-md flex-1 sm:flex-none"
+                  >
+                    👤 로그인
+                  </Link>
+                  <Link
+                    href="/user/signup"
+                    className="btn btn-outline btn-sm sm:btn-md flex-1 sm:flex-none"
+                  >
+                    ✨ 회원가입
+                  </Link>
                 </div>
               </div>
             )}
-
-            <p className="text-gray-500 mt-2 text-sm sm:text-base">
-              {formatBytes(file?.originalSize || file?.size)}
-            </p>
-
-            {file?.isEncrypted && (
-              <div className="mt-4">
-                <span className="badge badge-warning badge-sm sm:badge-md whitespace-nowrap">
-                  🔒 암호화된 파일
-                </span>
-              </div>
-            )}
-            {file?.isWebGLBuild && (
-              <div className="mt-4">
-                <span className="badge badge-success badge-sm sm:badge-md whitespace-nowrap">
-                  🎮 WebGL 게임
-                </span>
-              </div>
-            )}
           </div>
-
-          <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4">
-            {file?.isWebGLBuild && (
-              <button
-                className={`btn btn-success btn-sm sm:btn-lg flex-1 sm:flex-none ${
-                  webGLLoading ? "loading" : ""
-                }`}
-                onClick={handlePlayGame}
-                disabled={webGLLoading}
-              >
-                {webGLLoading
-                  ? "로딩 중..."
-                  : file?.isEncrypted
-                  ? "🔒 복호화 후 게임 플레이"
-                  : "🎮 게임 플레이"}
-              </button>
-            )}
-            {isPreviewable(file?.mimetype) && !file?.isWebGLBuild && (
-              <button
-                className={`btn btn-secondary btn-sm sm:btn-lg flex-1 sm:flex-none ${
-                  previewLoading ? "loading" : ""
-                }`}
-                onClick={handlePreview}
-                disabled={previewLoading}
-              >
-                {previewLoading
-                  ? "로딩 중..."
-                  : file?.isEncrypted
-                  ? "🔒 복호화 후 미리보기"
-                  : "👁️ 미리보기"}
-              </button>
-            )}
-            <button
-              className="btn btn-primary btn-sm sm:btn-lg flex-1 sm:flex-none"
-              onClick={handleDownload}
-            >
-              {file?.isEncrypted ? "🔒 복호화 후 다운로드" : "⬇️ 다운로드"}
-            </button>
-          </div>
-
-          {!user && (
-            <div className="text-center mt-6 sm:mt-8 pt-4 border-t">
-              <p className="text-sm sm:text-base">
-                더 많은 파일을 공유하고 관리하세요
-              </p>
-              <div className="flex flex-col sm:flex-row justify-center gap-2 mt-2">
-                <Link
-                  href="/user/signin"
-                  className="btn btn-sm sm:btn-md flex-1 sm:flex-none"
-                >
-                  👤 로그인
-                </Link>
-                <Link
-                  href="/user/signup"
-                  className="btn btn-outline btn-sm sm:btn-md flex-1 sm:flex-none"
-                >
-                  ✨ 회원가입
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </main>
 
       {/* 암호화 파일 비밀번호 입력 모달 */}
@@ -667,8 +766,8 @@ export default function SharePage() {
             <h2 className="text-xl font-bold mb-4">🔒 게임 복호화</h2>
 
             <p className="text-sm text-gray-600 mb-4">
-              이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화 비밀번호를
-              입력해주세요.
+              이 게임은 암호화되어 있습니다. 게임을 플레이하려면 복호화
+              비밀번호를 입력해주세요.
             </p>
 
             <div className="form-control mb-4">

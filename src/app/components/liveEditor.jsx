@@ -2,7 +2,13 @@
 
 import React, { useCallback, useRef, useState, useEffect } from "react";
 import { createReactEditorJS } from "react-editor-js";
-import { prepareFileUpdate, completeFileUpdate } from "@/actions/files";
+import {
+  prepareFileUpdate,
+  completeFileUpdate,
+  uploadEditorMedia,
+  completeEditorMediaUpload,
+  getEditorMediaUrl,
+} from "@/actions/files";
 import { encryptFile } from "@/lib/crypto/encryption";
 
 // Editor.js 플러그인
@@ -15,46 +21,114 @@ import Delimiter from "@editorjs/delimiter";
 import InlineCode from "@editorjs/inline-code";
 import Marker from "@editorjs/marker";
 import Table from "@editorjs/table";
+import ImageTool from "@editorjs/image";
 
 const ReactEditorJS = createReactEditorJS();
 
-const EDITOR_JS_TOOLS = {
-  header: {
-    class: Header,
-    config: {
-      levels: [1, 2, 3, 4, 5, 6],
-      defaultLevel: 2,
+// 이미지 포함 에디터 도구 생성 (parentFileId 필요)
+function createEditorTools(parentFileId, readOnly = false) {
+  const tools = {
+    header: {
+      class: Header,
+      config: {
+        levels: [1, 2, 3, 4, 5, 6],
+        defaultLevel: 2,
+      },
     },
-  },
-  list: {
-    class: List,
-    inlineToolbar: true,
-  },
-  checklist: {
-    class: Checklist,
-    inlineToolbar: true,
-  },
-  quote: {
-    class: Quote,
-    inlineToolbar: true,
-  },
-  code: CodeTool,
-  delimiter: Delimiter,
-  inlineCode: {
-    class: InlineCode,
-  },
-  marker: {
-    class: Marker,
-  },
-  table: {
-    class: Table,
-    inlineToolbar: true,
-    config: {
-      rows: 2,
-      cols: 3,
+    list: {
+      class: List,
+      inlineToolbar: true,
     },
-  },
-};
+    checklist: {
+      class: Checklist,
+      inlineToolbar: true,
+    },
+    quote: {
+      class: Quote,
+      inlineToolbar: true,
+    },
+    code: CodeTool,
+    delimiter: Delimiter,
+    inlineCode: {
+      class: InlineCode,
+    },
+    marker: {
+      class: Marker,
+    },
+    table: {
+      class: Table,
+      inlineToolbar: true,
+      config: {
+        rows: 2,
+        cols: 3,
+      },
+    },
+  };
+
+  // 이미지 도구 추가 - 업로드 기능은 readOnly가 아닐 때만
+  tools.image = {
+    class: ImageTool,
+    config: {
+      captionPlaceholder: "이미지 설명을 입력하세요...",
+      uploader: readOnly
+        ? undefined
+        : {
+            async uploadByFile(fileObj) {
+              try {
+                if (!parentFileId) throw new Error("문서 ID가 없습니다.");
+
+                // 1. 서버에 미디어 업로드 요청
+                const result = await uploadEditorMedia({
+                  parentFileId,
+                  filename: fileObj.name,
+                  size: fileObj.size,
+                  mimetype: fileObj.type,
+                });
+
+                if (result.error) throw new Error(result.error);
+
+                // 2. presigned URL로 파일 업로드
+                const uploadResponse = await fetch(result.uploadUrl, {
+                  method: "PUT",
+                  body: fileObj,
+                  headers: { "Content-Type": fileObj.type },
+                });
+
+                if (!uploadResponse.ok) throw new Error("파일 업로드 실패");
+
+                // 3. 업로드 완료 처리
+                const completeResult = await completeEditorMediaUpload({
+                  fileId: result.file.id,
+                });
+
+                if (completeResult.error) throw new Error(completeResult.error);
+
+                return {
+                  success: 1,
+                  file: {
+                    url: completeResult.url,
+                    hash: result.file.hash,
+                    name: fileObj.name,
+                  },
+                };
+              } catch (err) {
+                console.error("이미지 업로드 오류:", err);
+                return { success: 0 };
+              }
+            },
+            async uploadByUrl(url) {
+              // URL 이미지는 그대로 사용
+              return {
+                success: 1,
+                file: { url },
+              };
+            },
+          },
+    },
+  };
+
+  return tools;
+}
 
 // HTML 내보내기용 CSS 스타일
 function getExportStyles() {
@@ -63,6 +137,12 @@ function getExportStyles() {
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
       h1, h2, h3, h4, h5, h6 { margin-top: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
       p { margin: 0.8em 0; }
+      figure.image-block { margin: 1.5em 0; text-align: center; }
+      figure.image-block img { max-width: 100%; height: auto; border-radius: 4px; }
+      figure.image-block.stretched img { width: 100%; }
+      figure.image-block.with-border img { border: 1px solid #ddd; }
+      figure.image-block.with-background { background: #f9f9f9; padding: 10px; border-radius: 4px; }
+      figure.image-block figcaption { margin-top: 0.5em; font-size: 0.9em; color: #666; font-style: italic; }
       table { border-collapse: collapse; width: 100%; margin: 1em 0; }
       th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
       th { background-color: #f5f5f5; font-weight: 600; }
@@ -112,6 +192,18 @@ function blocksToHtml(blocks) {
           return `<blockquote><p>${block.data.text}</p>${block.data.caption ? `<cite>— ${block.data.caption}</cite>` : ""}</blockquote>`;
         case "code":
           return `<pre><code>${block.data.code}</code></pre>`;
+        case "image": {
+          const classes = ["image-block"];
+          if (block.data.stretched) classes.push("stretched");
+          if (block.data.withBorder) classes.push("with-border");
+          if (block.data.withBackground) classes.push("with-background");
+          let imgHtml = `<figure class="${classes.join(" ")}">`;
+          imgHtml += `<img src="${block.data.file?.url || ""}" alt="${block.data.caption || ""}" />`;
+          if (block.data.caption)
+            imgHtml += `<figcaption>${block.data.caption}</figcaption>`;
+          imgHtml += `</figure>`;
+          return imgHtml;
+        }
         case "delimiter":
           return "<hr />";
         case "table": {
@@ -177,6 +269,8 @@ function blocksToMarkdown(blocks) {
           return `> ${stripHtml(block.data.text)}${block.data.caption ? `\n> — ${stripHtml(block.data.caption)}` : ""}`;
         case "code":
           return `\`\`\`\n${block.data.code}\n\`\`\``;
+        case "image":
+          return `![${stripHtml(block.data.caption || "")}](${block.data.file?.url || ""})`;
         case "delimiter":
           return "---";
         case "table": {
@@ -226,6 +320,8 @@ function blocksToText(blocks) {
           return `"${stripHtml(block.data.text)}"${block.data.caption ? ` — ${stripHtml(block.data.caption)}` : ""}`;
         case "code":
           return block.data.code;
+        case "image":
+          return `[이미지: ${stripHtml(block.data.caption || block.data.file?.url || "")}]`;
         case "delimiter":
           return "———";
         case "table":
@@ -259,6 +355,7 @@ function stripHtml(html) {
  * @param {Object} file - 파일 메타데이터 (id, originalName, isEncrypted, ...)
  * @param {string} fileUrl - 파일 내용 URL (blob: URL 또는 일반 URL)
  * @param {string} encryptionPassword - 암호화된 파일의 비밀번호 (옵션)
+ * @param {boolean} readOnly - 읽기 전용 모드 (공유 뷰어용)
  * @param {Function} onClose - 에디터 닫기 콜백
  * @param {Function} onSaved - 저장 완료 콜백 (옵션)
  */
@@ -266,6 +363,7 @@ export default function LiveEditor({
   file,
   fileUrl,
   encryptionPassword = null,
+  readOnly = false,
   onClose,
   onSaved,
 }) {
@@ -277,6 +375,12 @@ export default function LiveEditor({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [exportDropdown, setExportDropdown] = useState(false);
+
+  // 에디터 도구 (file.id가 변경될 때만 재생성)
+  const editorTools = React.useMemo(
+    () => createEditorTools(file?.id, readOnly),
+    [file?.id, readOnly],
+  );
 
   // 에디터 인스턴스 참조 저장
   const handleInitialize = useCallback((instance) => {
@@ -319,6 +423,32 @@ export default function LiveEditor({
           };
         }
 
+        // 이미지 블록의 presigned URL 갱신
+        const refreshedBlocks = await Promise.all(
+          parsed.blocks.map(async (block) => {
+            if (block.type === "image" && block.data?.file?.hash) {
+              try {
+                const result = await getEditorMediaUrl({
+                  fileHash: block.data.file.hash,
+                });
+                if (result.success && result.url) {
+                  return {
+                    ...block,
+                    data: {
+                      ...block.data,
+                      file: { ...block.data.file, url: result.url },
+                    },
+                  };
+                }
+              } catch (e) {
+                console.warn("이미지 URL 갱신 실패:", e);
+              }
+            }
+            return block;
+          }),
+        );
+
+        parsed.blocks = refreshedBlocks;
         setEditorData(parsed);
       } catch (err) {
         console.error("에디터 데이터 로드 오류:", err);
@@ -568,54 +698,63 @@ export default function LiveEditor({
           {file?.isEncrypted && (
             <span className="badge badge-warning badge-xs">🔒 암호화</span>
           )}
-          {statusBadge()}
+          {readOnly && (
+            <span className="badge badge-ghost badge-xs">👁 읽기 전용</span>
+          )}
+          {!readOnly && statusBadge()}
         </div>
 
-        <div className="flex items-center gap-1">
-          {/* 저장 버튼 */}
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={handleSave}
-            disabled={saveStatus === "saving" || saveStatus === "loaded"}
-            title="저장 (Ctrl+S)"
-          >
-            💾 저장
-          </button>
-
-          {/* 내보내기 */}
-          <div className="dropdown dropdown-end">
-            <label
-              tabIndex={0}
-              className="btn btn-sm btn-ghost"
-              onClick={() => setExportDropdown(!exportDropdown)}
+        {!readOnly && (
+          <div className="flex items-center gap-1">
+            {/* 저장 버튼 */}
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={handleSave}
+              disabled={saveStatus === "saving" || saveStatus === "loaded"}
+              title="저장 (Ctrl+S)"
             >
-              📥 내보내기
-            </label>
-            {exportDropdown && (
-              <ul
+              💾 저장
+            </button>
+
+            {/* 내보내기 */}
+            <div className="dropdown dropdown-end">
+              <label
                 tabIndex={0}
-                className="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-44"
+                className="btn btn-sm btn-ghost"
+                onClick={() => setExportDropdown(!exportDropdown)}
               >
-                <li>
-                  <button onClick={() => handleExport("html")}>🌐 HTML</button>
-                </li>
-                <li>
-                  <button onClick={() => handleExport("markdown")}>
-                    📝 Markdown
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => handleExport("text")}>
-                    📄 텍스트
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => handleExport("json")}>🔧 JSON</button>
-                </li>
-              </ul>
-            )}
+                📥 내보내기
+              </label>
+              {exportDropdown && (
+                <ul
+                  tabIndex={0}
+                  className="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-44"
+                >
+                  <li>
+                    <button onClick={() => handleExport("html")}>
+                      🌐 HTML
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => handleExport("markdown")}>
+                      📝 Markdown
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => handleExport("text")}>
+                      📄 텍스트
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => handleExport("json")}>
+                      🔧 JSON
+                    </button>
+                  </li>
+                </ul>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 에디터 영역 */}
@@ -623,9 +762,10 @@ export default function LiveEditor({
         {editorData && (
           <ReactEditorJS
             onInitialize={handleInitialize}
-            onChange={handleChange}
-            tools={EDITOR_JS_TOOLS}
+            onChange={readOnly ? undefined : handleChange}
+            tools={editorTools}
             defaultValue={editorData}
+            readOnly={readOnly}
             placeholder="여기에 내용을 작성하세요..."
           />
         )}
@@ -633,7 +773,9 @@ export default function LiveEditor({
 
       {/* 하단 상태 바 */}
       <div className="flex items-center justify-between px-3 py-1 text-xs opacity-50 mt-1">
-        <span>Ctrl+S: 저장 · 30초 자동 저장</span>
+        <span>
+          {readOnly ? "읽기 전용 모드" : "Ctrl+S: 저장 · 30초 자동 저장"}
+        </span>
         {saveMessage && saveStatus === "error" && (
           <span className="text-error">{saveMessage}</span>
         )}

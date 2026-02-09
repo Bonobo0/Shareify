@@ -9,9 +9,10 @@ import {
   createEditorFile,
   completeEditorFileCreation,
   getFileDownloadUrl,
+  toggleEditorShareLink,
 } from "@/actions/files";
 import { createPreviewUrl } from "@/lib/downloadUtils";
-import { encryptFile } from "@/lib/crypto/encryption";
+import { encryptFile, decryptFile } from "@/lib/crypto/encryption";
 import DirectoryTreePicker from "@/app/components/directoryTreePicker";
 
 const LiveEditor = dynamic(() => import("@/app/components/liveEditor"), {
@@ -35,6 +36,13 @@ export default function EditorPage() {
   // 현재 편집 중인 파일
   const [currentFile, setCurrentFile] = useState(null);
   const [currentFileUrl, setCurrentFileUrl] = useState(null);
+  const [currentEncryptionPassword, setCurrentEncryptionPassword] =
+    useState(null);
+
+  // 복호화 비밀번호 모달
+  const [decryptModal, setDecryptModal] = useState({ show: false, file: null });
+  const [decryptPassword, setDecryptPassword] = useState("");
+  const [decrypting, setDecrypting] = useState(false);
 
   // 새 파일 생성 모달
   const [showNewFileModal, setShowNewFileModal] = useState(false);
@@ -46,6 +54,12 @@ export default function EditorPage() {
 
   // Alert 모달
   const [alertModal, setAlertModal] = useState({ show: false, message: "" });
+
+  // 공유 링크 상태
+  const [shareModal, setShareModal] = useState({ show: false, file: null });
+  const [shareUrl, setShareUrl] = useState("");
+  const [sharingLoading, setSharingLoading] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
 
   const fetchFiles = useCallback(async () => {
     try {
@@ -72,6 +86,13 @@ export default function EditorPage() {
   }, [authLoading, isAuthenticated, router, fetchFiles]);
 
   const handleOpenFile = async (file) => {
+    // 암호화된 파일이면 비밀번호 입력 모달 표시
+    if (file.isEncrypted) {
+      setDecryptModal({ show: true, file });
+      setDecryptPassword("");
+      return;
+    }
+
     try {
       setError("");
       const result = await getFileDownloadUrl({
@@ -95,8 +116,79 @@ export default function EditorPage() {
 
       setCurrentFile(file);
       setCurrentFileUrl(previewResult.url);
+      setCurrentEncryptionPassword(null);
     } catch (err) {
       setAlertModal({ show: true, message: "파일을 열 수 없습니다." });
+    }
+  };
+
+  // 암호화된 파일 복호화 후 열기
+  const handleDecryptAndOpen = async () => {
+    if (!decryptPassword.trim()) {
+      setAlertModal({ show: true, message: "복호화 비밀번호를 입력해주세요." });
+      return;
+    }
+
+    const file = decryptModal.file;
+    setDecrypting(true);
+
+    try {
+      const result = await getFileDownloadUrl({
+        fileId: file.id,
+        asPreview: true,
+      });
+      if (result.error) {
+        setAlertModal({ show: true, message: result.error });
+        return;
+      }
+
+      // 암호화된 파일 다운로드
+      const response = await fetch(result.downloadUrl);
+      if (!response.ok) throw new Error("파일 다운로드 실패");
+      const encryptedBuffer = await response.arrayBuffer();
+
+      // 복호화
+      const decryptResult = await decryptFile(
+        encryptedBuffer,
+        decryptPassword.trim(),
+        {
+          originalName: file.originalName,
+          originalType: file.originalMimetype || "application/json",
+        },
+      );
+
+      if (!decryptResult.success) {
+        setAlertModal({
+          show: true,
+          message:
+            decryptResult.error ||
+            "복호화에 실패했습니다. 비밀번호를 확인해주세요.",
+        });
+        return;
+      }
+
+      // 복호화된 내용으로 blob URL 생성
+      const decryptedBlob = new Blob(
+        [await decryptResult.decryptedFile.arrayBuffer()],
+        {
+          type: "application/json",
+        },
+      );
+      const blobUrl = URL.createObjectURL(decryptedBlob);
+
+      setCurrentFile(file);
+      setCurrentFileUrl(blobUrl);
+      setCurrentEncryptionPassword(decryptPassword.trim());
+      setDecryptModal({ show: false, file: null });
+      setDecryptPassword("");
+    } catch (err) {
+      console.error("복호화 오류:", err);
+      setAlertModal({
+        show: true,
+        message: "복호화 중 오류가 발생했습니다. 비밀번호를 확인해주세요.",
+      });
+    } finally {
+      setDecrypting(false);
     }
   };
 
@@ -106,7 +198,51 @@ export default function EditorPage() {
     }
     setCurrentFile(null);
     setCurrentFileUrl(null);
+    setCurrentEncryptionPassword(null);
     fetchFiles();
+  };
+
+  // 공유 링크 토글
+  const handleToggleShare = async (file) => {
+    setSharingLoading(true);
+    try {
+      const result = await toggleEditorShareLink({ fileId: file.id });
+      if (result.error) {
+        setAlertModal({ show: true, message: result.error });
+        return;
+      }
+
+      if (result.isPublic && result.shareUrl) {
+        setShareUrl(result.shareUrl);
+        setShareModal({ show: true, file });
+      } else {
+        // 공유 해제됨 - 파일 목록 새로고침
+        setShareModal({ show: false, file: null });
+        setShareUrl("");
+        await fetchFiles();
+        setAlertModal({ show: true, message: "공유 링크가 해제되었습니다." });
+      }
+
+      // 파일 목록에서 isPublic 상태 업데이트
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === file.id ? { ...f, isPublic: result.isPublic } : f,
+        ),
+      );
+    } catch (err) {
+      setAlertModal({
+        show: true,
+        message: "공유 설정 중 오류가 발생했습니다.",
+      });
+    } finally {
+      setSharingLoading(false);
+    }
+  };
+
+  const handleCopyShareUrl = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 2000);
   };
 
   const handleOpenNewFileModal = async () => {
@@ -232,21 +368,90 @@ export default function EditorPage() {
   if (currentFile && currentFileUrl) {
     return (
       <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
-        <div className="flex items-center gap-2 mb-4">
-          <button className="btn btn-ghost btn-sm" onClick={handleCloseEditor}>
-            ← 돌아가기
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={handleCloseEditor}
+            >
+              ← 돌아가기
+            </button>
+            <h1 className="text-lg font-bold truncate">
+              {currentFile.originalName}
+            </h1>
+          </div>
+          <button
+            className={`btn btn-sm ${currentFile.isPublic ? "btn-warning" : "btn-outline"}`}
+            onClick={() => handleToggleShare(currentFile)}
+            disabled={sharingLoading}
+            title={currentFile.isPublic ? "공유 링크 관리" : "공유 링크 생성"}
+          >
+            {sharingLoading ? (
+              <span className="loading loading-spinner loading-xs"></span>
+            ) : (
+              <>🔗 {currentFile.isPublic ? "공유 중" : "공유"}</>
+            )}
           </button>
-          <h1 className="text-lg font-bold truncate">
-            {currentFile.originalName}
-          </h1>
         </div>
         <div className="card bg-base-200 p-4">
           <LiveEditor
             file={currentFile}
             fileUrl={currentFileUrl}
+            encryptionPassword={currentEncryptionPassword}
             onClose={handleCloseEditor}
           />
         </div>
+
+        {/* 공유 모달 (에디터 모드에서도 표시) */}
+        {shareModal.show && (
+          <div className="modal modal-open">
+            <div className="modal-box">
+              <h3 className="font-bold text-lg">🔗 공유 링크</h3>
+              <p className="text-sm opacity-60 mt-1 truncate">
+                {shareModal.file?.originalName}
+              </p>
+              <div className="form-control mt-4">
+                <div className="join w-full">
+                  <input
+                    type="text"
+                    className="input input-bordered join-item flex-1"
+                    value={shareUrl}
+                    readOnly
+                  />
+                  <button
+                    className={`btn join-item ${copiedShare ? "btn-success" : "btn-primary"}`}
+                    onClick={handleCopyShareUrl}
+                  >
+                    {copiedShare ? "✓ 복사됨" : "복사"}
+                  </button>
+                </div>
+                <label className="label">
+                  <span className="label-text-alt opacity-60">
+                    이 링크를 통해 누구나 문서를 읽기 전용으로 볼 수 있습니다.
+                  </span>
+                </label>
+              </div>
+              <div className="modal-action">
+                <button
+                  className="btn btn-error btn-sm"
+                  onClick={() => handleToggleShare(shareModal.file)}
+                  disabled={sharingLoading}
+                >
+                  공유 해제
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setShareModal({ show: false, file: null });
+                    setShareUrl("");
+                  }}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     );
   }
@@ -304,14 +509,84 @@ export default function EditorPage() {
                   <span>{formatBytes(file.size)}</span>
                   <span>{formatDate(file.updatedAt || file.createdAt)}</span>
                 </div>
-                {file.isEncrypted && (
-                  <div className="badge badge-primary badge-xs mt-1">
-                    🔒 암호화
-                  </div>
-                )}
+                <div className="flex items-center gap-1 mt-1">
+                  {file.isEncrypted && (
+                    <div className="badge badge-primary badge-xs">
+                      🔒 암호화
+                    </div>
+                  )}
+                  {file.isPublic && (
+                    <div className="badge badge-warning badge-xs">
+                      🔗 공유 중
+                    </div>
+                  )}
+                  <div className="flex-1"></div>
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleShare(file);
+                    }}
+                    disabled={sharingLoading}
+                    title={file.isPublic ? "공유 설정 관리" : "공유 링크 생성"}
+                  >
+                    🔗
+                  </button>
+                </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 공유 링크 모달 */}
+      {shareModal.show && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">🔗 공유 링크</h3>
+            <p className="text-sm opacity-60 mt-1 truncate">
+              {shareModal.file?.originalName}
+            </p>
+            <div className="form-control mt-4">
+              <div className="join w-full">
+                <input
+                  type="text"
+                  className="input input-bordered join-item flex-1"
+                  value={shareUrl}
+                  readOnly
+                />
+                <button
+                  className={`btn join-item ${copiedShare ? "btn-success" : "btn-primary"}`}
+                  onClick={handleCopyShareUrl}
+                >
+                  {copiedShare ? "✓ 복사됨" : "복사"}
+                </button>
+              </div>
+              <label className="label">
+                <span className="label-text-alt opacity-60">
+                  이 링크를 통해 누구나 문서를 읽기 전용으로 볼 수 있습니다.
+                </span>
+              </label>
+            </div>
+            <div className="modal-action">
+              <button
+                className="btn btn-error btn-sm"
+                onClick={() => handleToggleShare(shareModal.file)}
+                disabled={sharingLoading}
+              >
+                공유 해제
+              </button>
+              <button
+                className="btn"
+                onClick={() => {
+                  setShareModal({ show: false, file: null });
+                  setShareUrl("");
+                }}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -424,6 +699,54 @@ export default function EditorPage() {
                 onClick={() => setAlertModal({ show: false, message: "" })}
               >
                 확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 복호화 비밀번호 모달 */}
+      {decryptModal.show && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">🔒 암호화된 문서</h3>
+            <p className="text-sm opacity-60 mt-1 truncate">
+              {decryptModal.file?.originalName}
+            </p>
+            <p className="text-sm mt-3">
+              이 문서는 암호화되어 있습니다. 복호화 비밀번호를 입력해주세요.
+            </p>
+            <div className="form-control mt-4">
+              <input
+                type="password"
+                className="input input-bordered"
+                placeholder="비밀번호를 입력하세요"
+                value={decryptPassword}
+                onChange={(e) => setDecryptPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleDecryptAndOpen();
+                }}
+                autoFocus
+                disabled={decrypting}
+              />
+            </div>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setDecryptModal({ show: false, file: null });
+                  setDecryptPassword("");
+                }}
+                disabled={decrypting}
+              >
+                취소
+              </button>
+              <button
+                className={`btn btn-primary ${decrypting ? "loading" : ""}`}
+                onClick={handleDecryptAndOpen}
+                disabled={decrypting || !decryptPassword.trim()}
+              >
+                열기
               </button>
             </div>
           </div>

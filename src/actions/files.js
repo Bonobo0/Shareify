@@ -619,6 +619,25 @@ export async function deleteFile({ fileId }) {
       console.error("R2 파일 삭제 오류:", r2Error);
     }
 
+    // 첨부된 미디어 파일들 캐스케이드 삭제
+    const attachedMedia = await File.find({
+      parentFile: file._id,
+      deleted: { $ne: true },
+    });
+
+    let mediaSize = 0;
+    for (const media of attachedMedia) {
+      try {
+        await deleteFileFromR2(media.fileName);
+      } catch (r2Error) {
+        console.error("미디어 R2 삭제 오류:", r2Error);
+      }
+      mediaSize += media.size || 0;
+      media.deleted = true;
+      media.deletedAt = new Date();
+      await media.save();
+    }
+
     // 데이터베이스에서 파일 삭제 (소프트 삭제)
     file.deleted = true;
     file.deletedAt = new Date();
@@ -629,7 +648,7 @@ export async function deleteFile({ fileId }) {
       const sizeToDecrement =
         file.isEncrypted && file.originalSize ? file.originalSize : file.size;
       await User.findByIdAndUpdate(userId, {
-        $inc: { storageUsed: -sizeToDecrement },
+        $inc: { storageUsed: -(sizeToDecrement + mediaSize) },
       });
     }
 
@@ -1630,6 +1649,7 @@ export async function getEditorFiles() {
         size: f.size,
         hash: f.hash,
         isEncrypted: f.isEncrypted || false,
+        isPublic: f.isPublic || false,
         createdAt: f.createdAt?.toISOString(),
         updatedAt: f.updatedAt?.toISOString(),
       })),
@@ -1860,5 +1880,173 @@ export async function bulkMoveFiles({ fileIds, targetDirectoryId }) {
   } catch (error) {
     console.error("벌크 파일 이동 오류:", error);
     return { error: "파일 이동 중 오류가 발생했습니다." };
+  }
+}
+
+// 에디터 미디어 파일 업로드 (이미지 등)
+export async function uploadEditorMedia({
+  parentFileId,
+  filename,
+  size,
+  mimetype,
+}) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+
+    if (!parentFileId || !filename || !size || !mimetype) {
+      return { error: "필수 매개변수가 누락되었습니다." };
+    }
+
+    await connectToDatabase();
+
+    // 부모 문서 파일 확인
+    const parentFile = await File.findOne({
+      _id: parentFileId,
+      deleted: { $ne: true },
+    });
+    if (!parentFile) return { error: "문서를 찾을 수 없습니다." };
+
+    // 소유자 또는 쓰기 권한 확인
+    const isOwner = parentFile.owner.toString() === userId;
+    const hasWriteAccess = parentFile.shared?.some(
+      (s) =>
+        s.userId.toString() === userId &&
+        ["write", "admin"].includes(s.permission),
+    );
+    if (!isOwner && !hasWriteAccess)
+      return { error: "파일 업로드 권한이 없습니다." };
+
+    const user = await User.findById(userId);
+    if (!user) return { error: "사용자를 찾을 수 없습니다." };
+    if (user.suspended) return { error: "정지된 사용자입니다." };
+
+    // 용량 확인
+    if (user.storageUsed + size > user.storageLimit) {
+      return { error: "저장소 용량이 부족합니다." };
+    }
+
+    // 미디어 크기 제한 (10MB)
+    if (size > 10 * 1024 * 1024) {
+      return { error: "미디어 파일은 10MB 이하만 업로드 가능합니다." };
+    }
+
+    const uniqueFilename = generateUniqueFilename(filename);
+    const fileHash = generateFileHash();
+    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype);
+
+    const file = new File({
+      originalName: filename,
+      fileName: uniqueFilename,
+      size,
+      mimetype,
+      hash: fileHash,
+      path: uniqueFilename,
+      owner: userId,
+      parentDirectory: parentFile.parentDirectory || null,
+      parentFile: new mongoose.Types.ObjectId(parentFileId),
+      uploaded: false,
+    });
+
+    await file.save();
+
+    return {
+      success: true,
+      file: {
+        id: file._id.toString(),
+        hash: file.hash,
+        originalName: file.originalName,
+      },
+      uploadUrl,
+    };
+  } catch (error) {
+    console.error("에디터 미디어 업로드 오류:", error);
+    return { error: "미디어 업로드 중 오류가 발생했습니다." };
+  }
+}
+
+// 에디터 미디어 업로드 완료
+export async function completeEditorMediaUpload({ fileId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+
+    await connectToDatabase();
+
+    const file = await File.findOne({ _id: fileId, deleted: { $ne: true } });
+    if (!file) return { error: "파일을 찾을 수 없습니다." };
+
+    const isOwner = file.owner.toString() === userId;
+    if (!isOwner) return { error: "권한이 없습니다." };
+
+    file.uploaded = true;
+    await file.save();
+
+    // 스토리지 사용량 증가
+    await User.findByIdAndUpdate(userId, {
+      $inc: { storageUsed: file.size },
+    });
+
+    // 다운로드 URL 생성 (미디어 표시용)
+    const downloadUrl = await generateDownloadUrl(file.path || file.fileName);
+
+    return {
+      success: true,
+      url: downloadUrl,
+      file: {
+        id: file._id.toString(),
+        hash: file.hash,
+        originalName: file.originalName,
+        size: file.size,
+        mimetype: file.mimetype,
+      },
+    };
+  } catch (error) {
+    console.error("에디터 미디어 업로드 완료 오류:", error);
+    return { error: "미디어 업로드 완료 처리 중 오류가 발생했습니다." };
+  }
+}
+
+// 에디터 미디어 URL 가져오기 (에디터 로드 시 이미지 URL 갱신)
+export async function getEditorMediaUrl({ fileHash }) {
+  try {
+    await connectToDatabase();
+
+    const file = await File.findOne({ hash: fileHash, deleted: { $ne: true } });
+    if (!file) return { error: "파일을 찾을 수 없습니다." };
+
+    const downloadUrl = await generateDownloadUrl(file.path || file.fileName);
+    return { success: true, url: downloadUrl };
+  } catch (error) {
+    console.error("에디터 미디어 URL 오류:", error);
+    return { error: "미디어 URL을 가져오는 중 오류가 발생했습니다." };
+  }
+}
+
+// 에디터 공유 링크 토글 (공개/비공개)
+export async function toggleEditorShareLink({ fileId }) {
+  try {
+    const userId = await getAuthenticatedUser();
+    if (!userId) return { error: "로그인이 필요합니다." };
+
+    await connectToDatabase();
+
+    const file = await File.findOne({ _id: fileId, deleted: { $ne: true } });
+    if (!file) return { error: "파일을 찾을 수 없습니다." };
+    if (file.owner.toString() !== userId) return { error: "권한이 없습니다." };
+
+    file.isPublic = !file.isPublic;
+    await file.save();
+
+    return {
+      success: true,
+      isPublic: file.isPublic,
+      shareUrl: file.isPublic
+        ? `${process.env.NEXT_PUBLIC_APP_URL || ""}/share/${file.hash}`
+        : null,
+    };
+  } catch (error) {
+    console.error("에디터 공유 링크 토글 오류:", error);
+    return { error: "공유 설정 변경 중 오류가 발생했습니다." };
   }
 }
