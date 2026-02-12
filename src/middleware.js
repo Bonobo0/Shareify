@@ -19,7 +19,7 @@ function parseSetCookie(setCookieStr) {
   const name = setCookieStr.substring(0, eqIndex).trim();
   const rest = setCookieStr.substring(eqIndex + 1);
   const semicolonIndex = rest.indexOf(";");
-  const value = semicolonIndex >= 0 ? rest.substring(0, semicolonIndex) : rest;
+  const value = (semicolonIndex >= 0 ? rest.substring(0, semicolonIndex) : rest).trim();
 
   const options = {};
   if (semicolonIndex >= 0) {
@@ -29,7 +29,10 @@ function parseSetCookie(setCookieStr) {
       const lower = trimmed.toLowerCase();
       if (lower === "httponly") options.httpOnly = true;
       else if (lower === "secure") options.secure = true;
-      else if (lower.startsWith("max-age=")) options.maxAge = parseInt(lower.substring(8));
+      else if (lower.startsWith("max-age=")) {
+        const maxAge = parseInt(lower.substring(8), 10);
+        if (!isNaN(maxAge)) options.maxAge = maxAge;
+      }
       else if (lower.startsWith("path=")) options.path = trimmed.substring(5);
       else if (lower.startsWith("samesite=")) options.sameSite = trimmed.substring(9).toLowerCase();
     }
@@ -112,7 +115,7 @@ export async function middleware(request) {
       if (isServerAction(request)) {
         try {
           const refreshUrl = new URL("/api/auth/refresh", request.url);
-          refreshUrl.searchParams.set("callbackUrl", "/");
+          refreshUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
 
           const refreshResponse = await fetch(refreshUrl.toString(), {
             headers: {
@@ -121,6 +124,7 @@ export async function middleware(request) {
             redirect: "manual",
           });
 
+          // getSetCookie() may not be available in all Edge Runtime versions
           const setCookieHeaders = refreshResponse.headers.getSetCookie?.() ?? [];
 
           let hasNewAccessToken = false;
