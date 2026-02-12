@@ -73,7 +73,7 @@ export async function middleware(request) {
       // refresh_token이 있으면 토큰 갱신 API로 리다이렉트
       const refreshUrl = new URL("/api/auth/refresh", request.url);
       refreshUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
-      return NextResponse.redirect(refreshUrl);
+      return NextResponse.redirect(refreshUrl, 303);
     }
 
     // refresh_token도 없으면 로그인 페이지로 리다이렉트
