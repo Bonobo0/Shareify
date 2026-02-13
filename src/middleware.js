@@ -1,6 +1,46 @@
 import { NextResponse } from "next/server";
 import { verifyAccessToken } from "./lib/auth/edgeAccessToken";
 
+/**
+ * Check if a request is a Next.js server action (POST with Next-Action header).
+ * Server actions must not be redirected because 303 forces GET, losing the POST.
+ */
+function isServerAction(request) {
+  return request.method === "POST" && request.headers.has("next-action");
+}
+
+/**
+ * Parse a Set-Cookie header string into { name, value, options }.
+ */
+function parseSetCookie(setCookieStr) {
+  const eqIndex = setCookieStr.indexOf("=");
+  if (eqIndex < 0) return null;
+
+  const name = setCookieStr.substring(0, eqIndex).trim();
+  const rest = setCookieStr.substring(eqIndex + 1);
+  const semicolonIndex = rest.indexOf(";");
+  const value = (semicolonIndex >= 0 ? rest.substring(0, semicolonIndex) : rest).trim();
+
+  const options = {};
+  if (semicolonIndex >= 0) {
+    const parts = rest.substring(semicolonIndex + 1).split(";");
+    for (const part of parts) {
+      const trimmed = part.trim();
+      const lower = trimmed.toLowerCase();
+      if (lower === "httponly") options.httpOnly = true;
+      else if (lower === "secure") options.secure = true;
+      else if (lower.startsWith("max-age=")) {
+        const maxAge = parseInt(lower.substring(8), 10);
+        if (!isNaN(maxAge)) options.maxAge = maxAge;
+      }
+      else if (lower.startsWith("path=")) options.path = trimmed.substring(5);
+      else if (lower.startsWith("samesite=")) options.sameSite = trimmed.substring(9).toLowerCase();
+    }
+  }
+
+  return { name, value, options };
+}
+
 // 인증이 필요한 경로 리스트
 const PROTECTED_ROUTES = [
   "/dashboard",
@@ -70,7 +110,55 @@ export async function middleware(request) {
     const refreshToken = request.cookies.get("refresh_token")?.value;
 
     if (refreshToken) {
-      // refresh_token이 있으면 토큰 갱신 API로 리다이렉트
+      // Server action인 경우, 리다이렉트 대신 인라인으로 토큰 갱신 후 요청 계속 진행
+      // (303 리다이렉트는 POST를 GET으로 변환하므로 server action이 유실됨)
+      if (isServerAction(request)) {
+        try {
+          const refreshUrl = new URL("/api/auth/refresh", request.url);
+          refreshUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
+
+          const refreshResponse = await fetch(refreshUrl.toString(), {
+            headers: {
+              Cookie: `refresh_token=${refreshToken}`,
+            },
+            redirect: "manual",
+          });
+
+          // getSetCookie() may not be available in all Edge Runtime versions
+          const setCookieHeaders = refreshResponse.headers.getSetCookie?.() ?? [];
+
+          let hasNewAccessToken = false;
+          const parsedCookies = [];
+
+          for (const cookieStr of setCookieHeaders) {
+            const parsed = parseSetCookie(cookieStr);
+            if (parsed) {
+              parsedCookies.push(parsed);
+              if (parsed.name === "access_token" && parsed.value) {
+                hasNewAccessToken = true;
+              }
+            }
+          }
+
+          if (hasNewAccessToken) {
+            // 토큰 갱신 성공 - 새 쿠키를 설정하고 원래 요청을 계속 진행
+            const response = NextResponse.next();
+            for (const { name, value, options } of parsedCookies) {
+              response.cookies.set(name, value, options);
+            }
+            return response;
+          }
+        } catch (error) {
+          console.error("Server action token refresh error:", error);
+        }
+
+        // 토큰 갱신 실패 시 로그인 페이지로 리다이렉트
+        const signinUrl = new URL("/user/signin", request.url);
+        signinUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
+        return NextResponse.redirect(signinUrl);
+      }
+
+      // 일반 요청(페이지 로드 등)은 기존 리다이렉트 방식 유지
       const refreshUrl = new URL("/api/auth/refresh", request.url);
       refreshUrl.searchParams.set("callbackUrl", request.nextUrl.pathname + request.nextUrl.search);
       return NextResponse.redirect(refreshUrl, 303);
