@@ -1,12 +1,11 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyAccessToken } from "@/lib/auth/jwt";
+import { requireAuthenticatedUser } from "@/lib/auth/serverAuth";
 import File from "@/models/File";
 import Directory from "@/models/Directory";
 import User from "@/models/User";
 import mongoose from "mongoose";
-import { cookies } from "next/headers";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
 import {
   generateUniqueFilename,
@@ -16,20 +15,6 @@ import {
   deleteObject as deleteFileFromR2,
 } from "@/lib/r2/r2Client";
 
-async function getAuthenticatedUser() {
-  const token = cookies().get("access_token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const decoded = await verifyAccessToken(token);
-  if (!decoded) {
-    return null;
-  }
-
-  return decoded.userId;
-}
 
 export async function getFileList({
   directoryId,
@@ -40,7 +25,7 @@ export async function getFileList({
   shareLinkHash = "null",
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -299,7 +284,7 @@ export async function uploadFile({
       originalMetadata,
     });
 
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -505,7 +490,7 @@ export async function uploadFile({
 
 export async function completeFileUpload({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -554,7 +539,7 @@ export async function completeFileUpload({ fileId }) {
 
 export async function deleteFile({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -668,7 +653,7 @@ export async function getFileDownloadUrl({
   asPreview = false,
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -787,7 +772,7 @@ export async function shareFile({ fileId, email, permission = "read" }) {
       };
     }
 
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -886,7 +871,7 @@ export async function shareFile({ fileId, email, permission = "read" }) {
 
 export async function getFileDetails({ hash, fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1090,7 +1075,7 @@ export async function getMyUploadedFiles({
   sortOrder = "desc",
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1201,7 +1186,7 @@ export async function getMyUploadedFiles({
 
 export async function removeFileShare({ fileId, shareId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1271,7 +1256,7 @@ export async function removeFileShare({ fileId, shareId }) {
 // 디렉토리의 모든 파일을 재귀적으로 가져오는 함수
 export async function getAllFilesForDownload({ directoryId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1387,7 +1372,7 @@ export async function getAllFilesForDownload({ directoryId }) {
 // 선택된 파일들의 다운로드 정보를 가져오는 함수
 export async function getSelectedFilesForDownload({ fileIds }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1472,7 +1457,7 @@ export async function getSelectedFilesForDownload({ fileIds }) {
 // 파일 내용 업데이트 준비 (에디터 저장용 - presigned URL 반환)
 export async function prepareFileUpdate({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1563,7 +1548,7 @@ export async function prepareFileUpdate({ fileId }) {
 // 파일 내용 업데이트 완료 (클라이언트가 presigned URL로 업로드 후 호출)
 export async function completeFileUpdate({ fileId, newSize, originalSize }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1626,7 +1611,7 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
 // 파일 이름 변경
 export async function renameFile({ fileId, newName }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) {
       return { error: "로그인이 필요합니다." };
     }
@@ -1678,7 +1663,7 @@ export async function renameFile({ fileId, newName }) {
 // 에디터 파일(.ejtxt) 목록 가져오기
 export async function getEditorFiles() {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) {
       return { error: "로그인이 필요합니다." };
     }
@@ -1824,7 +1809,7 @@ export async function getEditorFiles() {
 // 에디터 파일 단일 조회 (에디터 페이지용)
 export async function getEditorFileById({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) {
       return { error: "로그인이 필요합니다." };
     }
@@ -1923,7 +1908,7 @@ export async function createEditorFile({
   encryptionPassword = null,
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) {
       return { error: "로그인이 필요합니다." };
     }
@@ -2016,7 +2001,7 @@ export async function createEditorFile({
 // 새 에디터 파일 업로드 완료
 export async function completeEditorFileCreation({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
 
     await connectToDatabase();
@@ -2043,7 +2028,7 @@ export async function completeEditorFileCreation({ fileId }) {
 // 파일 이동 (디렉토리 변경)
 export async function moveFile({ fileId, targetDirectoryId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
 
     await connectToDatabase();
@@ -2079,7 +2064,7 @@ export async function moveFile({ fileId, targetDirectoryId }) {
 // 벌크 파일 이동
 export async function bulkMoveFiles({ fileIds, targetDirectoryId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
     if (!fileIds || fileIds.length === 0)
       return { error: "이동할 파일을 선택해주세요." };
@@ -2146,7 +2131,7 @@ export async function uploadEditorMedia({
   mimetype,
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
 
     if (!parentFileId || !filename || !size || !mimetype) {
@@ -2223,7 +2208,7 @@ export async function uploadEditorMedia({
 // 에디터 미디어 업로드 완료
 export async function completeEditorMediaUpload({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
 
     await connectToDatabase();
@@ -2281,7 +2266,7 @@ export async function getEditorMediaUrl({ fileHash }) {
 // 에디터 공유 링크 토글 (공개/비공개)
 export async function toggleEditorShareLink({ fileId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
 
     await connectToDatabase();

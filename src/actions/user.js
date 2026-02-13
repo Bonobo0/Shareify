@@ -1,31 +1,16 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyAccessToken } from "@/lib/auth/jwt";
+import { requireAuthenticatedUser } from "@/lib/auth/serverAuth";
 import User from "@/models/User";
 import File from "@/models/File";
 import mongoose from "mongoose";
-import { cookies } from "next/headers";
 import { deleteMultipleObjects } from "@/lib/r2/r2Client";
 
-async function getAuthenticatedUser() {
-  const token = cookies().get("access_token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const decoded = await verifyAccessToken(token);
-  if (!decoded) {
-    return null;
-  }
-
-  return decoded.userId;
-}
 
 export async function getUserInfo() {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "인증이 필요합니다." };
@@ -67,7 +52,7 @@ export async function getUserInfo() {
 
 export async function getStorageInfo() {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "인증이 필요합니다." };
@@ -140,7 +125,7 @@ export async function updateUserProfile({
   newPassword,
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "인증이 필요합니다." };
@@ -214,7 +199,7 @@ export async function changePassword({
   confirmPassword,
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "인증이 필요합니다." };
@@ -265,7 +250,7 @@ export async function changePassword({
 // 계정 삭제
 export async function deleteAccount({ password }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "인증이 필요합니다." };

@@ -1,12 +1,11 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyAccessToken } from "@/lib/auth/jwt";
+import { requireAuthenticatedUser } from "@/lib/auth/serverAuth";
 import Directory from "@/models/Directory";
 import File from "@/models/File";
 import User from "@/models/User";
 import mongoose from "mongoose";
-import { cookies } from "next/headers";
 import crypto from "crypto";
 import { deleteObject as deleteFileFromR2 } from "@/lib/r2/r2Client";
 import { dir } from "console";
@@ -15,20 +14,6 @@ function generateDirectoryHash() {
   return crypto.randomBytes(16).toString("hex");
 }
 
-async function getAuthenticatedUser() {
-  const token = cookies().get("access_token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const decoded = await verifyAccessToken(token);
-  if (!decoded) {
-    return null;
-  }
-
-  return decoded.userId;
-}
 
 export async function getDirectoryList({
   parentId,
@@ -39,7 +24,7 @@ export async function getDirectoryList({
   shareLinkHash = null,
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -181,7 +166,7 @@ export async function getDirectoryList({
 
 export async function createDirectory({ name, parentId, description }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -278,7 +263,7 @@ export async function createDirectory({ name, parentId, description }) {
 
 export async function updateDirectory({ directoryId, name, description }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -360,7 +345,7 @@ export async function updateDirectory({ directoryId, name, description }) {
 
 export async function deleteDirectory(directoryId) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -463,7 +448,7 @@ export async function shareDirectory({
   permission = "read",
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -540,7 +525,7 @@ export async function shareDirectory({
 // 디렉토리 공유 취소
 export async function unshareDirectory({ directoryId, targetUserId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -596,7 +581,7 @@ export async function unshareDirectory({ directoryId, targetUserId }) {
 // 디렉토리 공유 사용자 목록 조회
 export async function getDirectorySharedUsers({ directoryId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -643,7 +628,7 @@ export async function getDirectorySharedUsers({ directoryId }) {
 
 export async function getDirectoryDetails({ directoryId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -725,7 +710,7 @@ export async function getDirectoryDetails({ directoryId }) {
 
 export async function getDirectoryByHash({ hash }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -877,7 +862,7 @@ export async function getDirectoryByHash({ hash }) {
 
 export async function deleteDirectoryRecursive(directoryId) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1011,7 +996,7 @@ export async function createDirectoryShareLink({
   expiresIn = 7,
 }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1081,7 +1066,7 @@ export async function createDirectoryShareLink({
 // 디렉토리 공유 링크 목록 조회
 export async function getDirectoryShareLinks({ directoryId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1128,7 +1113,7 @@ export async function getDirectoryShareLinks({ directoryId }) {
 // 디렉토리 공유 링크 삭제
 export async function deleteDirectoryShareLink({ directoryId, shareHash }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1325,7 +1310,7 @@ export async function getSharedDirectoryFiles({
 
 export async function removeDirectoryShare({ directoryId, shareId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1374,7 +1359,7 @@ export async function removeDirectoryShare({ directoryId, shareId }) {
 // 디렉토리의 breadcrumbs 경로를 가져오는 함수
 export async function getDirectoryBreadcrumbs({ directoryId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
 
     if (!userId) {
       return { error: "로그인이 필요합니다." };
@@ -1430,7 +1415,7 @@ export async function getDirectoryBreadcrumbs({ directoryId }) {
 // 디렉토리 이동 (상위 디렉토리 변경)
 export async function moveDirectory({ directoryId, targetParentId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
 
     await connectToDatabase();
@@ -1482,7 +1467,7 @@ export async function moveDirectory({ directoryId, targetParentId }) {
 // 사용자의 모든 디렉토리 목록 (이동 대상 선택용)
 export async function getAllDirectoriesFlat() {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
 
     await connectToDatabase();
@@ -1530,7 +1515,7 @@ export async function getAllDirectoriesFlat() {
 // 벌크 디렉토리 이동
 export async function bulkMoveDirectories({ directoryIds, targetParentId }) {
   try {
-    const userId = await getAuthenticatedUser();
+    const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
     if (!directoryIds || directoryIds.length === 0)
       return { error: "이동할 디렉토리를 선택해주세요." };

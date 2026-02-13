@@ -1,28 +1,13 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyAccessToken } from "@/lib/auth/jwt";
+import { getAuthenticatedUser } from "@/lib/auth/serverAuth";
 import File from "@/models/File";
 import Directory from "@/models/Directory";
 import User from "@/models/User";
 import mongoose from "mongoose";
 import { generateDownloadUrl } from "@/lib/r2/r2Client";
-import { cookies } from "next/headers";
 
-async function getAuthenticatedUser() {
-  const token = cookies().get("access_token")?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const decoded = await verifyAccessToken(token);
-  if (!decoded) {
-    return null;
-  }
-
-  return decoded.userId;
-}
 
 export async function getSharedFileInfo({ hash }) {
   try {

@@ -12,7 +12,7 @@ export async function checkActionRateLimit(action, identifier = null) {
     // IP 주소 가져오기
     let clientIP = identifier;
     if (!clientIP) {
-      const headersList = headers();
+      const headersList = await headers();
       const forwarded = headersList.get("x-forwarded-for");
       const realIP = headersList.get("x-real-ip");
       const cloudflareIP = headersList.get("cf-connecting-ip");
