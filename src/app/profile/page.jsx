@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 import StorageInfo from "../components/storageInfo";
@@ -14,6 +14,12 @@ import {
   deleteAccount,
   cleanupStorage,
 } from "@/actions/user";
+import {
+  listSessions,
+  revokeSessionByJti,
+  revokeOtherSessions,
+  revokeAllSessions,
+} from "@/actions/auth";
 import { sendEmailVerification } from "@/actions/verification";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faFloppyDisk, faLock } from "@fortawesome/free-solid-svg-icons";
@@ -50,6 +56,10 @@ export default function ProfilePage() {
     percentage: 0,
   });
   const [sendingVerification, setSendingVerification] = useState(false);
+  const [sessionUpdating, setSessionUpdating] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
 
   // Modal helper functions
   const showConfirm = (message, callback) => {
@@ -182,6 +192,77 @@ export default function ProfilePage() {
     }
   };
 
+  const handleRevokeSessions = async (mode) => {
+    setError("");
+    setSuccess("");
+    setSessionUpdating(true);
+
+    try {
+      const result =
+        mode === "all" ? await revokeAllSessions() : await revokeOtherSessions();
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      if (result?.success) {
+        setSuccess(result.message);
+        if (result.loggedOut) {
+          await logout();
+          router.push("/user/signin");
+        }
+      }
+    } catch (error) {
+      setError(error.message || "세션 로그아웃에 실패했습니다.");
+    } finally {
+      setSessionUpdating(false);
+    }
+  };
+
+  const fetchSessions = useCallback(async () => {
+    setSessionLoading(true);
+    try {
+      const result = await listSessions();
+      if (result?.success) {
+        setSessions(result.sessions || []);
+        setCurrentSessionId(result.currentJti || null);
+      } else if (result?.error) {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      setError(error.message || "세션 목록을 불러오지 못했습니다.");
+    } finally {
+      setSessionLoading(false);
+    }
+  }, []);
+
+  const handleRevokeSession = async (jti) => {
+    setError("");
+    setSuccess("");
+    setSessionUpdating(true);
+
+    try {
+      const result = await revokeSessionByJti({ jti });
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      if (result?.success) {
+        setSuccess(result.message);
+        if (result.loggedOut) {
+          await logout();
+          router.push("/user/signin");
+          return;
+        }
+        await fetchSessions();
+      }
+    } catch (error) {
+      setError(error.message || "세션 로그아웃에 실패했습니다.");
+    } finally {
+      setSessionUpdating(false);
+    }
+  };
+
   const handleDeleteAccount = () => {
     if (!deletePassword) {
       setError("계정 삭제를 위해 비밀번호를 입력해주세요.");
@@ -301,6 +382,13 @@ export default function ProfilePage() {
                       deletePassword={deletePassword}
                       setDeletePassword={setDeletePassword}
                       handleDeleteAccount={handleDeleteAccount}
+                      handleRevokeSessions={handleRevokeSessions}
+                      sessionUpdating={sessionUpdating}
+                      fetchSessions={fetchSessions}
+                      sessionLoading={sessionLoading}
+                      sessions={sessions}
+                      currentSessionId={currentSessionId}
+                      handleRevokeSession={handleRevokeSession}
                     />
                   )}
                 </div>
@@ -459,7 +547,18 @@ function SecuritySettings({
   deletePassword,
   setDeletePassword,
   handleDeleteAccount,
+  handleRevokeSessions,
+  sessionUpdating,
+  fetchSessions,
+  sessionLoading,
+  sessions,
+  currentSessionId,
+  handleRevokeSession,
 }) {
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4">보안 설정</h2>
@@ -526,6 +625,90 @@ function SecuritySettings({
         </div>
         {/* 2FA 설정 */}
         <TwoFactorSetup />
+        {/* 세션 관리 */}
+        <div className="card bg-base-200">
+          <div className="card-body">
+            <h3 className="card-title">세션 관리</h3>
+            <p className="text-sm text-gray-500">
+              다른 기기에서 로그인된 세션을 강제로 로그아웃할 수 있습니다.
+            </p>
+
+            <div className="overflow-x-auto">
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    <th>기기</th>
+                    <th>IP</th>
+                    <th>최근 사용</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionLoading && (
+                    <tr>
+                      <td colSpan={4}>세션을 불러오는 중...</td>
+                    </tr>
+                  )}
+                  {!sessionLoading && sessions.length === 0 && (
+                    <tr>
+                      <td colSpan={4}>활성 세션이 없습니다.</td>
+                    </tr>
+                  )}
+                  {!sessionLoading &&
+                    sessions.map((session) => {
+                      const isCurrent = session.jti === currentSessionId;
+                      return (
+                        <tr key={session.jti}>
+                          <td>
+                            <div className="flex flex-col">
+                              <span>{session.userAgent || "Unknown"}</span>
+                              {isCurrent && (
+                                <span className="badge badge-success badge-sm w-fit">
+                                  현재 세션
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>{session.ip || "Unknown"}</td>
+                          <td>
+                            {session.lastUsedAt
+                              ? new Date(session.lastUsedAt).toLocaleString()
+                              : "-"}
+                          </td>
+                          <td className="text-right">
+                            <button
+                              className="btn btn-xs btn-outline"
+                              onClick={() => handleRevokeSession(session.jti)}
+                              disabled={sessionUpdating}
+                            >
+                              로그아웃
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                className={`btn btn-outline ${sessionUpdating ? "loading" : ""}`}
+                onClick={() => handleRevokeSessions("others")}
+                disabled={sessionUpdating}
+              >
+                다른 기기 로그아웃
+              </button>
+              <button
+                className={`btn btn-error ${sessionUpdating ? "loading" : ""}`}
+                onClick={() => handleRevokeSessions("all")}
+                disabled={sessionUpdating}
+              >
+                모든 세션 로그아웃
+              </button>
+            </div>
+          </div>
+        </div>
         {/* 계정 삭제 */}
         <div className="card bg-error text-error-content">
           <div className="card-body">

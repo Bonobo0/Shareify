@@ -53,9 +53,9 @@ export async function getAuthenticatedUser({ allowRefresh = true } = {}) {
   }
 }
 
-function getCallbackPath() {
+async function getCallbackPath() {
   try {
-    const headerStore = headers();
+    const headerStore = await headers();
     const referer = headerStore.get("referer");
     if (!referer) return "/dashboard";
     const url = new URL(referer);
@@ -68,7 +68,7 @@ function getCallbackPath() {
 export async function requireAuthenticatedUser(options = {}) {
   const userId = await getAuthenticatedUser(options);
   if (!userId) {
-    const callbackUrl = encodeURIComponent(getCallbackPath());
+    const callbackUrl = encodeURIComponent(await getCallbackPath());
     redirect(`/user/signin?callbackUrl=${callbackUrl}`);
   }
   return userId;

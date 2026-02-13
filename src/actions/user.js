@@ -2,6 +2,7 @@
 
 import { connectToDatabase } from "@/lib/db/mongodb";
 import { requireAuthenticatedUser } from "@/lib/auth/serverAuth";
+import { storageInfoCache, userInfoCache } from "@/lib/cache";
 import User from "@/models/User";
 import File from "@/models/File";
 import mongoose from "mongoose";
@@ -14,6 +15,14 @@ export async function getUserInfo() {
 
     if (!userId) {
       return { error: "인증이 필요합니다." };
+    }
+
+    const cachedUser = userInfoCache.get(userId);
+    if (cachedUser) {
+      return {
+        success: true,
+        user: cachedUser,
+      };
     }
 
     await connectToDatabase();
@@ -31,7 +40,7 @@ export async function getUserInfo() {
       return { error: "사용자를 찾을 수 없습니다." };
     }
 
-    return {
+    const response = {
       success: true,
       user: {
         id: user._id.toString(),
@@ -42,6 +51,9 @@ export async function getUserInfo() {
         storageUsed: user.storageUsed || 0, // Default 0 if null/undefined
       },
     };
+
+    userInfoCache.set(userId, response.user);
+    return response;
   } catch (error) {
     console.error("사용자 정보 조회 오류:", error);
     return {
@@ -56,6 +68,17 @@ export async function getStorageInfo() {
 
     if (!userId) {
       return { error: "인증이 필요합니다." };
+    }
+
+    const cachedStorage = storageInfoCache.get(userId);
+    if (cachedStorage) {
+      return {
+        success: true,
+        usedStorage: cachedStorage.usedStorage,
+        availableStorage: cachedStorage.availableStorage,
+        quota: cachedStorage.quota,
+        usagePercentage: cachedStorage.usagePercentage,
+      };
     }
 
     await connectToDatabase();
@@ -104,13 +127,22 @@ export async function getStorageInfo() {
     // 사용량 백분율 계산
     const usagePercentage = (usedStorage / storageQuota) * 100;
 
-    return {
+    const response = {
       success: true,
       usedStorage,
       availableStorage,
       quota: storageQuota,
       usagePercentage: parseFloat(usagePercentage.toFixed(2)),
     };
+
+    storageInfoCache.set(userId, {
+      usedStorage: response.usedStorage,
+      availableStorage: response.availableStorage,
+      quota: response.quota,
+      usagePercentage: response.usagePercentage,
+    });
+
+    return response;
   } catch (error) {
     console.error("스토리지 정보 조회 오류:", error);
     return {

@@ -99,7 +99,18 @@ export async function POST(request) {
       }
     }
 
-    const { accessToken, refreshToken } = await generateTokenPair(user._id);
+    const userAgent = request.headers.get("user-agent") || "Unknown";
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const realIp = request.headers.get("x-real-ip");
+    const ip = (forwardedFor?.split(",")[0] || realIp || "Unknown").trim();
+    const nowIso = new Date().toISOString();
+
+    const { accessToken, refreshToken } = await generateTokenPair(user._id, {
+      userAgent,
+      ip,
+      createdAt: nowIso,
+      lastUsedAt: nowIso,
+    });
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,7 @@
 
 import { connectToDatabase } from "@/lib/db/mongodb";
 import { requireAuthenticatedUser } from "@/lib/auth/serverAuth";
+import { breadcrumbsCache } from "@/lib/cache";
 import Directory from "@/models/Directory";
 import File from "@/models/File";
 import User from "@/models/User";
@@ -1365,6 +1366,15 @@ export async function getDirectoryBreadcrumbs({ directoryId }) {
       return { error: "로그인이 필요합니다." };
     }
 
+    const cacheKey = `${userId}:${directoryId || "root"}`;
+    const cachedBreadcrumbs = breadcrumbsCache.get(cacheKey);
+    if (cachedBreadcrumbs) {
+      return {
+        success: true,
+        breadcrumbs: cachedBreadcrumbs,
+      };
+    }
+
     await connectToDatabase();
 
     const breadcrumbs = [];
@@ -1402,10 +1412,13 @@ export async function getDirectoryBreadcrumbs({ directoryId }) {
       currentDirectoryId = directory.parent;
     }
 
-    return {
+    const response = {
       success: true,
       breadcrumbs,
     };
+
+    breadcrumbsCache.set(cacheKey, breadcrumbs);
+    return response;
   } catch (error) {
     console.error("breadcrumbs 조회 오류:", error);
     return { error: "경로 정보를 가져오는 중 오류가 발생했습니다." };

@@ -11,8 +11,10 @@ import {
 import {
   invalidateRefreshToken,
   invalidateAllUserRefreshTokens,
+  invalidateAllUserRefreshTokensExcept,
+  listUserRefreshTokenSessions,
 } from "@/lib/redis/client";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
   generateVerificationToken,
   sendVerificationEmail,
@@ -23,6 +25,22 @@ import { checkActionRateLimit } from "@/lib/actionRateLimit";
 // Cookie configuration
 const ACCESS_TOKEN_MAX_AGE = 15 * 60; // 15분
 const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60; // 7일
+
+async function buildSessionData() {
+  const headerStore = await headers();
+  const userAgent = headerStore.get("user-agent") || "Unknown";
+  const forwardedFor = headerStore.get("x-forwarded-for");
+  const realIp = headerStore.get("x-real-ip");
+  const ip = (forwardedFor?.split(",")[0] || realIp || "Unknown").trim();
+  const nowIso = new Date().toISOString();
+
+  return {
+    userAgent,
+    ip,
+    createdAt: nowIso,
+    lastUsedAt: nowIso,
+  };
+}
 
 export async function signIn(formData) {
   try {
@@ -115,7 +133,11 @@ export async function signIn(formData) {
       }
     }
 
-    const { accessToken, refreshToken } = await generateTokenPair(user._id);
+    const sessionData = await buildSessionData();
+    const { accessToken, refreshToken } = await generateTokenPair(
+      user._id,
+      sessionData,
+    );
     const cookieStore = await cookies();
 
     // Access token 쿠키 설정
@@ -225,7 +247,11 @@ export async function signUp(formData) {
     }
 
     // 토큰 페어 생성 및 쿠키 설정 (이메일 미인증 상태로도 로그인 허용)
-    const { accessToken, refreshToken } = await generateTokenPair(user._id);
+    const sessionData = await buildSessionData();
+    const { accessToken, refreshToken } = await generateTokenPair(
+      user._id,
+      sessionData,
+    );
     const cookieStore = await cookies();
 
     // Access token 쿠키 설정
@@ -366,6 +392,156 @@ export async function refreshTokens() {
       success: false,
       error: "토큰 갱신 중 오류가 발생했습니다.",
     };
+  }
+}
+
+export async function revokeOtherSessions() {
+  try {
+    const cookieStore = await cookies();
+    const refreshToken = cookieStore.get("refresh_token")?.value;
+
+    if (!refreshToken) {
+      return { error: "Refresh token이 없습니다." };
+    }
+
+    const payload = await verifyToken(refreshToken);
+    if (!payload?.userId || !payload?.jti) {
+      return { error: "유효하지 않은 refresh token입니다." };
+    }
+
+    await invalidateAllUserRefreshTokensExcept(payload.userId, payload.jti);
+
+    return {
+      success: true,
+      message: "다른 기기 세션이 모두 로그아웃되었습니다.",
+    };
+  } catch (error) {
+    console.error("Revoke other sessions error:", error);
+    return { error: "다른 세션 로그아웃 중 오류가 발생했습니다." };
+  }
+}
+
+export async function revokeAllSessions() {
+  try {
+    const cookieStore = await cookies();
+    const refreshToken = cookieStore.get("refresh_token")?.value;
+
+    if (!refreshToken) {
+      return { error: "Refresh token이 없습니다." };
+    }
+
+    const payload = await verifyToken(refreshToken);
+    if (!payload?.userId) {
+      return { error: "유효하지 않은 refresh token입니다." };
+    }
+
+    await invalidateAllUserRefreshTokens(payload.userId);
+
+    cookieStore.set("access_token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      expires: new Date(0),
+    });
+
+    cookieStore.set("refresh_token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      expires: new Date(0),
+    });
+
+    return {
+      success: true,
+      message: "모든 세션이 로그아웃되었습니다.",
+      loggedOut: true,
+    };
+  } catch (error) {
+    console.error("Revoke all sessions error:", error);
+    return { error: "전체 세션 로그아웃 중 오류가 발생했습니다." };
+  }
+}
+
+export async function listSessions() {
+  try {
+    const cookieStore = await cookies();
+    const refreshToken = cookieStore.get("refresh_token")?.value;
+
+    if (!refreshToken) {
+      return { error: "Refresh token이 없습니다." };
+    }
+
+    const payload = await verifyToken(refreshToken);
+    if (!payload?.userId) {
+      return { error: "유효하지 않은 refresh token입니다." };
+    }
+
+    const sessions = await listUserRefreshTokenSessions(payload.userId);
+
+    return {
+      success: true,
+      sessions,
+      currentJti: payload.jti || null,
+    };
+  } catch (error) {
+    console.error("List sessions error:", error);
+    return { error: "세션 목록 조회 중 오류가 발생했습니다." };
+  }
+}
+
+export async function revokeSessionByJti({ jti }) {
+  try {
+    if (!jti) {
+      return { error: "세션 ID가 필요합니다." };
+    }
+
+    const cookieStore = await cookies();
+    const refreshToken = cookieStore.get("refresh_token")?.value;
+
+    if (!refreshToken) {
+      return { error: "Refresh token이 없습니다." };
+    }
+
+    const payload = await verifyToken(refreshToken);
+    if (!payload?.userId) {
+      return { error: "유효하지 않은 refresh token입니다." };
+    }
+
+    await invalidateRefreshToken(payload.userId, jti);
+
+    if (payload.jti === jti) {
+      cookieStore.set("access_token", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 0,
+        expires: new Date(0),
+      });
+
+      cookieStore.set("refresh_token", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 0,
+        expires: new Date(0),
+      });
+
+      return {
+        success: true,
+        message: "현재 세션이 로그아웃되었습니다.",
+        loggedOut: true,
+      };
+    }
+
+    return {
+      success: true,
+      message: "선택한 세션이 로그아웃되었습니다.",
+    };
+  } catch (error) {
+    console.error("Revoke session by jti error:", error);
+    return { error: "세션 로그아웃 중 오류가 발생했습니다." };
   }
 }
 

@@ -6,6 +6,7 @@ import {
   storeRefreshToken,
   validateRefreshToken,
   invalidateRefreshToken,
+  getRefreshTokenSession,
 } from "@/lib/redis/client";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -57,9 +58,10 @@ export async function generateAccessToken(userId) {
 /**
  * Generate refresh token (long-lived: 7 days) with JTI for RTR
  * @param {string} userId - User ID
+ * @param {object|null} sessionData - Optional session metadata
  * @returns {Promise<{token: string, jti: string}>} Refresh token and JTI
  */
-export async function generateRefreshToken(userId) {
+export async function generateRefreshToken(userId, sessionData = null) {
   if (!userId) throw new Error("userId is required");
 
   const jti = generateJti();
@@ -76,7 +78,12 @@ export async function generateRefreshToken(userId) {
       .sign(secretKey);
 
     // Store refresh token in Redis
-    await storeRefreshToken(userId.toString(), jti, REFRESH_TOKEN_MAX_AGE);
+    await storeRefreshToken(
+      userId.toString(),
+      jti,
+      REFRESH_TOKEN_MAX_AGE,
+      sessionData,
+    );
 
     return { token, jti };
   } catch (error) {
@@ -88,11 +95,15 @@ export async function generateRefreshToken(userId) {
 /**
  * Generate both access and refresh tokens (for login/signup)
  * @param {string} userId - User ID
+ * @param {object|null} sessionData - Optional session metadata
  * @returns {Promise<{accessToken: string, refreshToken: string}>} Token pair
  */
-export async function generateTokenPair(userId) {
+export async function generateTokenPair(userId, sessionData = null) {
   const accessToken = await generateAccessToken(userId);
-  const { token: refreshToken } = await generateRefreshToken(userId);
+  const { token: refreshToken } = await generateRefreshToken(
+    userId,
+    sessionData,
+  );
   return { accessToken, refreshToken };
 }
 
@@ -172,11 +183,23 @@ export async function rotateRefreshToken(oldRefreshToken) {
     return null;
   }
 
+  const previousSession = await getRefreshTokenSession(
+    payload.userId,
+    payload.jti,
+  );
+  const nowIso = new Date().toISOString();
+  const sessionData = {
+    userAgent: previousSession?.userAgent || "Unknown",
+    ip: previousSession?.ip || "Unknown",
+    createdAt: previousSession?.createdAt || nowIso,
+    lastUsedAt: nowIso,
+  };
+
   // Invalidate old refresh token in Redis
   await invalidateRefreshToken(payload.userId, payload.jti);
 
   // Generate new token pair
-  const tokenPair = await generateTokenPair(payload.userId);
+  const tokenPair = await generateTokenPair(payload.userId, sessionData);
   return tokenPair;
 }
 
