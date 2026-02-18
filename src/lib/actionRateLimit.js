@@ -71,8 +71,8 @@ export async function checkActionRateLimit(action, identifier = null) {
     };
   } catch (error) {
     console.error("Rate limit check error:", error);
-    // 에러 발생 시 요청 허용 (fail-open)
-    return { allowed: true };
+    // 에러 발생 시 요청 차단 (fail-closed)
+    return { allowed: false, error: "요청을 처리할 수 없습니다. 잠시 후 다시 시도해주세요." };
   }
 }
 

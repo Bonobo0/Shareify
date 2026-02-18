@@ -50,18 +50,26 @@ export function generateFileHash() {
 export async function generateUploadUrl(
   filePath,
   contentType,
-  expiresIn = 3600
+  expiresIn = 3600,
+  contentLength = null
 ) {
   if (!R2_BUCKET_NAME) {
     throw new Error("R2_BUCKET_NAME이 설정되지 않았습니다.");
   }
 
   try {
-    const command = new PutObjectCommand({
+    const commandParams = {
       Bucket: R2_BUCKET_NAME,
       Key: filePath,
       ContentType: contentType,
-    });
+    };
+
+    // Content-Length 제한 설정으로 선언된 크기 이상의 파일 업로드 방지
+    if (contentLength !== null && contentLength > 0) {
+      commandParams.ContentLength = contentLength;
+    }
+
+    const command = new PutObjectCommand(commandParams);
 
     const presignedUrl = await getSignedUrl(s3Client, command, {
       expiresIn, // 1시간 동안 유효
