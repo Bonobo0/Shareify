@@ -412,7 +412,7 @@ export async function uploadFile({
     const fileHash = generateFileHash();
 
     // R2 업로드 URL 생성
-    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype);
+    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype, 3600, size);
 
     // 파일 메타데이터 저장
     const fileData = {
@@ -1957,7 +1957,7 @@ export async function createEditorFile({
     const mimetype = isEncrypted
       ? "application/octet-stream"
       : "application/json";
-    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype);
+    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype, 3600, fileSize);
 
     const file = new File({
       originalName: finalName,
@@ -2173,7 +2173,7 @@ export async function uploadEditorMedia({
 
     const uniqueFilename = generateUniqueFilename(filename);
     const fileHash = generateFileHash();
-    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype);
+    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype, 3600, size);
 
     const file = new File({
       originalName: filename,

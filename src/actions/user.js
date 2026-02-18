@@ -7,6 +7,7 @@ import User from "@/models/User";
 import File from "@/models/File";
 import mongoose from "mongoose";
 import { deleteMultipleObjects } from "@/lib/r2/r2Client";
+import { validatePassword } from "@/lib/validation";
 
 
 export async function getUserInfo() {
@@ -198,8 +199,9 @@ export async function updateUserProfile({
       }
 
       // 새 비밀번호 유효성 검사
-      if (newPassword.length < 6) {
-        return { error: "새 비밀번호는 최소 6자 이상이어야 합니다." };
+      const passwordValidation = validatePassword(newPassword);
+      if (!passwordValidation.valid) {
+        return { error: passwordValidation.error };
       }
 
       user.password = newPassword;
@@ -245,8 +247,9 @@ export async function changePassword({
       return { error: "새 비밀번호가 일치하지 않습니다." };
     }
 
-    if (newPassword.length < 8) {
-      return { error: "새 비밀번호는 최소 8자 이상이어야 합니다." };
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return { error: passwordValidation.error };
     }
 
     await connectToDatabase();

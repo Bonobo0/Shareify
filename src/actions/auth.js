@@ -21,6 +21,7 @@ import {
 } from "@/lib/email/emailService";
 import { verify2FAToken, verifyBackupCode } from "@/lib/auth/twoFactor";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
+import { validatePassword, validateEmail } from "@/lib/validation";
 
 // Cookie configuration
 const ACCESS_TOKEN_MAX_AGE = 15 * 60; // 15분
@@ -191,17 +192,15 @@ export async function signUp(formData) {
     const name = formData.get("name");
 
     // 이메일 유효성 검사
-    if (!email || !email.includes("@")) {
-      return {
-        error: "유효한 이메일을 입력해주세요.",
-      };
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      return { error: emailValidation.error };
     }
 
     // 비밀번호 유효성 검사
-    if (!password || password.length < 6) {
-      return {
-        error: "비밀번호는 최소 6자 이상이어야 합니다.",
-      };
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return { error: passwordValidation.error };
     }
 
     // 이미 가입된 이메일인지 확인
@@ -712,8 +711,9 @@ export async function resetPassword({
       return { error: "비밀번호가 일치하지 않습니다." };
     }
 
-    if (newPassword.length < 8) {
-      return { error: "비밀번호는 최소 8자 이상이어야 합니다." };
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return { error: passwordValidation.error };
     }
 
     await connectToDatabase();
@@ -743,21 +743,23 @@ export async function resetPassword({
 
       if (isBackupCode) {
         // 백업 코드 확인
-        const backupCodeResult = await verifyBackupCode(
-          user._id.toString(),
+        const backupCodeResult = verifyBackupCode(
           twoFactorCode,
+          user.twoFactorBackupCodes,
         );
-        if (!backupCodeResult.success) {
-          return { error: backupCodeResult.error };
+        if (!backupCodeResult.valid) {
+          return { error: "유효하지 않은 백업 코드입니다." };
         }
+        // 사용된 백업 코드 표시
+        user.twoFactorBackupCodes[backupCodeResult.index].used = true;
         is2FAValid = true;
       } else {
         // TOTP 코드 확인
-        const totpResult = await verify2FAToken(
-          user.twoFactorSecret,
+        const totpResult = verify2FAToken(
           twoFactorCode,
+          user.twoFactorSecret,
         );
-        if (!totpResult.success) {
+        if (!totpResult) {
           return { error: "유효하지 않은 2FA 인증 코드입니다." };
         }
         is2FAValid = true;
@@ -812,8 +814,9 @@ export async function changePassword({
       return { error: "새 비밀번호가 일치하지 않습니다." };
     }
 
-    if (newPassword.length < 8) {
-      return { error: "새 비밀번호는 최소 8자 이상이어야 합니다." };
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return { error: passwordValidation.error };
     }
 
     await connectToDatabase();
