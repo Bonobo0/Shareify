@@ -6,6 +6,8 @@ import { encryptFile } from "@/lib/crypto/encryption";
 import { validateWebGLBuildFile } from "@/lib/webgl/validation";
 import FileProgressList from "./fileUploader/FileProgressList";
 import UploadOptions from "./fileUploader/UploadOptions";
+import { aiUploadComplete } from "@/app/actions/ai";
+import useSearchStore from "@/app/stores/searchStore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowsRotate, faXmark } from "@fortawesome/free-solid-svg-icons";
 
@@ -14,6 +16,7 @@ export default function FileUploader({
   directoryId = null,
   shareHash = null,
 }) {
+  const addIndexingFile = useSearchStore((s) => s.addIndexingFile);
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({});
@@ -262,6 +265,12 @@ export default function FileUploader({
 
           if (completeResult.error) {
             throw new Error(completeResult.error);
+          }
+
+          // 4. AI 인덱싱 요청 (비동기, 실패해도 업로드는 성공으로 처리)
+          const aiResult = await aiUploadComplete(fileId, file.name, file.type || "application/octet-stream");
+          if (aiResult.success) {
+            addIndexingFile({ fileId: aiResult.fileId, filename: file.name, status: aiResult.status });
           }
 
           setProgress((prev) => ({

@@ -27,6 +27,7 @@ import BulkActionHandler from "./bulkActionHandler";
 import SelectedDownloadModal from "./selectedDownloadModal";
 import Paginator from "./paginator";
 import SearchFilters from "./fileList/SearchFilters";
+import FileStatus from "./fileList/FileStatus";
 import FileTable from "./fileList/FileTable";
 import FileListModals from "./fileList/FileListModals";
 import MoveModal from "./moveModal";
@@ -915,6 +916,7 @@ export default function FileList({
       )}
 
       {/* 검색 필터 */}
+      <FileStatus />
       <SearchFilters
         searchQuery={searchQuery}
         onSimpleSearch={handleSimpleSearch}
