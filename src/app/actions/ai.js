@@ -2,11 +2,24 @@
 
 const AI_BACKEND_URL = process.env.AI_BACKEND_URL || 'http://localhost:8000'
 
+/**
+ * Build common headers for AI backend requests.
+ * Attaches AI_CLIENT_TOKEN as a Bearer token when the env var is set.
+ */
+function aiHeaders(extra = {}) {
+  const headers = { 'Content-Type': 'application/json', ...extra }
+  const token = (process.env.AI_CLIENT_TOKEN || '').trim()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return headers
+}
+
 export async function aiUploadComplete(fileId, filename, mimetype) {
   try {
     const response = await fetch(`${AI_BACKEND_URL}/upload-complete`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiHeaders(),
       body: JSON.stringify({ fileId, filename, mimetype }),
     })
 
@@ -26,7 +39,7 @@ export async function aiFileStatus(fileId) {
   try {
     const response = await fetch(`${AI_BACKEND_URL}/file-status/${encodeURIComponent(fileId)}`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiHeaders(),
     })
 
     if (!response.ok) {
@@ -45,7 +58,7 @@ export async function aiSearch(query, filters = {}) {
   try {
     const response = await fetch(`${AI_BACKEND_URL}/search`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiHeaders(),
       body: JSON.stringify({ query, filters }),
     })
 
@@ -65,7 +78,7 @@ export async function aiTopics() {
   try {
     const response = await fetch(`${AI_BACKEND_URL}/topics`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiHeaders(),
     })
 
     if (!response.ok) {
