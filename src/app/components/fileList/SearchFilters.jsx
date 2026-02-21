@@ -98,12 +98,12 @@ export default function SearchFilters({
   return (
     <div className="mb-6">
       {/* 간단 검색 */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
         <div className="flex-1 min-w-[120px]">
           <input
             type="text"
             placeholder="파일/디렉토리 이름으로 검색..."
-            className="input input-bordered w-full"
+            className="input input-bordered input-sm sm:input-md w-full"
             value={searchQuery}
             onChange={(e) => onSimpleSearch(e.target.value)}
           />

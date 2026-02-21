@@ -8,6 +8,7 @@ import {
   getFileDownloadUrl,
   deleteFile,
   getFileDetails,
+  getFilesByIds,
   getMyUploadedFiles,
   renameFile,
 } from "@/actions/files";
@@ -47,6 +48,7 @@ export default function FileList({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [files, setFiles] = useState([]);
+  const [aiFiles, setAiFiles] = useState([]);
   const [directories, setDirectories] = useState([]);
   const [currentDirectory, setCurrentDirectory] = useState(null);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
@@ -407,16 +409,22 @@ export default function FileList({
       }
     }
 
-    // AI 검색 결과 필터 (활성화된 경우 AI 결과에 있는 파일만 표시)
+    // AI 검색 결과 필터 (활성화된 경우 서버에서 가져온 AI 결과 파일 사용)
     if (aiResults.length > 0) {
       const aiFileIds = new Set(aiResults.map((r) => r.fileId));
-      filtered_files = filtered_files.filter((file) => aiFileIds.has(file.id));
+      // 서버에서 가져온 AI 파일과 현재 페이지 파일을 합쳐서 중복 제거
+      const currentMatchedFiles = filtered_files.filter((file) =>
+        aiFileIds.has(file.id),
+      );
+      const currentIds = new Set(currentMatchedFiles.map((f) => f.id));
+      const additionalFiles = aiFiles.filter((f) => !currentIds.has(f.id));
+      filtered_files = [...currentMatchedFiles, ...additionalFiles];
       filtered_directories = [];
     }
 
     setFilteredFiles(filtered_files);
     setFilteredDirectories(filtered_directories);
-  }, [files, directories, searchFilters, aiResults]);
+  }, [files, directories, searchFilters, aiResults, aiFiles]);
 
   // 검색 초기화 함수
   const resetSearch = () => {
@@ -605,6 +613,26 @@ export default function FileList({
   useEffect(() => {
     generateFileTypeOptions();
   }, [generateFileTypeOptions]);
+
+  // AI 검색 결과에 해당하는 파일 데이터 가져오기
+  useEffect(() => {
+    if (aiResults.length === 0) {
+      setAiFiles([]);
+      return;
+    }
+    const fileIds = aiResults.map((r) => r.fileId).filter(Boolean);
+    if (fileIds.length === 0) {
+      setAiFiles([]);
+      return;
+    }
+    getFilesByIds(fileIds).then((result) => {
+      if (result.files) {
+        setAiFiles(result.files);
+      } else {
+        setAiFiles([]);
+      }
+    });
+  }, [aiResults]);
 
   // 검색 필터 적용
   useEffect(() => {

@@ -255,6 +255,118 @@ export async function getFileList({
   }
 }
 
+export async function getFilesByIds(fileIds) {
+  try {
+    const userId = await requireAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    if (!fileIds || fileIds.length === 0) {
+      return { files: [] };
+    }
+
+    await connectToDatabase();
+
+    const objectIds = fileIds
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+
+    if (objectIds.length === 0) {
+      return { files: [] };
+    }
+
+    const files = await File.find({
+      _id: { $in: objectIds },
+      deleted: { $ne: true },
+      $or: [
+        { owner: new mongoose.Types.ObjectId(userId) },
+        {
+          shared: {
+            $elemMatch: {
+              userId: new mongoose.Types.ObjectId(userId),
+            },
+          },
+        },
+      ],
+    })
+      .populate({
+        path: "owner",
+        select: "name email",
+      })
+      .populate({
+        path: "parentDirectory",
+        select: "name owner",
+        populate: {
+          path: "owner",
+          select: "name email",
+        },
+      })
+      .populate({
+        path: "shared.userId",
+        select: "name email",
+      })
+      .lean();
+
+    return {
+      files: files.map((file) => ({
+        id: file._id.toString(),
+        originalName: file.originalName,
+        fileName: file.fileName,
+        size: file.size,
+        mimetype: file.mimetype,
+        hash: file.hash,
+        isPublic: file.isPublic,
+        uploaded: file.uploaded,
+        isEncrypted: file.isEncrypted || false,
+        originalSize: file.originalSize,
+        originalMimetype: file.originalMimetype,
+        isWebGLBuild: file.isWebGLBuild || false,
+        webGLValidated: file.webGLValidated || false,
+        createdAt: file.createdAt ? file.createdAt.toISOString() : null,
+        updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
+        parentDirectory: file.parentDirectory
+          ? file.parentDirectory._id.toString()
+          : null,
+        parentDirectoryInfo: file.parentDirectory
+          ? {
+              id: file.parentDirectory._id.toString(),
+              name: file.parentDirectory.name,
+              owner: {
+                id: file.parentDirectory.owner._id.toString(),
+                name: file.parentDirectory.owner.name,
+                email: file.parentDirectory.owner.email,
+              },
+            }
+          : null,
+        deleted: file.deleted,
+        owner: file.owner._id.toString() === userId,
+        ownerInfo: {
+          id: file.owner._id.toString(),
+          name: file.owner.name,
+          email: file.owner.email,
+        },
+        sharedWith:
+          file.shared?.map((share) => ({
+            _id: share._id.toString(),
+            userId: share.userId._id.toString(),
+            user: {
+              name: share.userId.name,
+              email: share.userId.email,
+            },
+            permission: share.permission,
+          })) || [],
+      })),
+    };
+  } catch (error) {
+    console.error("파일 ID 목록 조회 오류:", error);
+    return {
+      error: "파일 목록을 조회하는 중 오류가 발생했습니다.",
+    };
+  }
+}
+
 export async function uploadFile({
   filename,
   size,
