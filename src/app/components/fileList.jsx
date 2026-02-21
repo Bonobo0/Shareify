@@ -631,6 +631,8 @@ export default function FileList({
       } else {
         setAiFiles([]);
       }
+    }).catch(() => {
+      setAiFiles([]);
     });
   }, [aiResults]);
 
