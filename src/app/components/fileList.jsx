@@ -33,6 +33,7 @@ import FileListModals from "./fileList/FileListModals";
 import MoveModal from "./moveModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faHouse, faUser, faBox } from "@fortawesome/free-solid-svg-icons";
+import useSearchStore from "@/app/stores/searchStore";
 
 export default function FileList({
   directoryId = null,
@@ -42,6 +43,7 @@ export default function FileList({
   shareLinkHash = null,
 }) {
   const router = useRouter();
+  const { aiResults } = useSearchStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [files, setFiles] = useState([]);
@@ -405,9 +407,16 @@ export default function FileList({
       }
     }
 
+    // AI 검색 결과 필터 (활성화된 경우 AI 결과에 있는 파일만 표시)
+    if (aiResults.length > 0) {
+      const aiFileIds = new Set(aiResults.map((r) => r.fileId));
+      filtered_files = filtered_files.filter((file) => aiFileIds.has(file.id));
+      filtered_directories = [];
+    }
+
     setFilteredFiles(filtered_files);
     setFilteredDirectories(filtered_directories);
-  }, [files, directories, searchFilters]);
+  }, [files, directories, searchFilters, aiResults]);
 
   // 검색 초기화 함수
   const resetSearch = () => {
@@ -937,10 +946,21 @@ export default function FileList({
       {filteredDirectories.length === 0 && filteredFiles.length === 0 ? (
         <div className="space-y-4">
           <div className="text-center py-8 bg-base-200 rounded-lg">
-            <p className="text-lg">이 디렉토리에 파일이 없습니다.</p>
-            <p className="text-gray-500 mt-2">
-              파일을 업로드하거나 새 디렉토리를 만들어보세요.
-            </p>
+            {aiResults.length > 0 ? (
+              <>
+                <p className="text-lg">AI 검색 결과가 현재 목록에 없습니다.</p>
+                <p className="text-gray-500 mt-2">
+                  다른 페이지에 결과가 있을 수 있습니다.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg">이 디렉토리에 파일이 없습니다.</p>
+                <p className="text-gray-500 mt-2">
+                  파일을 업로드하거나 새 디렉토리를 만들어보세요.
+                </p>
+              </>
+            )}
           </div>
           {/* 페이지가 여러 개인 경우 페이지네이터 표시 */}
           {totalPages > 1 && (
