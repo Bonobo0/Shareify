@@ -199,19 +199,22 @@ export default function SearchFilters({
                 <div>
                   <p className="text-sm font-medium mb-2">토픽</p>
                   <div className="flex flex-wrap gap-2">
-                    {availableTopics.map((topic) => (
-                      <button
-                        key={topic}
-                        className={`badge badge-outline cursor-pointer ${
-                          selectedTopics.includes(topic)
-                            ? "badge-primary"
-                            : ""
-                        }`}
-                        onClick={() => toggleTopic(topic)}
-                      >
-                        {topic}
-                      </button>
-                    ))}
+                    {availableTopics.map((item) => {
+                      const topic = typeof item === "string" ? item : item.topic;
+                      return (
+                        <button
+                          key={topic}
+                          className={`badge badge-outline cursor-pointer ${
+                            selectedTopics.includes(topic)
+                              ? "badge-primary"
+                              : ""
+                          }`}
+                          onClick={() => toggleTopic(topic)}
+                        >
+                          {topic}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
