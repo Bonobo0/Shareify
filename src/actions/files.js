@@ -255,6 +255,162 @@ export async function getFileList({
   }
 }
 
+export async function getFilesByIds(fileIds) {
+  try {
+    const userId = await requireAuthenticatedUser();
+
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    if (!fileIds || fileIds.length === 0) {
+      return { files: [] };
+    }
+
+    await connectToDatabase();
+
+    const objectIds = fileIds
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+
+    if (objectIds.length === 0) {
+      return { files: [] };
+    }
+
+    // 1단계: 삭제되지 않은 모든 요청 파일 조회 (접근 권한은 이후 확인)
+    const allFiles = await File.find({
+      _id: { $in: objectIds },
+      deleted: { $ne: true },
+    })
+      .populate({
+        path: "owner",
+        select: "name email",
+      })
+      .populate({
+        path: "parentDirectory",
+        select: "name owner",
+        populate: {
+          path: "owner",
+          select: "name email",
+        },
+      })
+      .populate({
+        path: "shared.userId",
+        select: "name email",
+      })
+      .lean();
+
+    // 2단계: 디렉토리 접근 권한 캐시 (중복 조회 방지)
+    const dirAccessCache = new Map();
+
+    async function checkDirAccess(dirId) {
+      if (!dirId) return false;
+      const key = dirId.toString();
+      if (dirAccessCache.has(key)) return dirAccessCache.get(key);
+
+      const dir = await Directory.findOne({
+        _id: dirId,
+        deleted: { $ne: true },
+      });
+      if (!dir) {
+        dirAccessCache.set(key, false);
+        return false;
+      }
+
+      const isOwner =
+        (dir.owner._id ? dir.owner._id.toString() : dir.owner.toString()) ===
+        userId;
+      const isShared = dir.shared?.some((s) => {
+        const sid = s.userId._id
+          ? s.userId._id.toString()
+          : s.userId.toString();
+        return sid === userId;
+      });
+
+      if (isOwner || isShared) {
+        dirAccessCache.set(key, true);
+        return true;
+      }
+
+      // 상위 디렉토리 재귀 확인
+      if (dir.parent) {
+        const parentAccess = await checkDirAccess(dir.parent);
+        dirAccessCache.set(key, parentAccess);
+        return parentAccess;
+      }
+
+      dirAccessCache.set(key, false);
+      return false;
+    }
+
+    // 3단계: 파일별 접근 권한 확인 (소유자, 직접 공유, 디렉토리 접근)
+    const files = [];
+    for (const file of allFiles) {
+      const isOwner = file.owner._id.toString() === userId;
+      const isShared = file.shared?.some((s) => {
+        const sid = s.userId._id
+          ? s.userId._id.toString()
+          : s.userId.toString();
+        return sid === userId;
+      });
+      const hasDirAccess = file.parentDirectory
+        ? await checkDirAccess(file.parentDirectory._id)
+        : false;
+
+      if (isOwner || isShared || hasDirAccess) {
+        files.push(file);
+      }
+    }
+
+    return {
+      files: files.map((file) => ({
+        id: file._id.toString(),
+        originalName: file.originalName,
+        isWebGLBuild: file.isWebGLBuild || false,
+        webGLValidated: file.webGLValidated || false,
+        createdAt: file.createdAt ? file.createdAt.toISOString() : null,
+        updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
+        parentDirectory: file.parentDirectory
+          ? file.parentDirectory._id.toString()
+          : null,
+        parentDirectoryInfo: file.parentDirectory
+          ? {
+              id: file.parentDirectory._id.toString(),
+              name: file.parentDirectory.name,
+              owner: {
+                id: file.parentDirectory.owner._id.toString(),
+                name: file.parentDirectory.owner.name,
+                email: file.parentDirectory.owner.email,
+              },
+            }
+          : null,
+        deleted: file.deleted,
+        owner: file.owner._id.toString() === userId,
+        ownerInfo: {
+          id: file.owner._id.toString(),
+          name: file.owner.name,
+          email: file.owner.email,
+        },
+        sharedWith:
+          file.shared?.map((share) => ({
+            _id: share._id.toString(),
+            userId: share.userId._id.toString(),
+            user: {
+              name: share.userId.name,
+              email: share.userId.email,
+            },
+            permission: share.permission,
+          })) || [],
+      })),
+    };
+  } catch (error) {
+    console.error("파일 ID 목록 조회 오류:", error);
+    return {
+      error: "파일 목록을 조회하는 중 오류가 발생했습니다.",
+    };
+  }
+}
+
 export async function uploadFile({
   filename,
   size,

@@ -1,5 +1,7 @@
 'use server'
 
+import { requireAuthenticatedUser } from '@/lib/auth/serverAuth'
+
 const AI_BACKEND_URL = process.env.AI_BACKEND_URL || 'http://localhost:8000'
 
 /**
@@ -56,10 +58,12 @@ export async function aiFileStatus(fileId) {
 
 export async function aiSearch(query, filters = {}) {
   try {
+    const userId = await requireAuthenticatedUser()
+
     const response = await fetch(`${AI_BACKEND_URL}/search`, {
       method: 'POST',
       headers: aiHeaders(),
-      body: JSON.stringify({ query, filters }),
+      body: JSON.stringify({ query, filters, userId }),
     })
 
     if (!response.ok) {
@@ -68,7 +72,18 @@ export async function aiSearch(query, filters = {}) {
     }
 
     const data = await response.json()
-    return { success: true, results: data.results ?? [] }
+    // snake_case → camelCase 변환 및 fileId 기준 중복 제거 (가장 높은 score 유지)
+    const seen = new Map()
+    for (const r of data.results ?? []) {
+      const fileId = r.fileId ?? r.file_id
+      if (!fileId) continue
+      const normalized = { ...r, fileId, file_id: undefined }
+      const prev = seen.get(fileId)
+      if (!prev || (r.score ?? 0) > (prev.score ?? 0)) {
+        seen.set(fileId, normalized)
+      }
+    }
+    return { success: true, results: [...seen.values()] }
   } catch (err) {
     return { error: `AI 백엔드 연결 실패: ${err.message}` }
   }
