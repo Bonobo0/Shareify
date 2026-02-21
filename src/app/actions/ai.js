@@ -84,6 +84,8 @@ export async function aiSearch(query, filters = {}) {
       }
     }
     let results = [...seen.values()]
+    // 음수 score 결과 제거
+    results = results.filter(r => (r.score ?? 0) >= 0)
     // 파일 타입(확장자) 필터 적용 (AI 백엔드가 처리하지 않으므로 직접 필터링)
     if (filters.fileTypes?.length > 0) {
       const exts = new Set(filters.fileTypes.map(t => t.toLowerCase()))

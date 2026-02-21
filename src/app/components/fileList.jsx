@@ -17,6 +17,7 @@ import {
   getDirectoryDetails,
   deleteDirectoryRecursive,
   getDirectoryBreadcrumbs,
+  getAllDescendantDirectoryIds,
 } from "@/actions/directories";
 import { downloadAndDecrypt, isMediaFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
@@ -411,7 +412,8 @@ export default function FileList({
 
     // AI 검색 결과 필터 (활성화된 경우 서버에서 가져온 AI 결과 파일 사용)
     if (aiResults.length > 0) {
-      const aiFileIds = new Set(aiResults.map((r) => r.fileId));
+      // aiFiles는 이미 디렉토리 필터가 적용된 상태
+      const aiFileIds = new Set(aiFiles.map((f) => f.id));
       // 서버에서 가져온 AI 파일과 현재 페이지 파일을 합쳐서 중복 제거
       const currentMatchedFiles = filtered_files.filter((file) =>
         aiFileIds.has(file.id),
@@ -625,16 +627,23 @@ export default function FileList({
       setAiFiles([]);
       return;
     }
-    getFilesByIds(fileIds).then((result) => {
-      if (result.files) {
-        setAiFiles(result.files);
-      } else {
+    getFilesByIds(fileIds).then(async (result) => {
+      if (!result.files) {
         setAiFiles([]);
+        return;
+      }
+      // 루트 디렉토리가 아닌 경우, 현재 디렉토리와 하위 디렉토리 파일만 필터
+      if (directoryId) {
+        const descResult = await getAllDescendantDirectoryIds(directoryId);
+        const allowedDirs = new Set([directoryId, ...(descResult.ids || [])]);
+        setAiFiles(result.files.filter((f) => allowedDirs.has(f.parentDirectory)));
+      } else {
+        setAiFiles(result.files);
       }
     }).catch(() => {
       setAiFiles([]);
     });
-  }, [aiResults]);
+  }, [aiResults, directoryId]);
 
   // 검색 필터 적용
   useEffect(() => {
@@ -971,6 +980,7 @@ export default function FileList({
         fileTypeOptions={fileTypeOptions}
         filteredDirectories={filteredDirectories}
         filteredFiles={filteredFiles}
+        aiFiles={aiFiles}
       />
 
       {filteredDirectories.length === 0 && filteredFiles.length === 0 ? (

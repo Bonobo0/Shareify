@@ -22,6 +22,7 @@ export default function SearchFilters({
   fileTypeOptions,
   filteredDirectories,
   filteredFiles,
+  aiFiles = [],
 }) {
   const {
     query: aiQuery,
@@ -121,6 +122,15 @@ export default function SearchFilters({
   };
 
   const isAiSearchActive = aiResults.length > 0 || aiQuery;
+
+  // aiFiles에서 최신 파일 이름을 조회하는 헬퍼
+  const aiFilesMap = React.useMemo(() => {
+    const map = new Map();
+    for (const f of aiFiles) {
+      map.set(f.id, f.originalName);
+    }
+    return map;
+  }, [aiFiles]);
 
   return (
     <div className="mb-6">
@@ -263,24 +273,38 @@ export default function SearchFilters({
             {/* AI 검색 결과 */}
             {aiResults.length > 0 && (
               <div className="mt-3">
-                <p className="text-sm font-medium mb-2">
-                  AI 검색 결과 ({aiResults.length}개)
-                </p>
-                <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-                  {aiResults.map((item, idx) => (
-                    <div
-                      key={item.fileId ?? idx}
-                      className="flex items-center justify-between p-2 rounded bg-base-200 text-sm"
-                    >
-                      <span className="truncate flex-1">{item.filename ?? item.fileId}</span>
-                      {item.score != null && (
-                        <span className="badge badge-outline badge-sm ml-2">
-                          {(item.score * 100).toFixed(0)}%
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {(() => {
+                  // aiFiles가 로드된 경우 디렉토리 필터링된 결과만 표시
+                  const displayResults = aiFiles.length > 0
+                    ? aiResults.filter((item) => aiFilesMap.has(item.fileId))
+                    : aiResults;
+                  return displayResults.length > 0 ? (
+                    <>
+                      <p className="text-sm font-medium mb-2">
+                        AI 검색 결과 ({displayResults.length}개)
+                      </p>
+                      <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
+                        {displayResults.map((item, idx) => (
+                          <div
+                            key={item.fileId ?? idx}
+                            className="flex items-center justify-between p-2 rounded bg-base-200 text-sm"
+                          >
+                            <span className="truncate flex-1">{aiFilesMap.get(item.fileId) ?? item.filename ?? item.fileId}</span>
+                            {item.score != null && (
+                              <span className="badge badge-outline badge-sm ml-2">
+                                {(item.score * 100).toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-base-content/50 mt-3">
+                      이 디렉토리에서 검색 결과가 없습니다.
+                    </p>
+                  );
+                })()}
               </div>
             )}
 
