@@ -9,6 +9,7 @@ import {
   completeEditorMediaUpload,
   getEditorMediaUrl,
 } from "@/actions/files";
+import { aiDeleteFile, aiUploadComplete } from "@/app/actions/ai";
 import { encryptFile } from "@/lib/crypto/encryption";
 
 // Editor.js 플러그인
@@ -543,6 +544,14 @@ export default function LiveEditor({
       });
 
       if (completeResult.error) throw new Error(completeResult.error);
+
+      // AI 인덱스 갱신: 기존 인덱스 삭제 후 재인덱싱
+      try {
+        await aiDeleteFile(file.id);
+        await aiUploadComplete(file.id, file.originalName, "application/json");
+      } catch (aiErr) {
+        console.error("AI 재인덱싱 오류:", aiErr);
+      }
 
       setSaveStatus("saved");
       setSaveMessage("저장 완료");

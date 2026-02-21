@@ -760,6 +760,20 @@ export async function deleteFile({ fileId }) {
       console.error("R2 파일 삭제 오류:", r2Error);
     }
 
+    // AI 인덱스 삭제
+    try {
+      const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
+      const token = (process.env.AI_CLIENT_TOKEN || "").trim();
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      await fetch(`${AI_BACKEND_URL}/file/${fileId}`, {
+        method: "DELETE",
+        headers,
+      });
+    } catch (aiError) {
+      console.error("AI 인덱스 삭제 오류:", aiError);
+    }
+
     // 첨부된 미디어 파일들 캐스케이드 삭제
     const attachedMedia = await File.find({
       parentFile: file._id,

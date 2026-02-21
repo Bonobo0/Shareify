@@ -89,6 +89,22 @@ export async function aiSearch(query, filters = {}) {
   }
 }
 
+export async function aiDeleteFile(fileId) {
+  try {
+    const response = await fetch(`${AI_BACKEND_URL}/file/${encodeURIComponent(fileId)}`, {
+      method: 'DELETE',
+      headers: aiHeaders(),
+    })
+    if (!response.ok) {
+      const text = await response.text()
+      return { error: `AI 인덱스 삭제 실패: ${response.status} ${text}` }
+    }
+    return { success: true }
+  } catch (err) {
+    return { error: `AI 백엔드 연결 실패: ${err.message}` }
+  }
+}
+
 export async function aiTopics() {
   try {
     const response = await fetch(`${AI_BACKEND_URL}/topics`, {
