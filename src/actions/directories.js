@@ -1617,3 +1617,43 @@ export async function bulkMoveDirectories({ directoryIds, targetParentId }) {
     return { error: "디렉토리 이동 중 오류가 발생했습니다." };
   }
 }
+
+/**
+ * 주어진 디렉토리의 모든 하위 디렉토리 ID 목록을 반환합니다 (재귀적).
+ */
+export async function getAllDescendantDirectoryIds(directoryId) {
+  try {
+    const userId = await requireAuthenticatedUser();
+    if (!userId) {
+      return { error: "로그인이 필요합니다." };
+    }
+
+    if (!directoryId) {
+      return { ids: [] };
+    }
+
+    await connectToDatabase();
+
+    const result = [];
+    const queue = [directoryId];
+
+    while (queue.length > 0) {
+      const parentIds = queue.splice(0, queue.length);
+      const children = await Directory.find({
+        parent: { $in: parentIds },
+        deleted: { $ne: true },
+      }).select("_id").lean();
+
+      for (const child of children) {
+        const id = child._id.toString();
+        result.push(id);
+        queue.push(id);
+      }
+    }
+
+    return { success: true, ids: result };
+  } catch (error) {
+    console.error("하위 디렉토리 조회 오류:", error);
+    return { error: "하위 디렉토리를 조회하는 중 오류가 발생했습니다." };
+  }
+}
