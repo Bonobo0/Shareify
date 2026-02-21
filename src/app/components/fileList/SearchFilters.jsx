@@ -98,8 +98,8 @@ export default function SearchFilters({
   return (
     <div className="mb-6">
       {/* 간단 검색 */}
-      <div className="flex gap-2 mb-4">
-        <div className="flex-1">
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <div className="flex-1 min-w-[120px]">
           <input
             type="text"
             placeholder="파일/디렉토리 이름으로 검색..."
@@ -109,21 +109,24 @@ export default function SearchFilters({
           />
         </div>
         <button
-          className="btn btn-outline"
+          className="btn btn-outline btn-sm sm:btn-md"
           onClick={onToggleAdvancedSearch}
         >
-          <FontAwesomeIcon icon={faMagnifyingGlass} /> 고급 검색
+          <FontAwesomeIcon icon={faMagnifyingGlass} />
+          <span className="hidden sm:inline"> 고급 검색</span>
         </button>
         <button
-          className={`btn ${showAiSearch ? "btn-primary" : "btn-outline"}`}
+          className={`btn btn-sm sm:btn-md ${showAiSearch ? "btn-primary" : "btn-outline"}`}
           onClick={() => setShowAiSearch((v) => !v)}
           title="AI 벡터 검색"
         >
-          <FontAwesomeIcon icon={faRobot} /> AI 검색
+          <FontAwesomeIcon icon={faRobot} />
+          <span className="hidden sm:inline"> AI 검색</span>
         </button>
         {(searchQuery || Object.values(searchFilters).some((v) => v)) && (
-          <button className="btn btn-ghost" onClick={onResetSearch}>
-            <FontAwesomeIcon icon={faXmark} /> 초기화
+          <button className="btn btn-ghost btn-sm sm:btn-md" onClick={onResetSearch}>
+            <FontAwesomeIcon icon={faXmark} />
+            <span className="hidden sm:inline"> 초기화</span>
           </button>
         )}
       </div>
@@ -137,32 +140,35 @@ export default function SearchFilters({
             </h3>
 
             {/* 검색 입력 */}
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mb-3 flex-wrap">
               <input
                 type="text"
                 placeholder="자연어로 검색... (예: 지난달 재무 보고서)"
-                className="input input-bordered flex-1"
+                className="input input-bordered flex-1 min-w-[120px]"
                 value={aiQuery}
                 onChange={(e) => setAiQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAiSearch()}
               />
-              <button
-                className="btn btn-primary"
-                onClick={handleAiSearch}
-                disabled={!aiQuery.trim() || isLoading || isPending}
-              >
-                {isLoading || isPending ? (
-                  <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
-                ) : (
-                  <FontAwesomeIcon icon={faMagnifyingGlass} />
-                )}
-                검색
-              </button>
-              {isAiSearchActive && (
-                <button className="btn btn-ghost" onClick={handleAiReset}>
-                  <FontAwesomeIcon icon={faXmark} /> 초기화
+              <div className="flex gap-2 shrink-0">
+                <button
+                  className="btn btn-primary"
+                  onClick={handleAiSearch}
+                  disabled={!aiQuery.trim() || isLoading || isPending}
+                >
+                  {isLoading || isPending ? (
+                    <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                  ) : (
+                    <FontAwesomeIcon icon={faMagnifyingGlass} />
+                  )}
+                  검색
                 </button>
-              )}
+                {isAiSearchActive && (
+                  <button className="btn btn-ghost" onClick={handleAiReset}>
+                    <FontAwesomeIcon icon={faXmark} />
+                    <span className="hidden sm:inline"> 초기화</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
