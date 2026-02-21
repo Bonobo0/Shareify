@@ -545,12 +545,14 @@ export default function LiveEditor({
 
       if (completeResult.error) throw new Error(completeResult.error);
 
-      // AI 인덱스 갱신: 기존 인덱스 삭제 후 재인덱싱
-      try {
-        await aiDeleteFile(file.id);
-        await aiUploadComplete(file.id, file.originalName, "application/json");
-      } catch (aiErr) {
-        console.error("AI 재인덱싱 오류:", aiErr);
+      // AI 인덱스 갱신: 기존 인덱스 삭제 후 재인덱싱 (암호화된 파일은 제외)
+      if (!file.isEncrypted) {
+        try {
+          await aiDeleteFile(file.id);
+          await aiUploadComplete(file.id, file.originalName, "application/json");
+        } catch (aiErr) {
+          console.error("AI 재인덱싱 오류:", aiErr);
+        }
       }
 
       setSaveStatus("saved");

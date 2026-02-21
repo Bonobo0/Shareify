@@ -267,10 +267,12 @@ export default function FileUploader({
             throw new Error(completeResult.error);
           }
 
-          // 4. AI 인덱싱 요청 (비동기, 실패해도 업로드는 성공으로 처리)
-          const aiResult = await aiUploadComplete(fileId, file.name, file.type || "application/octet-stream");
-          if (aiResult.success) {
-            addIndexingFile({ fileId: aiResult.fileId, filename: file.name, status: aiResult.status });
+          // 4. AI 인덱싱 요청 (비동기, 실패해도 업로드는 성공으로 처리, 암호화된 파일은 제외)
+          if (!enableE2EE) {
+            const aiResult = await aiUploadComplete(fileId, file.name, file.type || "application/octet-stream");
+            if (aiResult.success) {
+              addIndexingFile({ fileId: aiResult.fileId, filename: file.name, status: aiResult.status });
+            }
           }
 
           setProgress((prev) => ({
