@@ -43,6 +43,34 @@ export default function SearchFilters({
   const [aiError, setAiError] = useState("");
   const [showAllFileTypes, setShowAllFileTypes] = useState(false);
 
+  const topicLabels = {
+    text: "텍스트",
+    image: "이미지",
+    video: "동영상",
+    audio: "오디오",
+    news: "뉴스",
+    gaming: "게임",
+    code: "코드",
+    document: "문서",
+    spreadsheet: "스프레드시트",
+    presentation: "프레젠테이션",
+    archive: "압축파일",
+    music: "음악",
+    photo: "사진",
+    education: "교육",
+    science: "과학",
+    technology: "기술",
+    business: "비즈니스",
+    finance: "금융",
+    health: "건강",
+    sports: "스포츠",
+    travel: "여행",
+    food: "음식",
+    art: "예술",
+    design: "디자인",
+    entertainment: "엔터테인먼트",
+  };
+
   // 토픽 목록 동적 로드
   useEffect(() => {
     if (!showAiSearch) return;
@@ -74,7 +102,6 @@ export default function SearchFilters({
   const handleAiReset = () => {
     resetAiSearch();
     setAiError("");
-    setAvailableTopics([]);
   };
 
   const toggleFileType = (type) => {
@@ -217,7 +244,7 @@ export default function SearchFilters({
                           }`}
                           onClick={() => toggleTopic(topic)}
                         >
-                          {topic}
+                          {topicLabels[topic] || topic}
                         </button>
                       );
                     })}

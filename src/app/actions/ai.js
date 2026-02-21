@@ -83,7 +83,16 @@ export async function aiSearch(query, filters = {}) {
         seen.set(fileId, normalized)
       }
     }
-    return { success: true, results: [...seen.values()] }
+    let results = [...seen.values()]
+    // 파일 타입(확장자) 필터 적용 (AI 백엔드가 처리하지 않으므로 직접 필터링)
+    if (filters.fileTypes?.length > 0) {
+      const exts = new Set(filters.fileTypes.map(t => t.toLowerCase()))
+      results = results.filter(r => {
+        const ext = r.filename?.split('.').pop()?.toLowerCase()
+        return ext && exts.has(ext)
+      })
+    }
+    return { success: true, results }
   } catch (err) {
     return { error: `AI 백엔드 연결 실패: ${err.message}` }
   }
