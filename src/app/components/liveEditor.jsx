@@ -618,6 +618,8 @@ export default function LiveEditor({
 
       // 이미지 다운로드 및 로컬 파일 매핑
       const imageMap = new Map(); // url -> { filename, blob }
+      const usedNames = new Set();
+      let failedCount = 0;
       if (imageBlocks.length > 0) {
         let imgIdx = 0;
         await Promise.all(
@@ -626,17 +628,25 @@ export default function LiveEditor({
             if (imageMap.has(url)) return;
             try {
               const resp = await fetch(url);
-              if (!resp.ok) return;
+              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
               const blob = await resp.blob();
               const origName = block.data.file.name || block.data.caption || "";
               const ext =
                 origName.split(".").pop()?.toLowerCase() ||
                 blob.type.split("/").pop() ||
                 "png";
-              const filename = `images/image_${imgIdx++}.${ext}`;
+              // 원본 파일명 유지, 충돌 시 번호 부여
+              let baseName = origName.replace(/\.[^.]+$/, "") || `image_${imgIdx}`;
+              let filename = `images/${baseName}.${ext}`;
+              while (usedNames.has(filename)) {
+                imgIdx++;
+                filename = `images/${baseName}_${imgIdx}.${ext}`;
+              }
+              usedNames.add(filename);
+              imgIdx++;
               imageMap.set(url, { filename, blob });
             } catch {
-              // 이미지 다운로드 실패 시 무시
+              failedCount++;
             }
           }),
         );
@@ -705,6 +715,10 @@ export default function LiveEditor({
         }
         const zipBlob = await zip.generateAsync({ type: "blob" });
         saveAs(zipBlob, `${baseName}.zip`);
+        if (failedCount > 0) {
+          setSaveMessage(`내보내기 완료 (이미지 ${failedCount}개 다운로드 실패)`);
+          setSaveStatus("error");
+        }
       } else {
         const blob = new Blob([content], { type: mimeType });
         const url = URL.createObjectURL(blob);

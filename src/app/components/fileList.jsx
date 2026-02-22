@@ -183,11 +183,11 @@ export default function FileList({
         setFiles(fileResult.files || []);
 
         if (showDirectories) {
-          // 디렉토리 목록 가져오기 (디렉토리는 페이지네이션 없이 전체 조회)
+          // 디렉토리 목록 가져오기 (디렉토리는 페이지네이션 없이 전체 조회, 상한 1000개)
           const dirResult = await getDirectoryList({
             parentId: directoryId || null,
             page: 1,
-            limit: 0, // 제한 없이 전체 조회
+            limit: 1000,
             sortBy,
             sortOrder,
             shareLinkHash, // 공유 링크 해시 추가
@@ -667,8 +667,7 @@ export default function FileList({
   };
 
   // 페이지당 항목 수 변경 핸들러
-  const handleItemsPerPageChange = async (newValue) => {
-    const val = parseInt(newValue, 10);
+  const handleItemsPerPageChange = async (val) => {
     if (isNaN(val) || val < 5 || val > 100) return;
     setItemsPerPage(val);
     setCurrentPage(1);

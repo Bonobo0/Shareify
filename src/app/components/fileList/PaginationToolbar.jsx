@@ -18,7 +18,7 @@ export default function PaginationToolbar({
         <select
           className="select select-bordered select-xs"
           value={itemsPerPage}
-          onChange={(e) => onItemsPerPageChange(e.target.value)}
+          onChange={(e) => onItemsPerPageChange(parseInt(e.target.value, 10))}
         >
           {[5, 10, 20, 30, 50, 100].map((n) => (
             <option key={n} value={n}>
