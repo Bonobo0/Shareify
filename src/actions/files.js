@@ -1947,6 +1947,7 @@ export async function getEditorFiles() {
         createdAt: f.createdAt?.toISOString(),
         updatedAt: f.updatedAt?.toISOString(),
         parentDirectoryName: f.parentDirectory?.name || null,
+        parentDirectoryId: f.parentDirectory?._id?.toString() || null,
       })),
       sharedFiles: allSharedFiles.map((f) => {
         const userShare = f.shared?.find(
@@ -1965,6 +1966,7 @@ export async function getEditorFiles() {
           createdAt: f.createdAt?.toISOString(),
           updatedAt: f.updatedAt?.toISOString(),
           parentDirectoryName: f.parentDirectory?.name || null,
+          parentDirectoryId: f.parentDirectory?._id?.toString() || null,
           ownerName: f.owner?.name || f.owner?.email?.split("@")[0] || "알 수 없음",
           permission: userShare?.permission || dirPermission || "read",
         };
