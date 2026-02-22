@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   getFileList,
   getFileDownloadUrl,
@@ -28,14 +27,15 @@ import BulkDownloadModal from "./bulkDownloadModal";
 import ShareModal from "./shareModal";
 import BulkActionHandler from "./bulkActionHandler";
 import SelectedDownloadModal from "./selectedDownloadModal";
-import Paginator from "./paginator";
 import SearchFilters from "./fileList/SearchFilters";
 import FileStatus from "./fileList/FileStatus";
 import FileTable from "./fileList/FileTable";
 import FileListModals from "./fileList/FileListModals";
+import Breadcrumbs from "./fileList/Breadcrumbs";
+import PaginationToolbar from "./fileList/PaginationToolbar";
 import MoveModal from "./moveModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHouse, faUser, faBox } from "@fortawesome/free-solid-svg-icons";
+import { faBox } from "@fortawesome/free-solid-svg-icons";
 import useSearchStore from "@/app/stores/searchStore";
 
 export default function FileList({
@@ -923,50 +923,7 @@ export default function FileList({
     <div>
       {error && <div className="alert alert-error mb-4">{error}</div>}
       {/* 경로 표시 (breadcrumbs) */}
-      {(directoryId || breadcrumbs.length > 0) && (
-        <div className="breadcrumbs mb-4 text-sm">
-          <ul>
-            <li>
-              <Link
-                href="/dashboard"
-                className="text-blue-700 hover:text-blue-800"
-              >
-                <FontAwesomeIcon icon={faHouse} /> 내 파일
-              </Link>
-            </li>
-            {breadcrumbs.map((crumb, index) => (
-              <li key={crumb.id}>
-                <div className="flex items-center gap-1">
-                  {index === breadcrumbs.length - 1 ? (
-                    <>
-                      <span className="  font-medium">{crumb.name}</span>
-                      {!crumb.isOwner && (
-                        <span className="badge badge-accent badge-xs">
-                          <FontAwesomeIcon icon={faUser} /> 공유받음
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        href={`/directory/${crumb.hash}`}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        {crumb.name}
-                      </Link>
-                      {!crumb.isOwner && (
-                        <span className="badge badge-accent badge-xs ml-1">
-                          <FontAwesomeIcon icon={faUser} />
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <Breadcrumbs directoryId={directoryId} breadcrumbs={breadcrumbs} />
 
       {/* 검색 필터 */}
       <FileStatus />
@@ -1009,13 +966,13 @@ export default function FileList({
           </div>
           {/* 페이지가 여러 개인 경우 페이지네이터 표시 */}
           {totalPages > 1 && (
-            <Paginator
+            <PaginationToolbar
               currentPage={currentPage}
               totalPages={totalPages}
               totalItems={totalItems}
               itemsPerPage={itemsPerPage}
               onPageChange={handlePageChange}
-              className="mt-6 mb-20"
+              onItemsPerPageChange={handleItemsPerPageChange}
             />
           )}
         </div>
@@ -1060,27 +1017,14 @@ export default function FileList({
             onRenameFile={handleRenameFile}
           />
           {/* 페이지네이터 */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 mb-20">
-            <div className="flex items-center gap-2 text-sm">
-              <span>페이지당</span>
-              <select
-                className="select select-bordered select-xs"
-                value={itemsPerPage}
-                onChange={(e) => handleItemsPerPageChange(e.target.value)}
-              >
-                {[5, 10, 20, 30, 50, 100].map((n) => (
-                  <option key={n} value={n}>{n}개</option>
-                ))}
-              </select>
-            </div>
-            <Paginator
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              onPageChange={handlePageChange}
-            />
-          </div>
+          <PaginationToolbar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+            onItemsPerPageChange={handleItemsPerPageChange}
+          />
         </div>
       )}
       {/* 모달들 */}
