@@ -11,6 +11,8 @@ import {
 } from "@/actions/files";
 import { aiDeleteFile, aiUploadComplete } from "@/app/actions/ai";
 import { encryptFile } from "@/lib/crypto/encryption";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 // Editor.js 플러그인
 import Header from "@editorjs/header";
@@ -602,18 +604,76 @@ export default function LiveEditor({
     };
   }, [handleSave]);
 
-  // 내보내기: 파일로 다운로드
+  // 내보내기: 파일로 다운로드 (이미지 포함 시 zip으로 내보내기)
   const handleExport = useCallback(
     async (format) => {
       setExportDropdown(false);
       const data = await getEditorData();
       if (!data || !data.blocks) return;
 
+      // 이미지 블록 수집
+      const imageBlocks = data.blocks.filter(
+        (block) => block.type === "image" && block.data?.file?.url,
+      );
+
+      // 이미지 다운로드 및 로컬 파일 매핑
+      const imageMap = new Map(); // url -> { filename, blob }
+      const usedNames = new Set();
+      let failedCount = 0;
+      if (imageBlocks.length > 0) {
+        let imgIdx = 0;
+        await Promise.all(
+          imageBlocks.map(async (block) => {
+            const url = block.data.file.url;
+            if (imageMap.has(url)) return;
+            try {
+              const resp = await fetch(url);
+              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+              const blob = await resp.blob();
+              const origName = block.data.file.name || block.data.caption || "";
+              const ext =
+                origName.split(".").pop()?.toLowerCase() ||
+                blob.type.split("/").pop() ||
+                "png";
+              // 원본 파일명 유지, 충돌 시 번호 부여
+              let baseName = origName.replace(/\.[^.]+$/, "") || `image_${imgIdx}`;
+              let filename = `images/${baseName}.${ext}`;
+              while (usedNames.has(filename)) {
+                imgIdx++;
+                filename = `images/${baseName}_${imgIdx}.${ext}`;
+              }
+              usedNames.add(filename);
+              imgIdx++;
+              imageMap.set(url, { filename, blob });
+            } catch {
+              failedCount++;
+            }
+          }),
+        );
+      }
+
+      // 블록 내 이미지 URL을 로컬 경로로 치환한 복사본 생성
+      const localBlocks = data.blocks.map((block) => {
+        if (block.type === "image" && block.data?.file?.url) {
+          const mapped = imageMap.get(block.data.file.url);
+          if (mapped) {
+            return {
+              ...block,
+              data: {
+                ...block.data,
+                file: { ...block.data.file, url: mapped.filename },
+              },
+            };
+          }
+        }
+        return block;
+      });
+
       let content, mimeType, extension;
 
       switch (format) {
         case "html": {
-          const htmlBody = blocksToHtml(data.blocks);
+          const htmlBody = blocksToHtml(localBlocks);
           const styles = getExportStyles();
           content = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>${file?.originalName || "document"}</title>${styles}</head>\n<body>\n${htmlBody}\n</body>\n</html>`;
           mimeType = "text/html";
@@ -621,19 +681,20 @@ export default function LiveEditor({
           break;
         }
         case "markdown": {
-          content = blocksToMarkdown(data.blocks);
+          content = blocksToMarkdown(localBlocks);
           mimeType = "text/markdown";
           extension = "md";
           break;
         }
         case "text": {
-          content = blocksToText(data.blocks);
+          content = blocksToText(localBlocks);
           mimeType = "text/plain";
           extension = "txt";
           break;
         }
         case "json": {
-          content = JSON.stringify(data, null, 2);
+          const localData = { ...data, blocks: localBlocks };
+          content = JSON.stringify(localData, null, 2);
           mimeType = "application/json";
           extension = "json";
           break;
@@ -642,17 +703,33 @@ export default function LiveEditor({
           return;
       }
 
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
       const baseName =
         file?.originalName?.replace(/\.ejtxt$/, "") || "document";
-      a.download = `${baseName}.${extension}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      // 이미지가 있으면 zip으로 내보내기
+      if (imageMap.size > 0) {
+        const zip = new JSZip();
+        zip.file(`${baseName}.${extension}`, content);
+        for (const [, { filename, blob }] of imageMap) {
+          zip.file(filename, blob);
+        }
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        saveAs(zipBlob, `${baseName}.zip`);
+        if (failedCount > 0) {
+          setSaveMessage(`내보내기 완료 (이미지 ${failedCount}개 다운로드 실패)`);
+          setSaveStatus("error");
+        }
+      } else {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${baseName}.${extension}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
     },
     [getEditorData, file],
   );

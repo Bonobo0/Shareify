@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   getFileList,
   getFileDownloadUrl,
@@ -19,6 +18,7 @@ import {
   getDirectoryBreadcrumbs,
   getAllDescendantDirectoryIds,
 } from "@/actions/directories";
+import { getUserPreferences, updateUserPreferences } from "@/actions/user";
 import { downloadAndDecrypt, isMediaFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
 import DirectoryShareModal from "./directoryShareModal";
@@ -27,14 +27,15 @@ import BulkDownloadModal from "./bulkDownloadModal";
 import ShareModal from "./shareModal";
 import BulkActionHandler from "./bulkActionHandler";
 import SelectedDownloadModal from "./selectedDownloadModal";
-import Paginator from "./paginator";
 import SearchFilters from "./fileList/SearchFilters";
 import FileStatus from "./fileList/FileStatus";
 import FileTable from "./fileList/FileTable";
 import FileListModals from "./fileList/FileListModals";
+import Breadcrumbs from "./fileList/Breadcrumbs";
+import PaginationToolbar from "./fileList/PaginationToolbar";
 import MoveModal from "./moveModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHouse, faUser, faBox } from "@fortawesome/free-solid-svg-icons";
+import { faBox } from "@fortawesome/free-solid-svg-icons";
 import useSearchStore from "@/app/stores/searchStore";
 
 export default function FileList({
@@ -68,7 +69,8 @@ export default function FileList({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10); // 페이지당 아이템 수(디렉토리, 파일 별개 처리)
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   // 검색 상태
   const [searchQuery, setSearchQuery] = useState("");
@@ -181,11 +183,11 @@ export default function FileList({
         setFiles(fileResult.files || []);
 
         if (showDirectories) {
-          // 디렉토리 목록 가져오기 (디렉토리는 페이지네이션 없이)
+          // 디렉토리 목록 가져오기 (디렉토리는 페이지네이션 없이 전체 조회, 상한 1000개)
           const dirResult = await getDirectoryList({
             parentId: directoryId || null,
-            page: currentPage,
-            limit: itemsPerPage,
+            page: 1,
+            limit: 1000,
             sortBy,
             sortOrder,
             shareLinkHash, // 공유 링크 해시 추가
@@ -197,25 +199,9 @@ export default function FileList({
           setDirectories(dirResult.directories || []);
           const fileCount = fileResult.pagination?.totalFiles || 0;
 
-          // 파일과 디렉토리 총 개수를 한 번에 설정
-          const totalCombinedItems = fileCount;
-          setTotalItems(totalCombinedItems);
-
-          // 페이지 계산: 실제 화면에 표시되는 아이템 수를 기준으로 계산
-          // 현재 페이지에 표시되는 실제 아이템 수
-          const currentPageItems =
-            (fileResult.files?.length || 0) +
-            (dirResult.directories?.length || 0);
-
-          // 만약 현재 페이지에 아이템이 itemsPerPage보다 적고, 이것이 마지막 페이지라면
-          if (
-            currentPageItems < itemsPerPage &&
-            totalCombinedItems <= currentPage * itemsPerPage
-          ) {
-            setTotalPages(currentPage);
-          } else {
-            setTotalPages(Math.ceil(totalCombinedItems / itemsPerPage) || 1);
-          }
+          // 파일 수만으로 페이지네이션 결정 (디렉토리는 항상 전체 표시)
+          setTotalItems(fileCount);
+          setTotalPages(Math.ceil(fileCount / itemsPerPage) || 1);
         } else {
           setDirectories([]);
           setTotalItems(fileResult.pagination.totalFiles || 0);
@@ -611,6 +597,16 @@ export default function FileList({
     fetchData();
   }, [directoryId, refreshTrigger, fetchData]);
 
+  // 사용자 환경설정 로드
+  useEffect(() => {
+    getUserPreferences().then((result) => {
+      if (result.success && result.preferences) {
+        setItemsPerPage(result.preferences.itemsPerPage || 10);
+      }
+      setPreferencesLoaded(true);
+    });
+  }, []);
+
   // 파일 타입 옵션 생성
   useEffect(() => {
     generateFileTypeOptions();
@@ -668,6 +664,14 @@ export default function FileList({
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
     setSelectedItems(new Set()); // 페이지 변경 시 선택 초기화
+  };
+
+  // 페이지당 항목 수 변경 핸들러
+  const handleItemsPerPageChange = async (val) => {
+    if (isNaN(val) || val < 5 || val > 100) return;
+    setItemsPerPage(val);
+    setCurrentPage(1);
+    await updateUserPreferences({ itemsPerPage: val });
   };
 
   // E2EE 관련 함수들
@@ -918,50 +922,7 @@ export default function FileList({
     <div>
       {error && <div className="alert alert-error mb-4">{error}</div>}
       {/* 경로 표시 (breadcrumbs) */}
-      {(directoryId || breadcrumbs.length > 0) && (
-        <div className="breadcrumbs mb-4 text-sm">
-          <ul>
-            <li>
-              <Link
-                href="/dashboard"
-                className="text-blue-700 hover:text-blue-800"
-              >
-                <FontAwesomeIcon icon={faHouse} /> 내 파일
-              </Link>
-            </li>
-            {breadcrumbs.map((crumb, index) => (
-              <li key={crumb.id}>
-                <div className="flex items-center gap-1">
-                  {index === breadcrumbs.length - 1 ? (
-                    <>
-                      <span className="  font-medium">{crumb.name}</span>
-                      {!crumb.isOwner && (
-                        <span className="badge badge-accent badge-xs">
-                          <FontAwesomeIcon icon={faUser} /> 공유받음
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        href={`/directory/${crumb.hash}`}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        {crumb.name}
-                      </Link>
-                      {!crumb.isOwner && (
-                        <span className="badge badge-accent badge-xs ml-1">
-                          <FontAwesomeIcon icon={faUser} />
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <Breadcrumbs directoryId={directoryId} breadcrumbs={breadcrumbs} />
 
       {/* 검색 필터 */}
       <FileStatus />
@@ -1004,13 +965,13 @@ export default function FileList({
           </div>
           {/* 페이지가 여러 개인 경우 페이지네이터 표시 */}
           {totalPages > 1 && (
-            <Paginator
+            <PaginationToolbar
               currentPage={currentPage}
               totalPages={totalPages}
               totalItems={totalItems}
               itemsPerPage={itemsPerPage}
               onPageChange={handlePageChange}
-              className="mt-6 mb-20"
+              onItemsPerPageChange={handleItemsPerPageChange}
             />
           )}
         </div>
@@ -1055,13 +1016,13 @@ export default function FileList({
             onRenameFile={handleRenameFile}
           />
           {/* 페이지네이터 */}
-          <Paginator
+          <PaginationToolbar
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={totalItems}
             itemsPerPage={itemsPerPage}
             onPageChange={handlePageChange}
-            className="mt-6 mb-20"
+            onItemsPerPageChange={handleItemsPerPageChange}
           />
         </div>
       )}

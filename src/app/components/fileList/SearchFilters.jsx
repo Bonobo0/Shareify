@@ -146,7 +146,7 @@ export default function SearchFilters({
           />
         </div>
         <button
-          className="btn btn-outline btn-sm sm:btn-md"
+          className={`btn btn-sm sm:btn-md ${showAdvancedSearch ? "btn-primary" : "btn-outline"}`}
           onClick={onToggleAdvancedSearch}
         >
           <FontAwesomeIcon icon={faMagnifyingGlass} />

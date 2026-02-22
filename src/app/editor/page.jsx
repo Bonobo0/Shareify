@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -8,10 +8,11 @@ import {
   createEditorFile,
   completeEditorFileCreation,
 } from "@/actions/files";
+import { getUserPreferences, updateUserPreferences } from "@/actions/user";
 import { encryptFile } from "@/lib/crypto/encryption";
 import DirectoryTreePicker from "@/app/components/directoryTreePicker";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLink, faPenToSquare, faFileLines, faLock, faTriangleExclamation, faFolder, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faPenToSquare, faFileLines, faLock, faTriangleExclamation, faFolder, faUser, faList, faFolderTree } from "@fortawesome/free-solid-svg-icons";
 
 export default function EditorListPage() {
   const router = useRouter();
@@ -32,6 +33,9 @@ export default function EditorListPage() {
 
   // Alert 모달
   const [alertModal, setAlertModal] = useState({ show: false, message: "" });
+
+  // 보기 모드: "all" (전체 보기) | "directory" (디렉토리별 보기)
+  const [viewMode, setViewMode] = useState("all");
 
   const fetchFiles = useCallback(async () => {
     try {
@@ -56,11 +60,44 @@ export default function EditorListPage() {
       return;
     }
     fetchFiles();
+    getUserPreferences().then((result) => {
+      if (result.success && result.preferences?.editorViewMode) {
+        setViewMode(result.preferences.editorViewMode);
+      }
+    });
   }, [authLoading, isAuthenticated, router, fetchFiles]);
 
   const handleOpenFile = (file) => {
     router.push(`/editor/${file.id}`);
   };
+
+  const handleViewModeChange = async (mode) => {
+    setViewMode(mode);
+    await updateUserPreferences({ editorViewMode: mode });
+  };
+
+  // 디렉토리별로 파일 그룹화
+  const groupedFiles = useMemo(() => {
+    if (viewMode !== "directory") return null;
+    const groups = {};
+    files.forEach((file) => {
+      const dirName = file.parentDirectoryName || "루트";
+      if (!groups[dirName]) groups[dirName] = [];
+      groups[dirName].push(file);
+    });
+    return groups;
+  }, [files, viewMode]);
+
+  const groupedSharedFiles = useMemo(() => {
+    if (viewMode !== "directory") return null;
+    const groups = {};
+    sharedFiles.forEach((file) => {
+      const dirName = file.parentDirectoryName || "루트";
+      if (!groups[dirName]) groups[dirName] = [];
+      groups[dirName].push(file);
+    });
+    return groups;
+  }, [sharedFiles, viewMode]);
 
   const handleCloseNewFileModal = () => {
     setShowNewFileModal(false);
@@ -181,12 +218,31 @@ export default function EditorListPage() {
             .ejtxt 문서를 만들고 편집하세요
           </p>
         </div>
-        <button
-          className="btn btn-primary btn-sm sm:btn-md"
-          onClick={() => setShowNewFileModal(true)}
-        >
-          <FontAwesomeIcon icon={faPenToSquare} /> 새 문서
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 보기 모드 토글 */}
+          <div className="join">
+            <button
+              className={`join-item btn btn-sm ${viewMode === "all" ? "btn-active" : ""}`}
+              onClick={() => handleViewModeChange("all")}
+              title="전체 보기"
+            >
+              <FontAwesomeIcon icon={faList} />
+            </button>
+            <button
+              className={`join-item btn btn-sm ${viewMode === "directory" ? "btn-active" : ""}`}
+              onClick={() => handleViewModeChange("directory")}
+              title="디렉토리별 보기"
+            >
+              <FontAwesomeIcon icon={faFolderTree} />
+            </button>
+          </div>
+          <button
+            className="btn btn-primary btn-sm sm:btn-md"
+            onClick={() => setShowNewFileModal(true)}
+          >
+            <FontAwesomeIcon icon={faPenToSquare} /> 새 문서
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -209,7 +265,101 @@ export default function EditorListPage() {
             <FontAwesomeIcon icon={faPenToSquare} /> 첫 문서 만들기
           </button>
         </div>
+      ) : viewMode === "directory" ? (
+        /* 디렉토리별 보기 */
+        <>
+          {files.length > 0 && (
+            <>
+              <h2 className="text-lg font-semibold mb-3">내 문서</h2>
+              {Object.entries(groupedFiles || {}).map(([dirName, dirFiles]) => (
+                <div key={dirName} className="mb-4">
+                  <div className="flex items-center gap-2 mb-2 text-sm font-medium opacity-70">
+                    <FontAwesomeIcon icon={faFolder} />
+                    <span>{dirName}</span>
+                    <span className="badge badge-ghost badge-xs">{dirFiles.length}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 ml-4">
+                    {dirFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        className="card bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
+                        onClick={() => handleOpenFile(file)}
+                      >
+                        <div className="card-body p-4">
+                          <h2 className="card-title text-sm sm:text-base truncate">
+                            <FontAwesomeIcon icon={faFileLines} /> {file.originalName}
+                          </h2>
+                          <div className="flex items-center justify-between text-xs opacity-60">
+                            <span>{formatBytes(file.size)}</span>
+                            <span>{formatDate(file.updatedAt || file.createdAt)}</span>
+                          </div>
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            {file.isEncrypted && (
+                              <div className="badge badge-primary badge-xs">
+                                <FontAwesomeIcon icon={faLock} /> 암호화
+                              </div>
+                            )}
+                            {file.isPublic && (
+                              <div className="badge badge-warning badge-xs">
+                                <FontAwesomeIcon icon={faLink} /> 공유 중
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {sharedFiles.length > 0 && (
+            <>
+              <h2 className="text-lg font-semibold mb-3 mt-6">공유 받은 문서</h2>
+              {Object.entries(groupedSharedFiles || {}).map(([dirName, dirFiles]) => (
+                <div key={dirName} className="mb-4">
+                  <div className="flex items-center gap-2 mb-2 text-sm font-medium opacity-70">
+                    <FontAwesomeIcon icon={faFolder} />
+                    <span>{dirName}</span>
+                    <span className="badge badge-ghost badge-xs">{dirFiles.length}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 ml-4">
+                    {dirFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        className="card bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
+                        onClick={() => handleOpenFile(file)}
+                      >
+                        <div className="card-body p-4">
+                          <h2 className="card-title text-sm sm:text-base truncate">
+                            <FontAwesomeIcon icon={faFileLines} /> {file.originalName}
+                          </h2>
+                          <div className="flex items-center justify-between text-xs opacity-60">
+                            <span>{formatBytes(file.size)}</span>
+                            <span>{formatDate(file.updatedAt || file.createdAt)}</span>
+                          </div>
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            <div className="badge badge-accent badge-xs gap-1">
+                              <FontAwesomeIcon icon={faUser} /> {file.ownerName}
+                            </div>
+                            {file.isEncrypted && (
+                              <div className="badge badge-primary badge-xs">
+                                <FontAwesomeIcon icon={faLock} /> 암호화
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </>
       ) : (
+        /* 전체 보기 (기존 방식) */
         <>
           {files.length > 0 && (
             <>

@@ -282,6 +282,72 @@ export async function changePassword({
   }
 }
 
+// 사용자 환경설정 조회
+export async function getUserPreferences() {
+  try {
+    const userId = await requireAuthenticatedUser();
+    if (!userId) {
+      return { error: "인증이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    const user = await User.findById(userId).select("preferences");
+    if (!user) {
+      return { error: "사용자를 찾을 수 없습니다." };
+    }
+
+    return {
+      success: true,
+      preferences: {
+        itemsPerPage: user.preferences?.itemsPerPage ?? 10,
+        editorViewMode: user.preferences?.editorViewMode ?? "all",
+      },
+    };
+  } catch (error) {
+    console.error("환경설정 조회 오류:", error);
+    return { error: "환경설정을 조회하는 중 오류가 발생했습니다." };
+  }
+}
+
+// 사용자 환경설정 업데이트
+export async function updateUserPreferences({ itemsPerPage, editorViewMode }) {
+  try {
+    const userId = await requireAuthenticatedUser();
+    if (!userId) {
+      return { error: "인증이 필요합니다." };
+    }
+
+    await connectToDatabase();
+
+    const update = {};
+    if (itemsPerPage !== undefined) {
+      const val = parseInt(itemsPerPage, 10);
+      if (isNaN(val) || val < 5 || val > 100) {
+        return { error: "페이지당 항목 수는 5~100 사이여야 합니다." };
+      }
+      update["preferences.itemsPerPage"] = val;
+    }
+    if (editorViewMode !== undefined) {
+      if (!["all", "directory"].includes(editorViewMode)) {
+        return { error: "유효하지 않은 에디터 보기 모드입니다." };
+      }
+      update["preferences.editorViewMode"] = editorViewMode;
+    }
+
+    if (Object.keys(update).length === 0) {
+      return { error: "업데이트할 항목이 없습니다." };
+    }
+
+    await User.findByIdAndUpdate(userId, { $set: update });
+
+    return { success: true };
+  } catch (error) {
+    console.error("환경설정 업데이트 오류:", error);
+    return { error: "환경설정을 업데이트하는 중 오류가 발생했습니다." };
+  }
+}
+
 // 계정 삭제
 export async function deleteAccount({ password }) {
   try {
