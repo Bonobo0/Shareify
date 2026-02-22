@@ -77,6 +77,19 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  preferences: {
+    itemsPerPage: {
+      type: Number,
+      default: 10,
+      min: 5,
+      max: 100,
+    },
+    editorViewMode: {
+      type: String,
+      enum: ["all", "directory"],
+      default: "all",
+    },
+  },
   createdAt: {
     type: Date,
     default: Date.now,

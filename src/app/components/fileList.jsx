@@ -19,6 +19,7 @@ import {
   getDirectoryBreadcrumbs,
   getAllDescendantDirectoryIds,
 } from "@/actions/directories";
+import { getUserPreferences, updateUserPreferences } from "@/actions/user";
 import { downloadAndDecrypt, isMediaFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
 import DirectoryShareModal from "./directoryShareModal";
@@ -68,7 +69,8 @@ export default function FileList({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10); // 페이지당 아이템 수(디렉토리, 파일 별개 처리)
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   // 검색 상태
   const [searchQuery, setSearchQuery] = useState("");
@@ -181,11 +183,11 @@ export default function FileList({
         setFiles(fileResult.files || []);
 
         if (showDirectories) {
-          // 디렉토리 목록 가져오기 (디렉토리는 페이지네이션 없이)
+          // 디렉토리 목록 가져오기 (디렉토리는 페이지네이션 없이 전체 조회)
           const dirResult = await getDirectoryList({
             parentId: directoryId || null,
-            page: currentPage,
-            limit: itemsPerPage,
+            page: 1,
+            limit: 0, // 제한 없이 전체 조회
             sortBy,
             sortOrder,
             shareLinkHash, // 공유 링크 해시 추가
@@ -197,25 +199,9 @@ export default function FileList({
           setDirectories(dirResult.directories || []);
           const fileCount = fileResult.pagination?.totalFiles || 0;
 
-          // 파일과 디렉토리 총 개수를 한 번에 설정
-          const totalCombinedItems = fileCount;
-          setTotalItems(totalCombinedItems);
-
-          // 페이지 계산: 실제 화면에 표시되는 아이템 수를 기준으로 계산
-          // 현재 페이지에 표시되는 실제 아이템 수
-          const currentPageItems =
-            (fileResult.files?.length || 0) +
-            (dirResult.directories?.length || 0);
-
-          // 만약 현재 페이지에 아이템이 itemsPerPage보다 적고, 이것이 마지막 페이지라면
-          if (
-            currentPageItems < itemsPerPage &&
-            totalCombinedItems <= currentPage * itemsPerPage
-          ) {
-            setTotalPages(currentPage);
-          } else {
-            setTotalPages(Math.ceil(totalCombinedItems / itemsPerPage) || 1);
-          }
+          // 파일 수만으로 페이지네이션 결정 (디렉토리는 항상 전체 표시)
+          setTotalItems(fileCount);
+          setTotalPages(Math.ceil(fileCount / itemsPerPage) || 1);
         } else {
           setDirectories([]);
           setTotalItems(fileResult.pagination.totalFiles || 0);
@@ -611,6 +597,16 @@ export default function FileList({
     fetchData();
   }, [directoryId, refreshTrigger, fetchData]);
 
+  // 사용자 환경설정 로드
+  useEffect(() => {
+    getUserPreferences().then((result) => {
+      if (result.success && result.preferences) {
+        setItemsPerPage(result.preferences.itemsPerPage || 10);
+      }
+      setPreferencesLoaded(true);
+    });
+  }, []);
+
   // 파일 타입 옵션 생성
   useEffect(() => {
     generateFileTypeOptions();
@@ -668,6 +664,15 @@ export default function FileList({
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
     setSelectedItems(new Set()); // 페이지 변경 시 선택 초기화
+  };
+
+  // 페이지당 항목 수 변경 핸들러
+  const handleItemsPerPageChange = async (newValue) => {
+    const val = parseInt(newValue, 10);
+    if (isNaN(val) || val < 5 || val > 100) return;
+    setItemsPerPage(val);
+    setCurrentPage(1);
+    await updateUserPreferences({ itemsPerPage: val });
   };
 
   // E2EE 관련 함수들
@@ -1055,14 +1060,27 @@ export default function FileList({
             onRenameFile={handleRenameFile}
           />
           {/* 페이지네이터 */}
-          <Paginator
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            itemsPerPage={itemsPerPage}
-            onPageChange={handlePageChange}
-            className="mt-6 mb-20"
-          />
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 mb-20">
+            <div className="flex items-center gap-2 text-sm">
+              <span>페이지당</span>
+              <select
+                className="select select-bordered select-xs"
+                value={itemsPerPage}
+                onChange={(e) => handleItemsPerPageChange(e.target.value)}
+              >
+                {[5, 10, 20, 30, 50, 100].map((n) => (
+                  <option key={n} value={n}>{n}개</option>
+                ))}
+              </select>
+            </div>
+            <Paginator
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
+            />
+          </div>
         </div>
       )}
       {/* 모달들 */}

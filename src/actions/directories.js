@@ -106,7 +106,7 @@ export async function getDirectoryList({
     }
 
     // 디렉토리 조회 (공유자 정보 포함)
-    const directories = await Directory.find(filter)
+    let dirQuery = Directory.find(filter)
       .populate({
         path: "owner",
         select: "name email",
@@ -116,9 +116,14 @@ export async function getDirectoryList({
         select: "name email",
       })
       .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
-      .lean()
-      .skip((page - 1) * limit)
-      .limit(limit);
+      .lean();
+
+    // limit > 0인 경우에만 페이지네이션 적용 (limit=0이면 전체 조회)
+    if (limit > 0) {
+      dirQuery = dirQuery.skip((page - 1) * limit).limit(limit);
+    }
+
+    const directories = await dirQuery;
 
     // 디렉토리 개수 조회
     const totalDirectories = await Directory.countDocuments(filter);
