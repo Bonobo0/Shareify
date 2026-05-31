@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { uploadFile, completeFileUpload } from "@/actions/files";
-import { encryptFile } from "@/lib/crypto/encryption";
+import { encryptFile, validatePasswordStrength } from "@/lib/crypto/encryption";
 import { validateWebGLBuildFile } from "@/lib/webgl/validation";
 import FileProgressList from "./fileUploader/FileProgressList";
 import UploadOptions from "./fileUploader/UploadOptions";
@@ -61,6 +61,12 @@ export default function FileUploader({
     }
   };
 
+  const [isValidPassword, setIsValidPassword] = useState(false);
+
+  const handlePasswordValidation = (isValid) => {
+    setIsValidPassword(isValid);
+  };
+
   const handleE2EEToggle = (checked) => {
     setEnableE2EE(checked);
     if (checked) {
@@ -68,7 +74,8 @@ export default function FileUploader({
     } else {
       setShowPasswordInput(false);
       setEncryptionPassword("");
-      setError(""); // 에러 메시지 클리어
+      setError("");
+      setIsValidPassword(false);
     }
   };
 
@@ -80,6 +87,11 @@ export default function FileUploader({
 
     if (enableE2EE && !encryptionPassword) {
       setError("암호화를 활성화했을 때는 암호화 키를 입력해주세요.");
+      return;
+    }
+
+    if (enableE2EE && !isValidPassword) {
+      setError("비밀번호는 최소 12자 이상이어야 합니다.");
       return;
     }
 
@@ -408,6 +420,7 @@ export default function FileUploader({
           showPasswordInput={showPasswordInput}
           encryptionPassword={encryptionPassword}
           onPasswordChange={setEncryptionPassword}
+          onPasswordValidation={handlePasswordValidation}
           isWebGLBuild={isWebGLBuild}
           onWebGLToggle={setIsWebGLBuild}
           uploading={uploading}
@@ -417,7 +430,7 @@ export default function FileUploader({
           <button
             className={`btn btn-primary ${uploading ? "loading" : ""}`}
             onClick={() => handleUpload(false)}
-            disabled={uploading || files.length === 0}
+            disabled={uploading || files.length === 0 || (enableE2EE && !isValidPassword)}
           >
             {uploading ? "업로드 중..." : "업로드"}
           </button>
