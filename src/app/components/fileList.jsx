@@ -60,6 +60,7 @@ export default function FileList({
   const [shareModal, setShareModal] = useState({ isOpen: false, fileId: null });
   const [decryptModal, setDecryptModal] = useState(null);
   const [decryptPassword, setDecryptPassword] = useState("");
+  const [decryptError, setDecryptError] = useState("");
   const [previewModal, setPreviewModal] = useState(null);
 
   // 선택 관련 상태 (BulkActionHandler로 이동)
@@ -712,13 +713,13 @@ export default function FileList({
 
   const handleEncryptedDownload = async () => {
     if (!decryptPassword) {
-      setError("복호화 키를 입력해주세요.");
+      setDecryptError("복호화 키를 입력해주세요.");
       return;
     }
 
     const file = decryptModal;
     setActionLoading((prev) => ({ ...prev, [file.id]: true }));
-    setError("");
+    setDecryptError("");
 
     try {
       const result = await getFileDownloadUrl({
@@ -727,7 +728,7 @@ export default function FileList({
       });
 
       if (result.error) {
-        setError(result.error);
+        setDecryptError(result.error);
         return;
       }
 
@@ -744,14 +745,15 @@ export default function FileList({
       );
 
       if (downloadResult.error) {
-        setError(downloadResult.error);
+        setDecryptError(downloadResult.error);
         return;
       }
 
       setDecryptModal(null);
       setDecryptPassword("");
+      setDecryptError("");
     } catch (err) {
-      setError("복호화 및 다운로드 중 오류가 발생했습니다.");
+      setDecryptError("복호화 및 다운로드 중 오류가 발생했습니다.");
     } finally {
       setActionLoading((prev) => ({ ...prev, [file.id]: false }));
     }
@@ -798,13 +800,13 @@ export default function FileList({
 
   const handleEncryptedPreview = async () => {
     if (!decryptPassword) {
-      setError("복호화 키를 입력해주세요.");
+      setDecryptError("복호화 키를 입력해주세요.");
       return;
     }
 
     const file = decryptModal;
     setActionLoading((prev) => ({ ...prev, [file.id]: true }));
-    setError("");
+    setDecryptError("");
 
     try {
       const result = await getFileDownloadUrl({
@@ -814,7 +816,7 @@ export default function FileList({
       });
 
       if (result.error) {
-        setError(result.error);
+        setDecryptError(result.error);
         return;
       }
 
@@ -829,7 +831,7 @@ export default function FileList({
       });
 
       if (previewResult.error) {
-        setError(previewResult.error || "복호화에 실패했습니다.");
+        setDecryptError(previewResult.error || "복호화에 실패했습니다.");
         return;
       }
 
@@ -840,9 +842,10 @@ export default function FileList({
       });
       setDecryptModal(null);
       setDecryptPassword("");
+      setDecryptError("");
     } catch (err) {
       console.error("미리보기 복호화 오류:", err);
-      setError(
+      setDecryptError(
         "미리보기 생성 중 오류가 발생했습니다. 복호화 키가 올바른지 확인해주세요.",
       );
     } finally {
@@ -1032,6 +1035,7 @@ export default function FileList({
         decryptPassword={decryptPassword}
         setDecryptPassword={setDecryptPassword}
         setDecryptModal={setDecryptModal}
+        setDecryptError={setDecryptError}
         actionLoading={actionLoading}
         onEncryptedDownload={handleEncryptedDownload}
         onEncryptedPreview={handleEncryptedPreview}

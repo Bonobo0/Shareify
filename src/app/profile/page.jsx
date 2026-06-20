@@ -675,7 +675,7 @@ function SecuritySettings({
                           </td>
                           <td className="text-right">
                             <button
-                              className="btn btn-xs btn-outline"
+                              className="btn btn-xs btn-outline whitespace-nowrap"
                               onClick={() => handleRevokeSession(session.jti)}
                               disabled={sessionUpdating}
                             >

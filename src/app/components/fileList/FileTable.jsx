@@ -218,12 +218,14 @@ export default function FileTable({
               <td>
                 <div
                   className={`dropdown dropdown-end ${
-                    index === 0 ? "dropdown-bottom" : "dropdown-top"
+                    index === filteredDirectories.length - 1
+                      ? "dropdown-top"
+                      : "dropdown-bottom"
                   }`}
                 >
                   <label
                     tabIndex={0}
-                    className="btn btn-ghost btn-xs sm:btn-sm"
+                    className="btn btn-ghost btn-xs sm:btn-sm flex items-center justify-center"
                     onClick={(e) => e.stopPropagation()}
                   >
                     ⋮
@@ -392,14 +394,14 @@ export default function FileTable({
               <td>
                 <div
                   className={`dropdown dropdown-end ${
-                    filteredDirectories.length === 0 && index === 0
-                      ? "dropdown-bottom"
-                      : "dropdown-top"
+                    index === filteredFiles.length - 1
+                      ? "dropdown-top"
+                      : "dropdown-bottom"
                   }`}
                 >
                   <label
                     tabIndex={0}
-                    className="btn btn-ghost btn-xs sm:btn-sm"
+                    className="btn btn-ghost btn-xs sm:btn-sm flex items-center justify-center"
                     onClick={(e) => e.stopPropagation()}
                   >
                     ⋮

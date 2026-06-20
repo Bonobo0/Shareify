@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
@@ -21,6 +21,7 @@ export default function FileListModals({
   decryptPassword,
   setDecryptPassword,
   setDecryptModal,
+  setDecryptError,
   actionLoading,
   onEncryptedDownload,
   onEncryptedPreview,
@@ -81,12 +82,21 @@ export default function FileListModals({
               </label>
               <input
                 type="password"
-                className="input input-bordered"
+                className={`input input-bordered ${decryptError ? "input-error" : ""}`}
                 placeholder="암호화 시 사용한 비밀번호를 입력하세요"
                 value={decryptPassword}
-                onChange={(e) => setDecryptPassword(e.target.value)}
+                onChange={(e) => {
+                  setDecryptPassword(e.target.value);
+                  if (decryptError) setDecryptError("");
+                }}
               />
             </div>
+
+            {decryptError && (
+              <div className="alert alert-error mt-3 py-2 text-sm">
+                <span>{decryptError}</span>
+              </div>
+            )}
 
             <div className="modal-action">
               <button
@@ -94,6 +104,7 @@ export default function FileListModals({
                 onClick={() => {
                   setDecryptModal(null);
                   setDecryptPassword("");
+                  setDecryptError("");
                 }}
               >
                 취소
