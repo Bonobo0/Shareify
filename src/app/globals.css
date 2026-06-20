@@ -28,7 +28,6 @@
     line-height: 1.6;
   }
 
-  /* DaisyUI theme override for dark */
   [data-theme="shareify"] body {
     background-color: #0b0f19;
     color: #e2e8f0;
@@ -36,12 +35,12 @@
 
   [data-theme="shareify-light"] body {
     background-color: #ffffff;
-    color: #1e293b;
+    color: #0f172a;
   }
 
   ::selection {
     background-color: rgba(59, 130, 246, 0.3);
-    color: #fff;
+    color: inherit;
   }
 
   ::-webkit-scrollbar {
@@ -53,16 +52,24 @@
     background: transparent;
   }
 
-  ::-webkit-scrollbar-thumb {
+  [data-theme="shareify"]::-webkit-scrollbar-thumb {
     background: #334155;
     border-radius: 3px;
   }
 
-  ::-webkit-scrollbar-thumb:hover {
+  [data-theme="shareify-light"]::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+
+  [data-theme="shareify"]::-webkit-scrollbar-thumb:hover {
     background: #475569;
   }
 
-  /* Focus visible for accessibility */
+  [data-theme="shareify-light"]::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
   :focus-visible {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
@@ -72,7 +79,14 @@
 @layer components {
   /* ── Card surface ── */
   .card-surface {
-    @apply rounded-xl border border-surface-300/50 bg-surface-100 shadow-card transition-shadow duration-250;
+    @apply rounded-xl border shadow-card transition-shadow duration-250;
+    border-color: rgba(30, 41, 59, 0.12);
+    background-color: #131926;
+  }
+
+  [data-theme="shareify-light"] .card-surface {
+    border-color: rgba(0, 0, 0, 0.08);
+    background-color: #ffffff;
   }
 
   .card-surface:hover {
@@ -81,7 +95,18 @@
 
   /* ── Button variants ── */
   .btn-brand {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-brand-600 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: #3B82F6;
+  }
+  .btn-brand:hover {
+    background-color: #2563EB;
+  }
+
+  [data-theme="shareify-light"] .btn-brand {
+    background-color: #1D4ED8;
+  }
+  [data-theme="shareify-light"] .btn-brand:hover {
+    background-color: #1E40AF;
   }
 
   .btn-brand-lg {
@@ -89,7 +114,20 @@
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-base-content/80 transition-all duration-200 hover:bg-surface-200 hover:text-base-content active:scale-[0.97];
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 active:scale-[0.97];
+    color: #94a3b8;
+  }
+  .btn-ghost:hover {
+    background-color: rgba(30, 41, 59, 0.3);
+    color: #e2e8f0;
+  }
+
+  [data-theme="shareify-light"] .btn-ghost {
+    color: #475569;
+  }
+  [data-theme="shareify-light"] .btn-ghost:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
   }
 
   .btn-ghost-sm {
@@ -102,33 +140,90 @@
 
   /* ── Input ── */
   .input-field {
-    @apply w-full rounded-lg border border-surface-300/60 bg-surface-50 px-4 py-2.5 text-sm text-base-content placeholder-base-content/40 transition-all duration-200 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
+    @apply w-full rounded-lg border px-4 py-2.5 text-sm transition-all duration-200 focus:outline-none focus:ring-2;
+    border-color: rgba(30, 41, 59, 0.2);
+    background-color: #0f1623;
+    color: #e2e8f0;
+  }
+  .input-field::placeholder {
+    color: #64748b;
+  }
+  .input-field:focus {
+    border-color: #3B82F6;
+    --tw-ring-color: rgba(59, 130, 246, 0.2);
+  }
+
+  [data-theme="shareify-light"] .input-field {
+    border-color: #cbd5e1;
+    background-color: #ffffff;
+    color: #0f172a;
+  }
+  [data-theme="shareify-light"] .input-field::placeholder {
+    color: #94a3b8;
+  }
+  [data-theme="shareify-light"] .input-field:focus {
+    border-color: #1D4ED8;
+    --tw-ring-color: rgba(29, 78, 216, 0.15);
   }
 
   /* ── Badge ── */
   .badge-brand {
-    @apply inline-flex items-center gap-1 rounded-md bg-brand-500/15 px-2 py-0.5 text-xs font-medium text-brand-400;
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium;
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+  }
+  [data-theme="shareify-light"] .badge-brand {
+    background-color: rgba(29, 78, 216, 0.1);
+    color: #1D4ED8;
   }
 
   .badge-success {
-    @apply inline-flex items-center gap-1 rounded-md bg-success/15 px-2 py-0.5 text-xs font-medium text-success;
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium;
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+  }
+  [data-theme="shareify-light"] .badge-success {
+    background-color: rgba(4, 120, 87, 0.1);
+    color: #047857;
   }
 
   .badge-warning {
-    @apply inline-flex items-center gap-1 rounded-md bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning;
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium;
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+  }
+  [data-theme="shareify-light"] .badge-warning {
+    background-color: rgba(180, 83, 9, 0.1);
+    color: #B45309;
   }
 
   .badge-error {
-    @apply inline-flex items-center gap-1 rounded-md bg-error/15 px-2 py-0.5 text-xs font-medium text-error;
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium;
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+  }
+  [data-theme="shareify-light"] .badge-error {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #DC2626;
   }
 
   .badge-neutral {
-    @apply inline-flex items-center gap-1 rounded-md bg-surface-200 px-2 py-0.5 text-xs font-medium text-base-content/60;
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium;
+    background-color: rgba(30, 41, 59, 0.5);
+    color: #94a3b8;
+  }
+  [data-theme="shareify-light"] .badge-neutral {
+    background-color: #e2e8f0;
+    color: #475569;
   }
 
   /* ── Section heading ── */
   .section-eyebrow {
-    @apply text-xs font-semibold uppercase tracking-widest text-brand-400;
+    @apply text-xs font-semibold uppercase tracking-widest;
+    color: #3B82F6;
+  }
+  [data-theme="shareify-light"] .section-eyebrow {
+    color: #1D4ED8;
   }
 
   .section-title {
@@ -136,21 +231,44 @@
   }
 
   .section-subtitle {
-    @apply text-sm text-base-content/60;
+    @apply text-sm;
+    color: #94a3b8;
+  }
+  [data-theme="shareify-light"] .section-subtitle {
+    color: #475569;
   }
 
   /* ── Divider ── */
   .divider-subtle {
-    @apply border-t border-surface-300/40;
+    border-top: 1px solid rgba(30, 41, 59, 0.15);
+  }
+  [data-theme="shareify-light"] .divider-subtle {
+    border-top-color: rgba(0, 0, 0, 0.08);
   }
 
   /* ── Stat card ── */
   .stat-card {
-    @apply rounded-xl border border-surface-300/40 bg-surface-50/50 p-5 transition-all duration-250 hover:bg-surface-100/80;
+    @apply rounded-xl border p-5 transition-all duration-250;
+    border-color: rgba(30, 41, 59, 0.12);
+    background-color: rgba(19, 25, 38, 0.5);
+  }
+  [data-theme="shareify-light"] .stat-card {
+    border-color: rgba(0, 0, 0, 0.06);
+    background-color: #f8fafc;
+  }
+  .stat-card:hover {
+    background-color: rgba(19, 25, 38, 0.8);
+  }
+  [data-theme="shareify-light"] .stat-card:hover {
+    background-color: #f1f5f9;
   }
 
   .stat-label {
-    @apply text-xs font-medium uppercase tracking-wide text-base-content/50;
+    @apply text-xs font-medium uppercase tracking-wide;
+    color: #94a3b8;
+  }
+  [data-theme="shareify-light"] .stat-label {
+    color: #475569;
   }
 
   .stat-value {
@@ -159,33 +277,75 @@
 
   /* ── Table ── */
   .table-surface {
-    @apply w-full overflow-hidden rounded-xl border border-surface-300/40;
+    @apply w-full overflow-hidden rounded-xl border;
+    border-color: rgba(30, 41, 59, 0.15);
+  }
+  [data-theme="shareify-light"] .table-surface {
+    border-color: rgba(0, 0, 0, 0.08);
   }
 
   .table-surface thead {
-    @apply bg-surface-200/60;
+    background-color: rgba(30, 41, 59, 0.4);
+  }
+  [data-theme="shareify-light"] .table-surface thead {
+    background-color: #f1f5f9;
   }
 
   .table-surface th {
-    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-base-content/50;
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider;
+    color: #94a3b8;
+  }
+  [data-theme="shareify-light"] .table-surface th {
+    color: #475569;
   }
 
   .table-surface td {
-    @apply border-t border-surface-300/30 px-4 py-3 text-sm;
+    @apply px-4 py-3 text-sm;
+    border-top: 1px solid rgba(30, 41, 59, 0.1);
+  }
+  [data-theme="shareify-light"] .table-surface td {
+    border-top-color: rgba(0, 0, 0, 0.06);
   }
 
   .table-surface tbody tr {
-    @apply transition-colors duration-150 hover:bg-surface-200/40;
+    @apply transition-colors duration-150;
+  }
+  .table-surface tbody tr:hover {
+    background-color: rgba(30, 41, 59, 0.15);
+  }
+  [data-theme="shareify-light"] .table-surface tbody tr:hover {
+    background-color: #f8fafc;
   }
 
   /* ── Dropdown menu ── */
   .menu-surface {
-    @apply rounded-xl border border-surface-300/50 bg-surface-100 p-1.5 shadow-card-hover;
+    @apply rounded-xl border p-1.5 shadow-card-hover;
+    border-color: rgba(30, 41, 59, 0.15);
+    background-color: #131926;
+  }
+  [data-theme="shareify-light"] .menu-surface {
+    border-color: rgba(0, 0, 0, 0.08);
+    background-color: #ffffff;
   }
 
   .menu-surface li a,
   .menu-surface li button {
-    @apply rounded-lg px-3 py-2 text-sm transition-colors duration-150 hover:bg-surface-200 active:bg-surface-300;
+    @apply rounded-lg px-3 py-2 text-sm transition-colors duration-150;
+    color: #cbd5e1;
+  }
+  .menu-surface li a:hover,
+  .menu-surface li button:hover {
+    background-color: rgba(30, 41, 59, 0.3);
+    color: #e2e8f0;
+  }
+  [data-theme="shareify-light"] .menu-surface li a,
+  [data-theme="shareify-light"] .menu-surface li button {
+    color: #334155;
+  }
+  [data-theme="shareify-light"] .menu-surface li a:hover,
+  [data-theme="shareify-light"] .menu-surface li button:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
   }
 }
 
@@ -198,7 +358,6 @@
     text-wrap: pretty;
   }
 
-  /* Subtle gradient overlay for hero sections */
   .bg-hero-gradient {
     background:
       radial-gradient(
@@ -213,7 +372,6 @@
       );
   }
 
-  /* Glass effect */
   .glass {
     @apply border border-surface-300/30 bg-surface-100/60 backdrop-blur-xl;
   }
@@ -222,7 +380,6 @@
     @apply border-b border-surface-300/40 bg-surface-0/80 backdrop-blur-xl;
   }
 
-  /* Gradient text */
   .text-gradient {
     @apply bg-clip-text text-transparent;
     background-image: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
