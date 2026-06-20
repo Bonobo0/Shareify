@@ -74,6 +74,267 @@
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
   }
+
+  /* ── Light theme: DaisyUI component overrides ── */
+  [data-theme="shareify-light"] .alert {
+    border-color: rgba(0, 0, 0, 0.1);
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+  [data-theme="shareify-light"] .alert-error {
+    background-color: #fef2f2;
+    border-color: rgba(220, 38, 38, 0.2);
+    color: #991b1b;
+  }
+  [data-theme="shareify-light"] .alert-success {
+    background-color: #f0fdf4;
+    border-color: rgba(4, 120, 87, 0.2);
+    color: #166534;
+  }
+  [data-theme="shareify-light"] .alert-warning {
+    background-color: #fffbeb;
+    border-color: rgba(180, 83, 9, 0.2);
+    color: #92400e;
+  }
+  [data-theme="shareify-light"] .alert-info {
+    background-color: #f0f9ff;
+    border-color: rgba(2, 132, 199, 0.2);
+    color: #075985;
+  }
+
+  [data-theme="shareify-light"] .modal-box {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  [data-theme="shareify-light"] .card {
+    background-color: #ffffff;
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+  [data-theme="shareify-light"] .card-body {
+    color: #0f172a;
+  }
+  [data-theme="shareify-light"] .card-title {
+    color: #0f172a;
+  }
+
+  [data-theme="shareify-light"] .btn {
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #334155;
+  }
+  [data-theme="shareify-light"] .btn:hover {
+    background-color: #f1f5f9;
+    border-color: rgba(0, 0, 0, 0.15);
+  }
+  [data-theme="shareify-light"] .btn-ghost {
+    color: #475569;
+  }
+  [data-theme="shareify-light"] .btn-ghost:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+  }
+  [data-theme="shareify-light"] .btn-active,
+  [data-theme="shareify-light"] .btn.btn-active {
+    background-color: #1D4ED8;
+    color: #ffffff;
+    border-color: #1D4ED8;
+  }
+
+  [data-theme="shareify-light"] .input,
+  [data-theme="shareify-light"] .input-bordered {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+  }
+  [data-theme="shareify-light"] .input::placeholder,
+  [data-theme="shareify-light"] .input-bordered::placeholder {
+    color: #94a3b8;
+  }
+  [data-theme="shareify-light"] .input:focus,
+  [data-theme="shareify-light"] .input-bordered:focus {
+    border-color: #1D4ED8;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.15);
+  }
+
+  [data-theme="shareify-light"] .select,
+  [data-theme="shareify-light"] .select-bordered {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+  }
+
+  [data-theme="shareify-light"] .checkbox {
+    border-color: #cbd5e1;
+  }
+  [data-theme="shareify-light"] .checkbox:checked {
+    background-color: #1D4ED8;
+    border-color: #1D4ED8;
+  }
+
+  [data-theme="shareify-light"] .toggle {
+    border-color: #cbd5e1;
+    background-color: #e2e8f0;
+  }
+  [data-theme="shareify-light"] .toggle:checked {
+    background-color: #1D4ED8;
+    border-color: #1D4ED8;
+  }
+
+  [data-theme="shareify-light"] .badge {
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+  [data-theme="shareify-light"] .badge-primary {
+    background-color: rgba(29, 78, 216, 0.1);
+    color: #1D4ED8;
+    border-color: rgba(29, 78, 216, 0.15);
+  }
+  [data-theme="shareify-light"] .badge-secondary {
+    background-color: rgba(124, 58, 237, 0.1);
+    color: #7C3AED;
+    border-color: rgba(124, 58, 237, 0.15);
+  }
+  [data-theme="shareify-light"] .badge-accent {
+    background-color: rgba(139, 92, 246, 0.1);
+    color: #7C3AED;
+    border-color: rgba(139, 92, 246, 0.15);
+  }
+  [data-theme="shareify-light"] .badge-success {
+    background-color: rgba(4, 120, 87, 0.1);
+    color: #047857;
+    border-color: rgba(4, 120, 87, 0.15);
+  }
+  [data-theme="shareify-light"] .badge-warning {
+    background-color: rgba(180, 83, 9, 0.1);
+    color: #B45309;
+    border-color: rgba(180, 83, 9, 0.15);
+  }
+  [data-theme="shareify-light"] .badge-error {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #DC2626;
+    border-color: rgba(220, 38, 38, 0.15);
+  }
+  [data-theme="shareify-light"] .badge-info {
+    background-color: rgba(2, 132, 199, 0.1);
+    color: #0284C7;
+    border-color: rgba(2, 132, 199, 0.15);
+  }
+  [data-theme="shareify-light"] .badge-ghost {
+    background-color: #f1f5f9;
+    color: #475569;
+    border-color: rgba(0, 0, 0, 0.06);
+  }
+  [data-theme="shareify-light"] .badge-outline {
+    background-color: transparent;
+    color: #475569;
+    border-color: #cbd5e1;
+  }
+
+  [data-theme="shareify-light"] .table {
+    color: #0f172a;
+  }
+  [data-theme="shareify-light"] .table thead {
+    background-color: #f1f5f9;
+  }
+  [data-theme="shareify-light"] .table th {
+    color: #334155;
+  }
+  [data-theme="shareify-light"] .table td {
+    border-top-color: rgba(0, 0, 0, 0.06);
+    color: #0f172a;
+  }
+  [data-theme="shareify-light"] .table tbody tr:hover {
+    background-color: #f8fafc;
+  }
+
+  [data-theme="shareify-light"] .join .btn {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+    color: #334155;
+  }
+  [data-theme="shareify-light"] .join .btn-active {
+    background-color: #1D4ED8;
+    color: #ffffff;
+    border-color: #1D4ED8;
+  }
+
+  [data-theme="shareify-light"] .menu li a,
+  [data-theme="shareify-light"] .menu li button {
+    color: #334155;
+  }
+  [data-theme="shareify-light"] .menu li a:hover,
+  [data-theme="shareify-light"] .menu li button:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+  }
+  [data-theme="shareify-light"] .menu li a.active {
+    background-color: rgba(29, 78, 216, 0.1);
+    color: #1D4ED8;
+  }
+
+  [data-theme="shareify-light"] .dropdown-content {
+    background-color: #ffffff;
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  [data-theme="shareify-light"] .label-text {
+    color: #334155;
+  }
+  [data-theme="shareify-light"] .label-text-alt {
+    color: #64748b;
+  }
+
+  [data-theme="shareify-light"] .stat {
+    background-color: #f8fafc;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  [data-theme="shareify-light"] .stat-title {
+    color: #475569;
+  }
+  [data-theme="shareify-light"] .stat-value {
+    color: #0f172a;
+  }
+
+  [data-theme="shareify-light"] .progress {
+    background-color: #e2e8f0;
+  }
+
+  [data-theme="shareify-light"] .skeleton {
+    background-color: #e2e8f0;
+  }
+
+  [data-theme="shareify-light"] .divider {
+    color: #94a3b8;
+  }
+  [data-theme="shareify-light"] .text-base-content\/90 {
+    color: rgba(15, 23, 42, 0.95);
+  }
+  [data-theme="shareify-light"] .text-base-content\/80 {
+    color: rgba(15, 23, 42, 0.85);
+  }
+  [data-theme="shareify-light"] .text-base-content\/70 {
+    color: rgba(15, 23, 42, 0.75);
+  }
+  [data-theme="shareify-light"] .text-base-content\/60 {
+    color: rgba(15, 23, 42, 0.65);
+  }
+  [data-theme="shareify-light"] .text-base-content\/50 {
+    color: rgba(15, 23, 42, 0.55);
+  }
+  [data-theme="shareify-light"] .text-base-content\/40 {
+    color: rgba(15, 23, 42, 0.45);
+  }
+  [data-theme="shareify-light"] .text-base-content\/30 {
+    color: rgba(15, 23, 42, 0.35);
+  }
+  [data-theme="shareify-light"] .text-base-content\/20 {
+    color: rgba(15, 23, 42, 0.25);
+  }
+  [data-theme="shareify-light"] .text-base-content\/15 {
+    color: rgba(15, 23, 42, 0.2);
+  }
 }
 
 @layer components {
@@ -374,6 +635,12 @@
 
   .glass {
     @apply border border-surface-300/30 bg-surface-100/60 backdrop-blur-xl;
+  }
+
+  [data-theme="shareify-light"] .glass,
+  [data-theme="shareify-light"] .glass-header {
+    background-color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(0, 0, 0, 0.06);
   }
 
   .glass-header {
