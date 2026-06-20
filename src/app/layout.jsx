@@ -4,32 +4,35 @@ import Header from "./components/header";
 import Footer from "./components/footer";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata = {
   title: "Shareify",
-  description: "파일들을 편리하게 공유하세요",
+  description: "안전하고 빠른 파일 공유 플랫폼",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" data-theme="shareify" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  var theme = localStorage.getItem('theme') || 'dark';
+                  var theme = localStorage.getItem('theme') || 'shareify';
                   document.documentElement.setAttribute('data-theme', theme);
-                  document.body?.setAttribute('data-theme', theme);
                 } catch (e) {}
               })();
             `,
           }}
         />
       </head>
-      <body className={inter.className} suppressHydrationWarning>
+      <body className={`${inter.variable} font-sans`} suppressHydrationWarning>
         <AuthProvider>
           <Header />
           <main className="pt-16 min-h-screen">{children}</main>

@@ -23,7 +23,6 @@ export default function Signup() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 이미 로그인된 경우 대시보드로 이동
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       router.push("/dashboard");
@@ -59,7 +58,6 @@ export default function Signup() {
       }
 
       if (result.success) {
-        // 회원가입 성공 시 바로 대시보드로 이동
         router.push("/dashboard");
       }
     } catch (error) {
@@ -69,78 +67,124 @@ export default function Signup() {
     }
   };
 
-  // 인증 로딩 중일 때
   if (authLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center">
-        <div className="loading loading-spinner loading-lg"></div>
-        <p className="mt-4 text-lg">로딩 중...</p>
+        <div className="loading loading-spinner loading-lg text-brand-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center p-4 sm:p-6 md:p-8">
-      <h1 className="text-3xl sm:text-4xl font-bold mt-8 mb-8 text-center">회원가입</h1>
-      <div className="flex flex-col w-full max-w-md">{error && (
-          <div className="alert alert-error mb-4">
-            <span>{error}</span>
-          </div>
-        )}
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <Link
+          href="/"
+          className="mb-8 flex items-center justify-center gap-2 text-xl font-bold tracking-tight"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-brand text-sm font-bold text-white">
+            S
+          </span>
+          Shareify
+        </Link>
 
-        <form onSubmit={signup} className="flex flex-col gap-4">
-          <input
-            type="text"
-            placeholder="이름 (선택사항)"
-            className="input input-lg border-gray-500"
-            onChange={(e) => setName(e.target.value)}
-            disabled={loading}
-          />
-          <input
-            type="email"
-            placeholder="이메일"
-            className="input input-lg border-gray-500"
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={loading}
-            required
-          />
-          <input
-            type="password"
-            placeholder="비밀번호"
-            className="input input-lg border-gray-500"
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
-            required
-          />
-          <input
-            type="password"
-            placeholder="비밀번호 확인"
-            className="input input-lg border-gray-500"
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-            disabled={loading}
-            required
+        {/* Card */}
+        <div className="card-surface p-8">
+          <h1 className="mb-1 text-center text-2xl font-bold">회원가입</h1>
+          <p className="mb-6 text-center text-sm text-base-content/50">
+            새 계정을 만드세요
+          </p>
+
+          {error && (
+            <div className="mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={signup} className="flex flex-col gap-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-base-content/70">
+                이름{" "}
+                <span className="text-base-content/30">(선택사항)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="홍길동"
+                className="input-field"
+                onChange={(e) => setName(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-base-content/70">
+                이메일
+              </label>
+              <input
+                type="email"
+                placeholder="name@example.com"
+                className="input-field"
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-base-content/70">
+                비밀번호
+              </label>
+              <input
+                type="password"
+                placeholder="최소 6자 이상"
+                className="input-field"
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-base-content/70">
+                비밀번호 확인
+              </label>
+              <input
+                type="password"
+                placeholder="비밀번호를 다시 입력하세요"
+                className="input-field"
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn-brand w-full py-3"
+              disabled={loading}
+            >
+              {loading ? "처리 중..." : "회원가입"}
+            </button>
+          </form>
+
+          <Terms
+            terms={terms}
+            setTerms={setTerms}
+            privacy={privacy}
+            setPrivacy={setPrivacy}
           />
 
-          <button
-            type="submit"
-            className={`btn btn-lg btn-primary ${loading ? "loading" : ""}`}
-            disabled={loading}
-          >
-            {loading ? "처리 중..." : "회원가입"}
-          </button>
-        </form>
-        <Terms
-          terms={terms}
-          setTerms={setTerms}
-          privacy={privacy}
-          setPrivacy={setPrivacy}
-        />
-        <p className="text-gray-500 mt-4">
-          이미 계정이 있으신가요?{" "}
-          <Link href="/user/signin" className="link-hover link-primary">
-            로그인
-          </Link>
-        </p>
+          <p className="mt-6 text-center text-sm text-base-content/50">
+            이미 계정이 있으신가요?{" "}
+            <Link
+              href="/user/signin"
+              className="font-medium text-brand-400 hover:text-brand-300"
+            >
+              로그인
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

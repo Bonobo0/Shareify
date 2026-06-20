@@ -2,14 +2,21 @@
 
 import { useState, useRef } from "react";
 import { uploadFile, completeFileUpload } from "@/actions/files";
-import { encryptFile, validatePasswordStrength } from "@/lib/crypto/encryption";
+import {
+  encryptFile,
+  validatePasswordStrength,
+} from "@/lib/crypto/encryption";
 import { validateWebGLBuildFile } from "@/lib/webgl/validation";
 import FileProgressList from "./fileUploader/FileProgressList";
 import UploadOptions from "./fileUploader/UploadOptions";
 import { aiUploadComplete } from "@/app/actions/ai";
 import useSearchStore from "@/app/stores/searchStore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsRotate, faXmark } from "@fortawesome/free-solid-svg-icons";
+import {
+  faArrowsRotate,
+  faXmark,
+  faCloudArrowUp,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function FileUploader({
   onUploadComplete,
@@ -24,24 +31,23 @@ export default function FileUploader({
   const [enableE2EE, setEnableE2EE] = useState(false);
   const [encryptionPassword, setEncryptionPassword] = useState("");
   const [showPasswordInput, setShowPasswordInput] = useState(false);
-  const [uploadResults, setUploadResults] = useState({}); // 업로드 결과 추적
-  const [retryMode, setRetryMode] = useState(false); // 재시도 모드
+  const [uploadResults, setUploadResults] = useState({});
+  const [retryMode, setRetryMode] = useState(false);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
-  const [isWebGLBuild, setIsWebGLBuild] = useState(false); // WebGL 빌드 여부
+  const [isWebGLBuild, setIsWebGLBuild] = useState(false);
 
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
       setFiles(selectedFiles);
-      setError(""); // 에러 메시지 클리어
+      setError("");
     }
   };
 
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
@@ -53,11 +59,10 @@ export default function FileUploader({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
     if (e.dataTransfer.files.length > 0) {
       const selectedFiles = Array.from(e.dataTransfer.files);
       setFiles(selectedFiles);
-      setError(""); // 에러 메시지 클리어
+      setError("");
     }
   };
 
@@ -98,7 +103,6 @@ export default function FileUploader({
     setUploading(true);
     setError("");
 
-    // 재시도 모드일 때는 실패한 파일만 업로드
     const filesToUpload = isRetry
       ? files.filter(
           (file) =>
@@ -116,9 +120,7 @@ export default function FileUploader({
     let hasErrors = false;
 
     try {
-      // 각 파일별로 업로드
       for (const file of filesToUpload) {
-        // 이미 성공한 파일은 건너뛰기
         if (uploadResults[file.name]?.status === "success") {
           continue;
         }
@@ -129,73 +131,46 @@ export default function FileUploader({
             [file.name]: { percent: 0, status: "uploading" },
           }));
 
-          // WebGL 빌드 검증 (WebGL로 표시된 경우, 암호화 전에 검증)
           if (isWebGLBuild) {
             setProgress((prev) => ({
               ...prev,
               [file.name]: { percent: 2, status: "validating" },
             }));
-
-            console.log("WebGL 빌드 검증 시작:", file.name);
-            
             const validationResult = await validateWebGLBuildFile(file);
-            
             if (!validationResult.isValid) {
               throw new Error(
                 validationResult.error || "유효한 WebGL 빌드가 아닙니다."
               );
             }
-            
-            console.log("WebGL 빌드 검증 완료:", file.name);
           }
 
           let fileToUpload = file;
           let originalMetadata = null;
 
-          // E2EE가 활성화된 경우 파일 암호화
           if (enableE2EE) {
             setProgress((prev) => ({
               ...prev,
               [file.name]: { percent: 5, status: "encrypting" },
             }));
-
-            console.log("파일 암호화 시작:", file.name);
-
             const encryptResult = await encryptFile(file, encryptionPassword);
             if (!encryptResult.success) {
               throw new Error(encryptResult.error);
             }
-
             fileToUpload = encryptResult.encryptedFile;
             originalMetadata = encryptResult.metadata;
-
-            console.log(
-              "파일 암호화 완료:",
-              fileToUpload.name,
-              fileToUpload.size
-            );
-
             setProgress((prev) => ({
               ...prev,
               [file.name]: { percent: 15, status: "uploading" },
             }));
           }
 
-          // 1. 업로드 URL 요청
-          console.log("🚀 서버로 전송하는 데이터:", {
-            filename: fileToUpload.name,
-            size: fileToUpload.size,
-            mimetype: fileToUpload.type == "" ? "application/octet-stream" : fileToUpload.type,
-            directoryId: directoryId,
-            isEncrypted: enableE2EE,
-            originalMetadata: originalMetadata,
-            isWebGLBuild: isWebGLBuild,
-          });
-
           const uploadResult = await uploadFile({
             filename: fileToUpload.name,
             size: fileToUpload.size,
-            mimetype: fileToUpload.type == "" ? "application/octet-stream" : fileToUpload.type,
+            mimetype:
+              fileToUpload.type == ""
+                ? "application/octet-stream"
+                : fileToUpload.type,
             directoryId: directoryId,
             isEncrypted: enableE2EE,
             originalMetadata: originalMetadata,
@@ -211,23 +186,22 @@ export default function FileUploader({
 
           setProgress((prev) => ({
             ...prev,
-            [file.name]: { percent: enableE2EE ? 25 : 10, status: "uploading" },
+            [file.name]: {
+              percent: enableE2EE ? 25 : 10,
+              status: "uploading",
+            },
           }));
 
-          // 2. presigned URL로 직접 파일 업로드 (XMLHttpRequest 사용)
           const uploadResponse = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
-
             xhr.upload.addEventListener("progress", (event) => {
               if (event.lengthComputable) {
-                // E2EE가 활성화된 경우 25-90%, 비활성화된 경우 10-90% 범위로 진행률 매핑
                 const baseProgress = enableE2EE ? 25 : 10;
                 const progressPercent =
                   baseProgress +
                   Math.round(
                     (event.loaded / event.total) * (90 - baseProgress)
                   );
-
                 setProgress((prev) => ({
                   ...prev,
                   [file.name]: {
@@ -239,7 +213,6 @@ export default function FileUploader({
                 }));
               }
             });
-
             xhr.addEventListener("load", () => {
               if (xhr.status >= 200 && xhr.status < 300) {
                 resolve({ ok: true });
@@ -249,15 +222,14 @@ export default function FileUploader({
                 );
               }
             });
-
             xhr.addEventListener("error", () => {
-              reject(new Error("파일 업로드 중 네트워크 오류가 발생했습니다."));
+              reject(
+                new Error("파일 업로드 중 네트워크 오류가 발생했습니다.")
+              );
             });
-
             xhr.addEventListener("abort", () => {
               reject(new Error("파일 업로드가 취소되었습니다."));
             });
-
             xhr.open("PUT", uploadUrl);
             xhr.setRequestHeader("Content-Type", fileToUpload.type);
             xhr.send(fileToUpload);
@@ -272,18 +244,23 @@ export default function FileUploader({
             [file.name]: { percent: 90, status: "uploading" },
           }));
 
-          // 3. 서버에 업로드 완료 알림
           const completeResult = await completeFileUpload({ fileId });
-
           if (completeResult.error) {
             throw new Error(completeResult.error);
           }
 
-          // 4. AI 인덱싱 요청 (비동기, 실패해도 업로드는 성공으로 처리, 암호화된 파일은 제외)
           if (!enableE2EE) {
-            const aiResult = await aiUploadComplete(fileId, file.name, file.type || "application/octet-stream");
+            const aiResult = await aiUploadComplete(
+              fileId,
+              file.name,
+              file.type || "application/octet-stream"
+            );
             if (aiResult.success) {
-              addIndexingFile({ fileId: aiResult.fileId, filename: file.name, status: aiResult.status });
+              addIndexingFile({
+                fileId: aiResult.fileId,
+                filename: file.name,
+                status: aiResult.status,
+              });
             }
           }
 
@@ -291,8 +268,6 @@ export default function FileUploader({
             ...prev,
             [file.name]: { percent: 100, status: "success" },
           }));
-
-          // 업로드 결과 저장
           setUploadResults((prev) => ({
             ...prev,
             [file.name]: { status: "success", fileId },
@@ -300,7 +275,6 @@ export default function FileUploader({
         } catch (fileError) {
           console.error(`파일 ${file.name} 업로드 실패:`, fileError);
           hasErrors = true;
-
           setProgress((prev) => ({
             ...prev,
             [file.name]: {
@@ -309,21 +283,15 @@ export default function FileUploader({
               error: fileError.message,
             },
           }));
-
-          // 업로드 결과 저장
           setUploadResults((prev) => ({
             ...prev,
             [file.name]: { status: "error", error: fileError.message },
           }));
-
-          // 개별 파일 오류는 전체 업로드를 중단하지 않음
           continue;
         }
       }
 
-      // 모든 파일 처리 완료 후
       if (!hasErrors) {
-        // 모든 파일이 성공한 경우에만 초기화
         onUploadComplete();
         setFiles([]);
         setUploadResults({});
@@ -332,7 +300,6 @@ export default function FileUploader({
           fileInputRef.current.value = "";
         }
       } else {
-        // 일부 파일이 실패한 경우
         setRetryMode(true);
         setError(
           "일부 파일 업로드에 실패했습니다. 실패한 파일을 다시 시도할 수 있습니다."
@@ -347,7 +314,6 @@ export default function FileUploader({
     }
   };
 
-  // 재시도 핸들러
   const handleRetry = () => {
     handleUpload(true);
   };
@@ -362,39 +328,38 @@ export default function FileUploader({
   };
 
   return (
-    <div className="card p-6 bg-base-200">
-      <h2 className="text-xl font-bold mb-4">파일 업로드</h2>
+    <div className="card-surface p-6">
+      <h2 className="mb-4 text-lg font-semibold">파일 업로드</h2>
 
       {error && (
-        <div className="alert alert-error mb-4">
-          <span>{error}</span>
+        <div className="mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+          {error}
         </div>
       )}
 
       <div
-        className={`flex flex-col gap-4 ${
+        className={`flex flex-col gap-4 rounded-xl border-2 border-dashed p-6 transition-colors ${
           dragActive
-            ? "border-2 border-dashed border-primary p-4 rounded-lg"
-            : ""
+            ? "border-brand-500 bg-brand-500/5"
+            : "border-surface-300/40"
         }`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <input
             ref={fileInputRef}
             type="file"
-            className="file-input w-full"
+            className="file-input file-input-bordered file-input-sm w-full"
             multiple
             onChange={handleFileChange}
             disabled={uploading}
           />
-
           {files.length > 0 && !uploading && (
             <button
-              className="btn btn-ghost"
+              className="btn-ghost-sm shrink-0"
               onClick={cancelUpload}
               title="선택 취소"
             >
@@ -404,16 +369,21 @@ export default function FileUploader({
         </div>
 
         {files.length === 0 && (
-          <p className="text-center text-gray-500">
-            파일을 선택하거나 이곳에 드래그하세요
-          </p>
+          <div className="flex flex-col items-center gap-2 py-4 text-center">
+            <FontAwesomeIcon
+              icon={faCloudArrowUp}
+              className="text-3xl text-base-content/20"
+            />
+            <p className="text-sm text-base-content/40">
+              파일을 선택하거나 이곳에 드래그하세요
+            </p>
+          </div>
         )}
 
         {files.length > 0 && (
           <FileProgressList files={files} progress={progress} />
         )}
 
-        {/* E2EE 및 WebGL 옵션 */}
         <UploadOptions
           enableE2EE={enableE2EE}
           onE2EEToggle={handleE2EEToggle}
@@ -428,21 +398,25 @@ export default function FileUploader({
 
         <div className="flex gap-2">
           <button
-            className={`btn btn-primary ${uploading ? "loading" : ""}`}
+            className={`btn-brand ${uploading ? "loading" : ""}`}
             onClick={() => handleUpload(false)}
-            disabled={uploading || files.length === 0 || (enableE2EE && !isValidPassword)}
+            disabled={
+              uploading ||
+              files.length === 0 ||
+              (enableE2EE && !isValidPassword)
+            }
           >
             {uploading ? "업로드 중..." : "업로드"}
           </button>
 
           {retryMode && !uploading && (
-            <button className="btn btn-warning" onClick={handleRetry}>
+            <button className="btn-ghost" onClick={handleRetry}>
               <FontAwesomeIcon icon={faArrowsRotate} /> 실패한 파일 재시도
             </button>
           )}
 
           {retryMode && !uploading && (
-            <button className="btn btn-ghost" onClick={cancelUpload}>
+            <button className="btn-ghost" onClick={cancelUpload}>
               모두 취소
             </button>
           )}

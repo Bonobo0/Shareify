@@ -309,48 +309,50 @@ export default function ProfilePage() {
 
   return (
     <>
-      <main className="flex flex-col p-4 md:p-8">
-        <div className="max-w-6xl mx-auto w-full">
-          <h1 className="text-3xl font-bold mb-6">프로필 및 설정</h1>
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1 className="section-title">프로필 및 설정</h1>
+          <p className="section-subtitle mt-1">계정 정보를 관리하세요</p>
+        </div>
 
           {error && (
-            <div className="alert alert-error mb-4">
-              <span>{error}</span>
+            <div className="mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+              {error}
             </div>
           )}
 
           {success && (
-            <div className="alert alert-success mb-4">
-              <span>{success}</span>
+            <div className="mb-4 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+              {success}
             </div>
           )}
 
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex flex-col gap-6 lg:flex-row">
             {/* 사이드바 */}
-            <div className="lg:w-1/4">
-              <div className="card bg-base-200 shadow-xl">
-                <div className="card-body p-4">
-                  <div className="menu">
-                    {tabs.map((tab) => (
-                      <li key={tab.id}>
-                        <button
-                          className={`${activeTab === tab.id ? "active" : ""}`}
-                          onClick={() => setActiveTab(tab.id)}
-                        >
-                          <span className="mr-2">{tab.icon}</span>
-                          {tab.label}
-                        </button>
-                      </li>
-                    ))}
-                  </div>
-                </div>
+            <div className="lg:w-64">
+              <div className="card-surface p-2">
+                <nav className="flex flex-col gap-1">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                        activeTab === tab.id
+                          ? "bg-brand-500/15 text-brand-400"
+                          : "text-base-content/60 hover:bg-surface-200 hover:text-base-content"
+                      }`}
+                      onClick={() => setActiveTab(tab.id)}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
               </div>
             </div>
 
             {/* 메인 콘텐츠 */}
-            <div className="lg:w-3/4">
-              <div className="card bg-base-100 shadow-xl">
-                <div className="card-body">
+            <div className="flex-1">
+              <div className="card-surface p-6">
                   {activeTab === "profile" && (
                     <ProfileSettings
                       user={user}
@@ -394,10 +396,8 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* 확인 모달 */}
+            {/* 확인 모달 */}
         {confirmModal.show && (
           <div className="modal modal-open">
             <div className="modal-box">
@@ -431,57 +431,55 @@ function ProfileSettings({
 }) {
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">프로필 설정</h2>
+      <h2 className="mb-6 text-xl font-semibold">프로필 설정</h2>
 
       <div className="space-y-6">
         <form onSubmit={updateProfile} className="space-y-4">
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">이름</span>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-base-content/70">
+              이름
             </label>
             <input
               type="text"
               placeholder="이름을 입력하세요"
-              className="input input-bordered"
+              className="input-field"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={updating}
             />
           </div>
 
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">이메일</span>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-base-content/70">
+              이메일
             </label>
             <input
               type="email"
-              className="input input-bordered"
+              className="input-field opacity-60"
               value={user?.email || ""}
               disabled
             />
-            <label className="label">
-              <span className="label-text-alt text-gray-500">
-                이메일은 변경할 수 없습니다
-              </span>
-            </label>
+            <p className="mt-1 text-xs text-base-content/40">
+              이메일은 변경할 수 없습니다
+            </p>
           </div>
 
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">계정 상태</span>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-base-content/70">
+              계정 상태
             </label>
             <div className="flex items-center gap-2">
-              <div
-                className={`badge ${
+              <span
+                className={
                   user?.isVerified ? "badge-success" : "badge-warning"
-                }`}
+                }
               >
                 {user?.isVerified ? "인증됨" : "미인증"}
-              </div>
+              </span>
               {!user?.isVerified && (
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline"
+                  className="btn-ghost-sm"
                   onClick={handleSendVerification}
                   disabled={sendingVerification}
                 >
@@ -491,10 +489,10 @@ function ProfileSettings({
             </div>
           </div>
 
-          <div className="card-actions justify-end">
+          <div className="flex justify-end pt-2">
             <button
               type="submit"
-              className={`btn btn-primary ${updating ? "loading" : ""}`}
+              className={`btn-brand ${updating ? "loading" : ""}`}
               disabled={updating}
             >
               {updating ? "저장 중..." : "저장"}
