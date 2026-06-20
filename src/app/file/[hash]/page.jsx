@@ -372,7 +372,7 @@ export default function FilePage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="breadcrumbs mb-4 text-xs sm:text-sm">
           <ul>
             <li>

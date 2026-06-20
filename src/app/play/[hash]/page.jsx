@@ -245,7 +245,7 @@ export default function PlayPage() {
 
   if (error) {
     return (
-      <main className="flex min-h-screen flex-col p-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="alert alert-error">{error}</div>
         <button
           className="btn btn-primary mt-4"

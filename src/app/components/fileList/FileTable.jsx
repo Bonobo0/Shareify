@@ -201,15 +201,13 @@ export default function FileTable({
                     {directory.name}
                   </div>
                   {!directory.owner && directory.ownerInfo && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <div className="badge badge-accent badge-xs sm:badge-sm gap-1 text-xs whitespace-nowrap">
-                        <span><FontAwesomeIcon icon={faUser} /></span>
-                        <span className="truncate max-w-[100px] sm:max-w-none">
-                          {directory.ownerInfo.name ||
-                            directory.ownerInfo.email}
-                          님이 공유
+                    <div className="mt-1">
+                      <span className="badge-neutral inline-flex max-w-full items-center gap-1 truncate text-[10px] sm:text-xs">
+                        <FontAwesomeIcon icon={faUser} className="shrink-0" />
+                        <span className="truncate">
+                          {directory.ownerInfo.name || directory.ownerInfo.email} 님이 공유
                         </span>
-                      </div>
+                      </span>
                     </div>
                   )}
                 </div>
@@ -322,43 +320,46 @@ export default function FileTable({
                     <div className="font-medium break-words">
                       {file.originalName}
                     </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
                       {file.isEncrypted && (
-                        <div className="badge badge-primary badge-xs sm:badge-sm whitespace-nowrap">
-                          <FontAwesomeIcon icon={faLock} /> 암호화됨
-                        </div>
+                        <span className="badge-brand inline-flex items-center gap-0.5 text-[10px] sm:text-xs">
+                          <FontAwesomeIcon icon={faLock} className="shrink-0" />
+                          <span className="hidden sm:inline">암호화됨</span>
+                          <span className="sm:hidden">암호</span>
+                        </span>
                       )}
                       {file.isWebGLBuild && (
-                        <div className="badge badge-secondary badge-xs sm:badge-sm whitespace-nowrap">
-                          <FontAwesomeIcon icon={faGamepad} /> WebGL 게임
-                        </div>
+                        <span className="badge-warning inline-flex items-center gap-0.5 text-[10px] sm:text-xs">
+                          <FontAwesomeIcon icon={faGamepad} className="shrink-0" />
+                          <span className="hidden sm:inline">WebGL 게임</span>
+                          <span className="sm:hidden">WebGL</span>
+                        </span>
                       )}
                       {file.isPublic && (
-                        <div className="badge badge-success badge-xs sm:badge-sm whitespace-nowrap">
+                        <span className="badge-success inline-flex items-center gap-0.5 text-[10px] sm:text-xs">
                           공개
-                        </div>
+                        </span>
                       )}
                       {!file.owner && file.ownerInfo && (
-                        <div className="badge badge-accent badge-xs sm:badge-sm gap-1 whitespace-nowrap">
-                          <span><FontAwesomeIcon icon={faUser} /></span>
-                          <span className="truncate max-w-[80px] sm:max-w-none">
-                            {file.ownerInfo.name || file.ownerInfo.email}
-                            님이 공유
+                        <span className="badge-neutral inline-flex max-w-[120px] items-center gap-0.5 truncate text-[10px] sm:max-w-[200px] sm:text-xs">
+                          <FontAwesomeIcon icon={faUser} className="shrink-0" />
+                          <span className="truncate">
+                            {file.ownerInfo.name || file.ownerInfo.email} 님이 공유
                           </span>
-                        </div>
+                        </span>
                       )}
                       {file.owner &&
                         file.parentDirectoryInfo?.owner.id &&
                         file.parentDirectoryInfo?.owner.id !==
                           file.ownerInfo.id && (
-                          <div className="badge badge-info badge-xs sm:badge-sm gap-1 whitespace-nowrap">
-                            <span><FontAwesomeIcon icon={faFolder} /></span>
-                            <span className="truncate max-w-[100px] sm:max-w-none">
+                          <span className="badge-neutral inline-flex max-w-[120px] items-center gap-0.5 truncate text-[10px] sm:max-w-[200px] sm:text-xs">
+                            <FontAwesomeIcon icon={faFolder} className="shrink-0" />
+                            <span className="truncate">
                               {file.parentDirectoryInfo?.owner.name ||
                                 file.parentDirectoryInfo?.owner.email}
-                              님의 {file.parentDirectoryInfo?.name}에 업로드됨
+                              님의 {file.parentDirectoryInfo?.name}
                             </span>
-                          </div>
+                          </span>
                         )}
                     </div>
                   </div>

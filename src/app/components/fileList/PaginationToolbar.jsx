@@ -12,8 +12,9 @@ export default function PaginationToolbar({
   onItemsPerPageChange,
 }) {
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 mb-20">
-      <div className="flex items-center gap-2 text-sm">
+    <div className="mt-6 mb-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+      {/* Items per page selector */}
+      <div className="flex items-center gap-2 text-xs sm:text-sm text-base-content/60">
         <span>페이지당</span>
         <select
           className="select select-bordered select-xs"
@@ -27,6 +28,7 @@ export default function PaginationToolbar({
           ))}
         </select>
       </div>
+
       <Paginator
         currentPage={currentPage}
         totalPages={totalPages}

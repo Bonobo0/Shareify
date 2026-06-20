@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 export default function Paginator({
   currentPage = 1,
@@ -10,16 +10,23 @@ export default function Paginator({
   itemsPerPage = 20,
   className = "",
 }) {
-  // 페이지 번호 배열 생성 (현재 페이지 주변으로 제한)
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const maxVisiblePages = isMobile ? 3 : 7;
+  const halfVisible = Math.floor(maxVisiblePages / 2);
+
   const getPageNumbers = () => {
     const pages = [];
-    const maxVisiblePages = 5;
-    const halfVisible = Math.floor(maxVisiblePages / 2);
-
     let startPage = Math.max(1, currentPage - halfVisible);
     let endPage = Math.min(totalPages, currentPage + halfVisible);
 
-    // 시작 또는 끝에서 부족한 페이지를 반대편으로 보정
     if (endPage - startPage + 1 < maxVisiblePages) {
       if (startPage === 1) {
         endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
@@ -31,34 +38,41 @@ export default function Paginator({
     for (let i = startPage; i <= endPage; i++) {
       pages.push(i);
     }
-
     return pages;
   };
 
   const pageNumbers = getPageNumbers();
 
+  const btnClass = isMobile
+    ? "join-item btn btn-sm min-w-[2rem] px-1"
+    : "join-item btn";
+
+  const activeClass = isMobile
+    ? "join-item btn btn-sm min-w-[2rem] px-1 btn-active"
+    : "join-item btn btn-active";
+
+  const disabledClass = isMobile
+    ? "join-item btn btn-sm min-w-[2rem] px-1 btn-disabled"
+    : "join-item btn btn-disabled";
+
   return (
-    <div className={`flex flex-col gap-4 ${className}`}>
-      {/* 페이지네이션 버튼 */}
-      <div className="flex justify-center">
-        <div className="join">
-          {/* 처음 페이지 버튼 */}
+    <div className={`flex flex-col gap-3 ${className}`}>
+      {/* Pagination buttons */}
+      <div className="flex justify-center overflow-x-auto">
+        <div className="join flex-shrink-0">
+          {/* First page */}
           <button
-            className={`join-item btn ${
-              currentPage === 1 ? "btn-disabled" : ""
-            }`}
+            className={currentPage === 1 ? disabledClass : btnClass}
             onClick={() => onPageChange(1)}
             disabled={currentPage === 1}
             title="첫 페이지"
           >
-            ««
+            {isMobile ? "«" : "««"}
           </button>
 
-          {/* 이전 페이지 버튼 */}
+          {/* Previous page */}
           <button
-            className={`join-item btn ${
-              currentPage === 1 ? "btn-disabled" : ""
-            }`}
+            className={currentPage === 1 ? disabledClass : btnClass}
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
             title="이전 페이지"
@@ -66,39 +80,39 @@ export default function Paginator({
             «
           </button>
 
-          {/* 시작 생략 표시 */}
+          {/* Start ellipsis */}
           {pageNumbers[0] > 1 && (
             <>
-              <button className="join-item btn" onClick={() => onPageChange(1)}>
+              <button className={btnClass} onClick={() => onPageChange(1)}>
                 1
               </button>
               {pageNumbers[0] > 2 && (
-                <span className="join-item btn btn-disabled">...</span>
+                <span className={disabledClass}>…</span>
               )}
             </>
           )}
 
-          {/* 페이지 번호 버튼들 */}
+          {/* Page numbers */}
           {pageNumbers.map((pageNum) => (
             <button
               key={pageNum}
-              className={`join-item btn ${
-                pageNum === currentPage ? "btn-active" : ""
-              }`}
+              className={
+                pageNum === currentPage ? activeClass : btnClass
+              }
               onClick={() => onPageChange(pageNum)}
             >
               {pageNum}
             </button>
           ))}
 
-          {/* 끝 생략 표시 */}
+          {/* End ellipsis */}
           {pageNumbers[pageNumbers.length - 1] < totalPages && (
             <>
               {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
-                <span className="join-item btn btn-disabled">...</span>
+                <span className={disabledClass}>…</span>
               )}
               <button
-                className="join-item btn"
+                className={btnClass}
                 onClick={() => onPageChange(totalPages)}
               >
                 {totalPages}
@@ -106,11 +120,11 @@ export default function Paginator({
             </>
           )}
 
-          {/* 다음 페이지 버튼 */}
+          {/* Next page */}
           <button
-            className={`join-item btn ${
-              currentPage === totalPages ? "btn-disabled" : ""
-            }`}
+            className={
+              currentPage === totalPages ? disabledClass : btnClass
+            }
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
             title="다음 페이지"
@@ -118,43 +132,53 @@ export default function Paginator({
             »
           </button>
 
-          {/* 마지막 페이지 버튼 */}
+          {/* Last page */}
           <button
-            className={`join-item btn ${
-              currentPage === totalPages ? "btn-disabled" : ""
-            }`}
+            className={
+              currentPage === totalPages ? disabledClass : btnClass
+            }
             onClick={() => onPageChange(totalPages)}
             disabled={currentPage === totalPages}
             title="마지막 페이지"
           >
-            »»
+            {isMobile ? "»" : "»»"}
           </button>
         </div>
       </div>
 
-      {/* 페이지 직접 이동 */}
-      <div className="flex justify-center items-center gap-2 text-sm">
-        <span>페이지 이동:</span>
-        <input
-          type="number"
-          min="1"
-          max={totalPages}
-          defaultValue={currentPage}
-          className="input input-bordered input-xs w-16 text-center"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              const page = parseInt(e.target.value);
-              if (page >= 1 && page <= totalPages && page !== currentPage) {
-                onPageChange(page);
-              }
-              e.target.value = currentPage; // 현재 페이지로 리셋
-            }
-          }}
-          onBlur={(e) => {
-            e.target.value = currentPage; // 포커스 잃으면 현재 페이지로 리셋
-          }}
-        />
-        <span>/ {totalPages}</span>
+      {/* Page info + direct navigation */}
+      <div className="flex flex-wrap justify-center items-center gap-2 text-xs sm:text-sm text-base-content/60">
+        <span>
+          {totalItems > 0
+            ? `${(currentPage - 1) * itemsPerPage + 1}–${Math.min(currentPage * itemsPerPage, totalItems)} / ${totalItems}`
+            : `페이지 ${currentPage}`}
+        </span>
+        {!isMobile && (
+          <>
+            <span className="text-base-content/30">|</span>
+            <span>이동:</span>
+            <input
+              type="number"
+              min="1"
+              max={totalPages}
+              defaultValue={currentPage}
+              className="input input-bordered input-xs w-14 text-center"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const page = parseInt(e.target.value);
+                  if (page >= 1 && page <= totalPages && page !== currentPage) {
+                    onPageChange(page);
+                  }
+                  e.target.value = currentPage;
+                }
+              }}
+              onBlur={(e) => {
+                e.target.value = currentPage;
+              }}
+            />
+            <span>/ {totalPages}</span>
+          </>
+        )}
       </div>
     </div>
   );

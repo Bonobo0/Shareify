@@ -435,7 +435,7 @@ export default function SharePage() {
   if (error) {
     return (
       <>
-        <main className="flex min-h-screen flex-col items-center p-6 sm:p-8 md:p-10">
+        <main className="mx-auto max-w-4xl w-full px-4 py-8 sm:px-6 lg:px-8">
           <div className="alert alert-error max-w-md">{error}</div>
           <p className="mt-4">
             이 파일은 존재하지 않거나, 접근 권한이 없거나, 공개 상태가
@@ -457,7 +457,7 @@ export default function SharePage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col items-center p-6 sm:p-8 md:p-10">
+      <main className="mx-auto max-w-4xl w-full px-4 py-8 sm:px-6 lg:px-8">
         {/* 에디터 읽기 전용 뷰 */}
         {showEditor && editorFileUrl && (
           <div className="w-full max-w-4xl mb-6">

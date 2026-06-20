@@ -210,7 +210,7 @@ export default function EditorListPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
+    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">에디터</h1>

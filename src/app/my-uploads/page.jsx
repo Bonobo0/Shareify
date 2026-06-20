@@ -34,7 +34,7 @@ export default function MyUploadsPage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col p-2 sm:p-4 md:p-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">내가 업로드한 파일들</h1>

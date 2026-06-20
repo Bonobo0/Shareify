@@ -130,15 +130,15 @@ export default function SharedItemsPreview() {
                 <span className="text-2xl"><FontAwesomeIcon icon={faFolder} /></span>
                 <div>
                   <div className="font-medium">{directory.name}</div>
-                  <div className="text-sm text-gray-600">
-                    <span className="badge badge-sm mr-2">
+                  <div className="text-sm text-gray-600 flex flex-wrap items-center gap-1">
+                    <span className="badge-neutral text-[10px]">
                       {directory.permission === "read"
                         ? "읽기"
                         : directory.permission === "write"
-                        ? "편집"
-                        : "관리"}
+                          ? "편집"
+                          : "관리"}
                     </span>
-                    {directory.ownerName}님이 공유
+                    <span className="truncate max-w-[100px]">{directory.ownerName}님이 공유</span>
                   </div>
                 </div>
               </div>
@@ -159,15 +159,16 @@ export default function SharedItemsPreview() {
                 <span className="text-xl">{getFileIcon(file.mimetype)}</span>
                 <div>
                   <div className="font-medium">{file.originalName}</div>
-                  <div className="text-sm text-gray-600">
-                    <span className="badge badge-sm mr-2">
+                  <div className="text-sm text-gray-600 flex flex-wrap items-center gap-1">
+                    <span className="badge-neutral text-[10px]">
                       {file.permission === "read"
                         ? "읽기"
                         : file.permission === "write"
-                        ? "편집"
-                        : "관리"}
+                          ? "편집"
+                          : "관리"}
                     </span>
-                    {file.ownerName}님이 공유 • {formatBytes(file.size)}
+                    <span className="truncate max-w-[80px]">{file.ownerName}님이 공유</span>
+                    <span>• {formatBytes(file.size)}</span>
                   </div>
                 </div>
               </div>
