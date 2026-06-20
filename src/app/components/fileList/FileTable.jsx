@@ -101,7 +101,7 @@ export default function FileTable({
   );
 
   return (
-    <div className="overflow-x-auto overflow-y-visible -mx-2 sm:mx-0 relative">
+    <div className="-mx-2 sm:mx-0">
       <p className="text-xs sm:text-sm mb-2">
         각 페이지에는 조회 조건에 맞춰 디렉토리 및 파일이 각각 최대 10개씩
         표시됩니다.
@@ -126,6 +126,7 @@ export default function FileTable({
         </div>
       )}
 
+      <div className="overflow-x-auto">
       <table className="table w-full text-xs sm:text-sm">
         <thead>
           <tr className="text-xs sm:text-sm">
@@ -519,6 +520,7 @@ export default function FileTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

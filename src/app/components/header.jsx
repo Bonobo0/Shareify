@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import ThemeSelector from "./themeSelector";
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const getAvatarColor = (text) => {
     if (!text) return "bg-brand-500";
@@ -37,6 +39,8 @@ export default function Header() {
     const identifier = user?.name || user?.email || "default";
     return getAvatarColor(identifier);
   };
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
     <header className="glass-header fixed top-0 left-0 w-full z-50">
@@ -97,56 +101,39 @@ export default function Header() {
 
           {isAuthenticated ? (
             <>
-              {/* Mobile menu */}
-              <div className="dropdown dropdown-end lg:hidden">
-                <label
-                  tabIndex={0}
-                  className="btn-ghost-sm flex items-center gap-2"
+              {/* Mobile: hamburger button */}
+              <button
+                className="btn-ghost-sm lg:hidden"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="메뉴 열기"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${getAvatarBgColor()}`}
-                  >
-                    {getUserInitial()}
-                  </div>
-                </label>
-                <ul
-                  tabIndex={0}
-                  className="menu-surface mt-2 w-48"
-                >
-                  <li>
-                    <Link href="/dashboard">대시보드</Link>
-                  </li>
-                  <li>
-                    <Link href="/editor">에디터</Link>
-                  </li>
-                  <li>
-                    <Link href="/shared">공유된 파일</Link>
-                  </li>
-                  <li>
-                    <Link href="/my-uploads">내 업로드</Link>
-                  </li>
-                  <li>
-                    <Link href="/profile">프로필</Link>
-                  </li>
-                  {user?.role === "admin" && (
-                    <li>
-                      <Link href="/admin">관리자 페이지</Link>
-                    </li>
+                  {mobileMenuOpen ? (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  ) : (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
                   )}
-                  <li className="divider-subtle my-1">
-                    <button onClick={logout} className="text-error">
-                      로그아웃
-                    </button>
-                  </li>
-                </ul>
-              </div>
+                </svg>
+              </button>
 
-              {/* Desktop avatar */}
+              {/* Desktop avatar dropdown */}
               <div className="dropdown dropdown-end hidden lg:block">
-                <label
-                  tabIndex={0}
-                  className="cursor-pointer"
-                >
+                <label tabIndex={0} className="cursor-pointer">
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white ring-2 ring-transparent transition-all hover:ring-brand-500/40 ${getAvatarBgColor()}`}
                   >
@@ -155,7 +142,7 @@ export default function Header() {
                 </label>
                 <ul
                   tabIndex={0}
-                  className="menu-surface mt-2 w-48"
+                  className="menu-surface mt-2 w-52"
                 >
                   <li className="px-3 py-2">
                     <p className="text-xs text-base-content/50">로그인됨</p>
@@ -195,6 +182,68 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      {/* Mobile slide-down menu — rendered OUTSIDE the overflow container */}
+      {isAuthenticated && mobileMenuOpen && (
+        <div className="glass-header border-t border-surface-300/30 lg:hidden">
+          <nav className="mx-auto flex max-w-7xl flex-col px-4 py-3 sm:px-6">
+            <Link
+              href="/dashboard"
+              className="rounded-lg px-3 py-2.5 text-sm font-medium text-base-content/70 transition-colors hover:bg-surface-200 hover:text-base-content"
+              onClick={closeMobileMenu}
+            >
+              대시보드
+            </Link>
+            <Link
+              href="/editor"
+              className="rounded-lg px-3 py-2.5 text-sm font-medium text-base-content/70 transition-colors hover:bg-surface-200 hover:text-base-content"
+              onClick={closeMobileMenu}
+            >
+              에디터
+            </Link>
+            <Link
+              href="/shared"
+              className="rounded-lg px-3 py-2.5 text-sm font-medium text-base-content/70 transition-colors hover:bg-surface-200 hover:text-base-content"
+              onClick={closeMobileMenu}
+            >
+              공유된 파일
+            </Link>
+            <Link
+              href="/my-uploads"
+              className="rounded-lg px-3 py-2.5 text-sm font-medium text-base-content/70 transition-colors hover:bg-surface-200 hover:text-base-content"
+              onClick={closeMobileMenu}
+            >
+              내 업로드
+            </Link>
+            <Link
+              href="/profile"
+              className="rounded-lg px-3 py-2.5 text-sm font-medium text-base-content/70 transition-colors hover:bg-surface-200 hover:text-base-content"
+              onClick={closeMobileMenu}
+            >
+              프로필
+            </Link>
+            {user?.role === "admin" && (
+              <Link
+                href="/admin"
+                className="rounded-lg px-3 py-2.5 text-sm font-medium text-warning/80 transition-colors hover:bg-surface-200 hover:text-warning"
+                onClick={closeMobileMenu}
+              >
+                관리자 페이지
+              </Link>
+            )}
+            <div className="divider-subtle my-1"></div>
+            <button
+              onClick={() => {
+                closeMobileMenu();
+                logout();
+              }}
+              className="rounded-lg px-3 py-2.5 text-sm font-medium text-error transition-colors hover:bg-surface-200"
+            >
+              로그아웃
+            </button>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

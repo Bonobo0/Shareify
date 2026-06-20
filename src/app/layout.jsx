@@ -13,6 +13,12 @@ const inter = Inter({
 export const metadata = {
   title: "Shareify",
   description: "안전하고 빠른 파일 공유 플랫폼",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
 };
 
 export default function RootLayout({ children }) {
