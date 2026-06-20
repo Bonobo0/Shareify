@@ -36,7 +36,7 @@ export default function Home() {
       {/* Hero */}
       <section className="mx-auto flex min-h-[80vh] max-w-5xl flex-col items-center justify-center px-4 text-center">
         <div className="animate-fade-in">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-500/20 bg-brand-500/10 px-4 py-1.5 text-sm font-medium text-brand-400">
+          <div className="mt-8 mb-6 inline-flex items-center gap-2 rounded-full border border-brand-500/20 bg-brand-500/10 px-4 py-1.5 text-sm font-medium text-brand-400">
             <FontAwesomeIcon icon={faShield} className="text-xs" />
             종단간 암호화 지원
           </div>

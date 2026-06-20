@@ -41,7 +41,7 @@ export default function RootLayout({ children }) {
       <body className={`${inter.variable} font-sans`} suppressHydrationWarning>
         <AuthProvider>
           <Header />
-          <main className="pt-20 min-h-screen">{children}</main>
+          <main className="pt-16 min-h-screen">{children}</main>
           <Footer />
         </AuthProvider>
       </body>
