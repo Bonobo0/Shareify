@@ -309,6 +309,14 @@
     color: #94a3b8;
   }
 
+  /* ── Custom dropdown: only open when .dropdown-open is present ── */
+  .dropdown .dropdown-menu {
+    display: none;
+  }
+  .dropdown.dropdown-open .dropdown-menu {
+    display: block;
+  }
+
   /* ── Footer light theme ── */
   [data-theme="shareify"] .bg-footer {
     background-color: #0f1623;

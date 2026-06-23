@@ -132,7 +132,7 @@ export default function Header() {
               </button>
 
               {/* Desktop avatar dropdown */}
-              <div className="dropdown dropdown-end hidden lg:block">
+              <div className="dropdown dropdown-end hidden lg:block" onClick={(e) => e.currentTarget.classList.toggle('dropdown-open')}>
                 <label tabIndex={0} className="cursor-pointer">
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white ring-2 ring-transparent transition-all hover:ring-brand-500/40 ${getAvatarBgColor()}`}
@@ -142,7 +142,7 @@ export default function Header() {
                 </label>
                 <ul
                   tabIndex={0}
-                  className="menu-surface mt-2 w-52"
+                  className="menu-surface mt-2 w-52 dropdown-menu"
                 >
                   <li className="px-3 py-2">
                     <p className="text-xs text-base-content/50">로그인됨</p>
