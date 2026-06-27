@@ -495,7 +495,7 @@ export default function SharePage() {
 
         {/* 파일 정보 카드 */}
         {!showEditor && (
-          <div className="card bg-base-200 p-4 sm:p-6 max-w-xl w-full">
+          <div className="card bg-base-200 p-4 sm:p-6 max-w-xl w-full mx-auto">
             <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
               공유된 파일
             </h1>
