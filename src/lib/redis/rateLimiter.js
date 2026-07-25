@@ -59,15 +59,8 @@ export async function checkRateLimit(identifier, action) {
     };
   } catch (error) {
     console.error("Redis rate limiter error:", error.message);
-    // fail-open: Redis 장애 시 요청을 허용
-    return {
-      allowed: true,
-      count: 0,
-      remaining: 100,
-      resetTime: now + 15 * 60 * 1000,
-      retryAfter: null,
-      limit: 100,
-    };
+    // fail-closed: Redis 장애 시 요청을 차단
+    throw error;
   }
 }
 

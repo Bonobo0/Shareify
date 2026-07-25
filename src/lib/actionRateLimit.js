@@ -66,7 +66,7 @@ export async function checkActionRateLimit(action, identifier = null) {
     };
   } catch (error) {
     console.error("Rate limit check error:", error);
-    // Redis 장애 시 fail-open (요청 허용)
-    return { allowed: true };
+    // Redis 장애 시 fail-closed (요청 차단)
+    return { allowed: false, error: "요청을 처리할 수 없습니다. 잠시 후 다시 시도해주세요." };
   }
 }
