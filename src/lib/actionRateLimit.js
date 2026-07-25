@@ -1,4 +1,4 @@
-import { checkRateLimit } from "@/lib/redis/rateLimiter";
+import { checkRateLimit, getRateLimitStats as _getStats, resetRateLimit as _reset } from "@/lib/redis/rateLimiter";
 import { headers } from "next/headers";
 
 /**
@@ -69,4 +69,20 @@ export async function checkActionRateLimit(action, identifier = null) {
     // Redis 장애 시 fail-closed (요청 차단)
     return { allowed: false, error: "요청을 처리할 수 없습니다. 잠시 후 다시 시도해주세요." };
   }
+}
+
+/**
+ * Rate limit 통계 조회 (관리자용)
+ */
+export async function getActionRateLimitStats() {
+  return await _getStats();
+}
+
+/**
+ * Rate limit 초기화 (관리자용)
+ * @param {string} action - 액션 이름
+ * @param {string} identifier - 식별자
+ */
+export async function resetActionRateLimit(action, identifier) {
+  return await _reset(identifier, action);
 }
