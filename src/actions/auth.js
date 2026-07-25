@@ -245,41 +245,11 @@ export async function signUp(formData) {
       console.error("회원가입 후 인증 메일 전송 실패:", emailResult.error);
     }
 
-    // 토큰 페어 생성 및 쿠키 설정 (이메일 미인증 상태로도 로그인 허용)
-    const sessionData = await buildSessionData();
-    const { accessToken, refreshToken } = await generateTokenPair(
-      user._id,
-      sessionData,
-    );
-    const cookieStore = await cookies();
-
-    // Access token 쿠키 설정
-    cookieStore.set("access_token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: ACCESS_TOKEN_MAX_AGE,
-    });
-
-    // Refresh token 쿠키 설정
-    cookieStore.set("refresh_token", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: REFRESH_TOKEN_MAX_AGE,
-    });
-
+    // 이메일 인증 전에는 토큰을 발급하지 않음 (사용자가 직접 signIn 통해 로그인해야 함)
     return {
       success: true,
       message:
-        "회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.",
-      user: {
-        id: user._id.toString(),
-        email: user.email,
-        name: user.name,
-        isVerified: user.isVerified,
-        role: user.role,
-      },
+        "회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료한 후 로그인해주세요.",
       emailSent: !emailResult.error,
     };
   } catch (error) {

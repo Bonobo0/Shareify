@@ -1,4 +1,4 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { rotateRefreshToken, verifyAccessToken } from "@/lib/auth/jwt";
 
@@ -55,11 +55,8 @@ export async function getAuthenticatedUser({ allowRefresh = true } = {}) {
 
 async function getCallbackPath() {
   try {
-    const headerStore = await headers();
-    const referer = headerStore.get("referer");
-    if (!referer) return "/dashboard";
-    const url = new URL(referer);
-    return `${url.pathname}${url.search}` || "/dashboard";
+    // Referer 헤더 대신 기본값 사용 (Referer 기반 open redirect 방지)
+    return "/dashboard";
   } catch (error) {
     return "/dashboard";
   }

@@ -701,6 +701,12 @@ export async function deleteFile({ fileId }) {
       return { error: "로그인이 필요합니다." };
     }
 
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("file-operation");
+    if (!rateLimitResult.allowed) {
+      return { error: rateLimitResult.error };
+    }
+
     await connectToDatabase();
 
     // 파일 조회
@@ -829,6 +835,12 @@ export async function getFileDownloadUrl({
       return { error: "로그인이 필요합니다." };
     }
 
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("download");
+    if (!rateLimitResult.allowed) {
+      return { error: rateLimitResult.error };
+    }
+
     await connectToDatabase();
 
     // 파일 조회
@@ -890,7 +902,8 @@ export async function getFileDownloadUrl({
       }
     }
 
-    // 접근 권한 검증
+    // 접근 권한 검증 (shareLinkHash가 제공된 경우 공유 링크 페이지를 통한 접근임)
+    // shareLinkHash는 share 페이지에서 이미 유효성을 검증한 후 전달됨
     if (!isOwner && !isDirectlyShared && !hasParentAccess && !hasAccess) {
       return { error: "파일에 접근할 권한이 없습니다." };
     }
@@ -915,7 +928,7 @@ export async function getFileDownloadUrl({
     // 다운로드 URL 생성 (원본 파일명과 함께)
     const downloadUrl = await generateDownloadUrl(
       r2Key,
-      asPreview ? null : file.originalName,
+      file.originalName,
     );
 
     return {
@@ -1724,8 +1737,22 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
       return { error: "로그인이 필요합니다." };
     }
 
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("file-operation");
+    if (!rateLimitResult.allowed) {
+      return { error: rateLimitResult.error };
+    }
+
     if (!fileId || newSize === undefined) {
       return { error: "필수 매개변수가 누락되었습니다." };
+    }
+
+    // newSize 검증
+    if (typeof newSize !== "number" || newSize <= 0 || newSize > 100 * 1024 * 1024 * 1024) {
+      return { error: "유효하지 않은 파일 크기입니다." };
+    }
+    if (originalSize !== undefined && (typeof originalSize !== "number" || originalSize < 0 || originalSize > 100 * 1024 * 1024 * 1024)) {
+      return { error: "유효하지 않은 원본 파일 크기입니다." };
     }
 
     await connectToDatabase();
@@ -1784,6 +1811,12 @@ export async function renameFile({ fileId, newName }) {
     const userId = await requireAuthenticatedUser();
     if (!userId) {
       return { error: "로그인이 필요합니다." };
+    }
+
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("file-operation");
+    if (!rateLimitResult.allowed) {
+      return { error: rateLimitResult.error };
     }
 
     if (!newName || !newName.trim()) {
@@ -2202,6 +2235,12 @@ export async function moveFile({ fileId, targetDirectoryId }) {
   try {
     const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
+
+    // Rate limiting 체크
+    const rateLimitResult = await checkActionRateLimit("file-operation");
+    if (!rateLimitResult.allowed) {
+      return { error: rateLimitResult.error };
+    }
 
     await connectToDatabase();
 
