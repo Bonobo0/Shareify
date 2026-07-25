@@ -1035,6 +1035,7 @@ export default function FileList({
         decryptPassword={decryptPassword}
         setDecryptPassword={setDecryptPassword}
         setDecryptModal={setDecryptModal}
+        decryptError={decryptError}
         setDecryptError={setDecryptError}
         actionLoading={actionLoading}
         onEncryptedDownload={handleEncryptedDownload}

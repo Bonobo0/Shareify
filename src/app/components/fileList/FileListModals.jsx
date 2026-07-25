@@ -21,6 +21,7 @@ export default function FileListModals({
   decryptPassword,
   setDecryptPassword,
   setDecryptModal,
+  decryptError,
   setDecryptError,
   actionLoading,
   onEncryptedDownload,

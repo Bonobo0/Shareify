@@ -218,7 +218,7 @@ export default function FileTable({
               <td>
                 <div
                   className={`dropdown dropdown-end ${
-                    index === filteredDirectories.length - 1
+                    index >= filteredDirectories.length - 2
                       ? "dropdown-top"
                       : "dropdown-bottom"
                   }`}
@@ -394,7 +394,7 @@ export default function FileTable({
               <td>
                 <div
                   className={`dropdown dropdown-end ${
-                    index === filteredFiles.length - 1
+                    index >= filteredFiles.length - 2
                       ? "dropdown-top"
                       : "dropdown-bottom"
                   }`}
