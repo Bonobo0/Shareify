@@ -126,7 +126,7 @@ export default function FileTable({
         </div>
       )}
 
-      <div className="overflow-x-auto overflow-y-visible">
+      <div className="overflow-x-auto" style={{ overflowY: "visible" }}>
       <table className="table w-full text-xs sm:text-sm">
         <thead>
           <tr className="text-xs sm:text-sm">
