@@ -164,6 +164,9 @@ cp .env.example .env
 
 #### 2. 의존성 설치
 
+Node.js **22.x**가 필요합니다. 최신 AWS SDK와 Nodemailer 10 런타임 요구사항에
+맞춰 배포 환경과 로컬 환경에서 같은 Node.js 메이저 버전을 사용하세요.
+
 ```bash
 npm install
 # 또는

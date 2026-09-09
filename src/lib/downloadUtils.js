@@ -3,6 +3,10 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { decryptFile, decryptForPreview } from "@/lib/crypto/encryption";
+import {
+  getZipDownloadFailureMessage,
+  getZipEntryName,
+} from "./downloadZipUtils.mjs";
 
 // 단일 파일 다운로드 함수
 export async function downloadFile(
@@ -64,6 +68,7 @@ export async function downloadFilesAsZip(
     let completedFiles = 0;
     const totalFiles = files.length;
     const encryptedFiles = files.filter((file) => file.isEncrypted);
+    const usedZipNames = new Set();
 
     // 암호화된 파일이 있는데 비밀번호가 없는 경우
     if (encryptedFiles.length > 0 && !encryptionPasswordMap) {
@@ -162,7 +167,7 @@ export async function downloadFilesAsZip(
             fileData = await newBlob.arrayBuffer();
           }
 
-          const fileName = file.originalName || file.name || file.path;
+          const fileName = getZipEntryName(file, usedZipNames);
           zip.file(fileName, fileData);
 
           completedFiles++;
@@ -194,6 +199,14 @@ export async function downloadFilesAsZip(
     const failedFiles = results.filter((result) => result.error);
     if (failedFiles.length > 0) {
       console.warn("일부 파일 다운로드 실패:", failedFiles);
+
+      // Never present a partial archive as a successful download. Callers can
+      // keep the confirmation step open and retry the failed files instead.
+      return {
+        success: false,
+        error: getZipDownloadFailureMessage(failedFiles),
+        failedFiles,
+      };
     }
 
     // ZIP 파일 생성 및 다운로드

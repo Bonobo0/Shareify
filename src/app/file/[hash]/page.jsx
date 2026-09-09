@@ -13,6 +13,7 @@ import {
 import { toggleFilePublic } from "@/actions/share";
 import { downloadAndDecrypt, isMediaFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
+import PdfPreview from "@/app/components/pdfPreview";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLock, faUser, faDownload, faPenToSquare, faEye, faUpload, faTrash, faHouse, faGamepad } from "@fortawesome/free-solid-svg-icons";
 
@@ -700,13 +701,10 @@ export default function FilePage() {
                 previewModal.file.originalMimetype?.startsWith(
                   "application/pdf",
                 ) ? (
-                <iframe
-                  src={previewModal.url}
-                  className="w-full h-[70vh]"
-                  title={previewModal.file.originalName}
-                >
-                  PDF를 표시할 수 없습니다.
-                </iframe>
+                <PdfPreview
+                  url={previewModal.url}
+                  fileName={previewModal.file.originalName}
+                />
               ) : previewModal.file.originalName?.endsWith(".ejtxt") ? (
                 <LiveEditor
                   file={previewModal.file}
@@ -726,6 +724,7 @@ export default function FilePage() {
                   src={previewModal.url}
                   className="w-full h-[70vh]"
                   title={previewModal.file.originalName}
+                  sandbox=""
                 >
                   텍스트를 표시할 수 없습니다.
                 </iframe>

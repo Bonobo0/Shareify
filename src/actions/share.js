@@ -7,18 +7,27 @@ import Directory from "@/models/Directory";
 import User from "@/models/User";
 import mongoose from "mongoose";
 import { generateDownloadUrl } from "@/lib/r2/r2Client";
+import {
+  isFileHash,
+  isObjectIdString,
+  isShareLinkHash,
+} from "@/lib/security/identifiers.mjs";
 
 
 export async function getSharedFileInfo({ hash }) {
   try {
-    if (!hash) {
+    if (!isFileHash(hash)) {
       return { error: "파일 해시가 필요합니다." };
     }
 
     await connectToDatabase();
 
     // 파일 조회
-    const file = await File.findOne({ hash }).populate("owner", "name email");
+    const file = await File.findOne({
+      hash,
+      deleted: { $ne: true },
+      uploaded: true,
+    }).populate("owner", "name email");
 
     if (!file) {
       return { error: "파일을 찾을 수 없습니다." };
@@ -51,7 +60,10 @@ export async function getSharedFileInfo({ hash }) {
 
     // 4. 상위 디렉토리에 접근 권한이 있는 경우
     if (userId && file.parentDirectory) {
-      const parentDirectory = await Directory.findById(file.parentDirectory);
+      const parentDirectory = await Directory.findOne({
+        _id: file.parentDirectory,
+        deleted: { $ne: true },
+      });
       if (parentDirectory) {
         // 디렉토리 소유자인 경우
         if (parentDirectory.owner.toString() === userId) {
@@ -72,10 +84,18 @@ export async function getSharedFileInfo({ hash }) {
     // 5. 상위 디렉토리 계층에서 활성화된 공유 링크가 있는 경우
     if (file.parentDirectory) {
       let currentDirId = file.parentDirectory;
+      const visitedDirectoryIds = new Set();
 
       // 디렉토리 계층을 따라 올라가면서 공유 링크 확인
       while (currentDirId) {
-        const directory = await Directory.findById(currentDirId);
+        const directoryId = currentDirId.toString();
+        if (visitedDirectoryIds.has(directoryId)) break;
+        visitedDirectoryIds.add(directoryId);
+
+        const directory = await Directory.findOne({
+          _id: currentDirId,
+          deleted: { $ne: true },
+        });
         if (!directory) break;
 
         // 현재 디렉토리에 활성화된 공유 링크가 있는지 확인
@@ -126,14 +146,18 @@ export async function getSharedFileInfo({ hash }) {
 
 export async function downloadSharedFile({ hash, asPreview = false }) {
   try {
-    if (!hash) {
+    if (!isFileHash(hash)) {
       return { error: "파일 해시가 필요합니다." };
     }
 
     await connectToDatabase();
 
     // 파일 조회
-    const file = await File.findOne({ hash }).populate("owner", "name email");
+    const file = await File.findOne({
+      hash,
+      deleted: { $ne: true },
+      uploaded: true,
+    }).populate("owner", "name email");
 
     if (!file) {
       return { error: "파일을 찾을 수 없습니다." };
@@ -166,7 +190,10 @@ export async function downloadSharedFile({ hash, asPreview = false }) {
 
     // 4. 상위 디렉토리에 접근 권한이 있는 경우
     if (userId && file.parentDirectory) {
-      const parentDirectory = await Directory.findById(file.parentDirectory);
+      const parentDirectory = await Directory.findOne({
+        _id: file.parentDirectory,
+        deleted: { $ne: true },
+      });
       if (parentDirectory) {
         // 디렉토리 소유자인 경우
         if (parentDirectory.owner.toString() === userId) {
@@ -187,10 +214,18 @@ export async function downloadSharedFile({ hash, asPreview = false }) {
     // 5. 상위 디렉토리 계층에서 활성화된 공유 링크가 있는 경우
     if (file.parentDirectory) {
       let currentDirId = file.parentDirectory;
+      const visitedDirectoryIds = new Set();
 
       // 디렉토리 계층을 따라 올라가면서 공유 링크 확인
       while (currentDirId) {
-        const directory = await Directory.findById(currentDirId);
+        const directoryId = currentDirId.toString();
+        if (visitedDirectoryIds.has(directoryId)) break;
+        visitedDirectoryIds.add(directoryId);
+
+        const directory = await Directory.findOne({
+          _id: currentDirId,
+          deleted: { $ne: true },
+        });
         if (!directory) break;
 
         // 현재 디렉토리에 활성화된 공유 링크가 있는지 확인
@@ -401,10 +436,21 @@ export async function toggleFilePublic({ fileId }) {
 // 공유 디렉토리 정보 조회 (링크 기반)
 export async function getSharedDirectoryInfo({ shareHash, subPath }) {
   try {
+    if (!isShareLinkHash(shareHash)) {
+      return { error: "유효하지 않은 공유 링크입니다." };
+    }
+    if (
+      subPath !== undefined &&
+      subPath !== null &&
+      typeof subPath !== "string"
+    ) {
+      return { error: "유효하지 않은 경로입니다." };
+    }
+
     await connectToDatabase();
 
     const directory = await Directory.findOne({
-      "shareLinks.hash": shareHash,
+      shareLinks: { $elemMatch: { hash: shareHash } },
       deleted: { $ne: true },
     }).populate("owner", "name email");
 
@@ -465,6 +511,7 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
     const files = await File.find({
       parentDirectory: currentDirectory._id,
       deleted: { $ne: true },
+      uploaded: true,
     }).select(
       "originalName size createdAt hash mimetype originalMimetype originalSize isEncrypted isWebGLBuild webGLValidated"
     );
@@ -529,15 +576,22 @@ export async function getSharedSelectedFilesForDownload({
       fileIds,
     });
 
-    if (!shareHash || !fileIds || fileIds.length === 0) {
+    if (
+      !isShareLinkHash(shareHash) ||
+      !Array.isArray(fileIds) ||
+      fileIds.length === 0
+    ) {
       return { error: "필수 정보가 누락되었습니다." };
+    }
+    if (!fileIds.every((id) => isObjectIdString(id))) {
+      return { error: "유효하지 않은 파일 ID입니다." };
     }
 
     await connectToDatabase();
 
     // 공유 디렉토리 정보 확인
     const sharedDirectory = await Directory.findOne({
-      "shareLinks.hash": shareHash,
+      shareLinks: { $elemMatch: { hash: shareHash } },
       deleted: { $ne: true },
     }).populate("shareLinks");
 
@@ -663,7 +717,7 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
       directoryId,
     });
 
-    if (!shareHash || !directoryId) {
+    if (!isShareLinkHash(shareHash) || !isObjectIdString(directoryId)) {
       return { error: "필수 정보가 누락되었습니다." };
     }
 
@@ -671,7 +725,7 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
 
     // 먼저 공유 링크가 있는 루트 디렉토리를 찾기
     const rootSharedDirectory = await Directory.findOne({
-      "shareLinks.hash": shareHash,
+      shareLinks: { $elemMatch: { hash: shareHash } },
       deleted: { $ne: true },
     }).populate("shareLinks");
 
@@ -693,7 +747,10 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
     }
 
     // 현재 디렉토리가 공유 디렉토리 하위에 있는지 확인
-    const currentDirectory = await Directory.findById(directoryId);
+    const currentDirectory = await Directory.findOne({
+      _id: directoryId,
+      deleted: { $ne: true },
+    });
     if (!currentDirectory) {
       return { error: "디렉토리를 찾을 수 없습니다." };
     }
@@ -813,7 +870,7 @@ export async function downloadSharedDirectoryFile({
   asPreview = false,
 }) {
   try {
-    if (!shareHash || !fileId) {
+    if (!isShareLinkHash(shareHash) || !isObjectIdString(fileId)) {
       return { error: "필수 매개변수가 누락되었습니다." };
     }
 
@@ -821,8 +878,13 @@ export async function downloadSharedDirectoryFile({
 
     // 공유 디렉토리 정보 확인
     const sharedDirectory = await Directory.findOne({
-      "shareLinks.hash": shareHash,
-      "shareLinks.expiresAt": { $gte: new Date() },
+      shareLinks: {
+        $elemMatch: {
+          hash: shareHash,
+          expiresAt: { $gte: new Date() },
+        },
+      },
+      deleted: { $ne: true },
     });
 
     if (!sharedDirectory) {
@@ -830,7 +892,11 @@ export async function downloadSharedDirectoryFile({
     }
 
     // 파일 조회
-    const file = await File.findById(fileId).populate("owner", "name email");
+    const file = await File.findOne({
+      _id: fileId,
+      deleted: { $ne: true },
+      uploaded: true,
+    }).populate("owner", "name email");
 
     if (!file) {
       return { error: "파일을 찾을 수 없습니다." };
@@ -839,14 +905,22 @@ export async function downloadSharedDirectoryFile({
     // 파일이 공유 디렉토리 내에 있는지 확인
     let hasAccess = false;
     let currentDirId = file.parentDirectory;
+    const visitedDirectoryIds = new Set();
 
     while (currentDirId) {
-      if (currentDirId.toString() === sharedDirectory._id.toString()) {
+      const directoryId = currentDirId.toString();
+      if (visitedDirectoryIds.has(directoryId)) break;
+      visitedDirectoryIds.add(directoryId);
+
+      if (directoryId === sharedDirectory._id.toString()) {
         hasAccess = true;
         break;
       }
 
-      const parentDir = await Directory.findById(currentDirId);
+      const parentDir = await Directory.findOne({
+        _id: currentDirId,
+        deleted: { $ne: true },
+      });
       if (!parentDir) break;
       currentDirId = parentDir.parent;
     }
@@ -869,7 +943,7 @@ export async function downloadSharedDirectoryFile({
       downloadUrl,
       filename: file.originalName,
       mimeType: file.originalMimetype || file.mimeType,
-      size: file.originalSize || file.size,
+      size: file.originalSize ?? file.size,
       isEncrypted: file.isEncrypted,
     };
   } catch (error) {
@@ -895,12 +969,18 @@ export async function createSharedSubdirectory({
     if (!name || name.trim() === "") {
       return { error: "디렉토리 이름을 입력해주세요." };
     }
+    if (!isShareLinkHash(shareHash)) {
+      return { error: "유효하지 않은 공유 링크입니다." };
+    }
+    if (typeof subPath !== "string") {
+      return { error: "유효하지 않은 경로입니다." };
+    }
 
     await connectToDatabase();
 
     // 공유 디렉토리 정보 확인
     const sharedDirectory = await Directory.findOne({
-      "shareLinks.hash": shareHash,
+      shareLinks: { $elemMatch: { hash: shareHash } },
       deleted: { $ne: true },
     });
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getSafeCallbackUrl } from "@/lib/auth/safeCallbackUrl";
 
 function SigninContent() {
   const router = useRouter();
@@ -18,7 +19,7 @@ function SigninContent() {
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [useBackupCode, setUseBackupCode] = useState(false);
 
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = getSafeCallbackUrl(searchParams.get("callbackUrl"));
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {

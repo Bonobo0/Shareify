@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { verifyToken } from "@/lib/auth/jwt";
+import { verifyAccessToken } from "@/lib/auth/jwt";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
+import {
+  isDirectoryHash,
+  isObjectIdString,
+  isShareLinkHash,
+} from "@/lib/security/identifiers.mjs";
 import User from "@/models/User";
 import File from "@/models/File";
 import Directory from "@/models/Directory";
@@ -62,11 +67,20 @@ async function ensureDirectoryWriteAccess(
   }
 
   if (!hasAccess && shareHash) {
-    let currentDirId = directoryId;
+    // directoryId is the public directory hash, while the ancestry query
+    // below uses Mongo _id values. Starting with the hash makes Mongoose try
+    // to cast it as an ObjectId and turns valid shared uploads into 500s.
+    let currentDirId = directory._id;
     while (currentDirId && !hasAccess) {
       const sharedDirectory = await Directory.findOne({
         _id: currentDirId,
-        "shareLinks.hash": shareHash,
+        shareLinks: {
+          $elemMatch: {
+            hash: shareHash,
+            permission: "write",
+            expiresAt: { $gte: new Date() },
+          },
+        },
         deleted: { $ne: true },
       })
         .select("shareLinks parent")
@@ -163,7 +177,7 @@ export async function POST(request) {
       );
     }
 
-    const payload = await verifyToken(token);
+    const payload = await verifyAccessToken(token);
     if (!payload?.userId) {
       return NextResponse.json(
         { error: "유효하지 않은 토큰입니다." },
@@ -204,13 +218,38 @@ export async function POST(request) {
       );
     }
 
-    const shareHash =
-      typeof shareHashRaw === "string" && shareHashRaw.trim()
-        ? shareHashRaw.trim()
-        : null;
+    const normalizedDirectoryId =
+      typeof directoryId === "string" ? directoryId.trim() : directoryId;
+    const normalizedShareHash =
+      typeof shareHashRaw === "string" ? shareHashRaw.trim() : shareHashRaw;
+
+    if (
+      normalizedDirectoryId !== null &&
+      normalizedDirectoryId !== undefined &&
+      !isDirectoryHash(normalizedDirectoryId)
+    ) {
+      return NextResponse.json(
+        { error: "유효하지 않은 디렉토리 해시입니다." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      normalizedShareHash !== null &&
+      normalizedShareHash !== undefined &&
+      normalizedShareHash !== "" &&
+      !isShareLinkHash(normalizedShareHash)
+    ) {
+      return NextResponse.json(
+        { error: "유효하지 않은 공유 링크 해시입니다." },
+        { status: 400 },
+      );
+    }
+
+    const shareHash = normalizedShareHash || null;
 
     const numericSize = Number(size);
-    if (!Number.isFinite(numericSize) || numericSize <= 0) {
+    if (!Number.isSafeInteger(numericSize) || numericSize <= 0) {
       return NextResponse.json(
         { error: "파일 크기가 올바르지 않습니다." },
         { status: 400 }
@@ -230,10 +269,15 @@ export async function POST(request) {
       return sanitizedFilename;
     })();
 
-    const originalSizeCandidate =
-      isEncrypted && originalMetadata?.originalSize
-        ? Number(originalMetadata.originalSize)
-        : null;
+    const hasOriginalSize =
+      Boolean(isEncrypted) &&
+      originalMetadata !== null &&
+      typeof originalMetadata === "object" &&
+      originalMetadata.originalSize !== undefined &&
+      originalMetadata.originalSize !== null;
+    const originalSizeCandidate = hasOriginalSize
+      ? Number(originalMetadata.originalSize)
+      : null;
 
     const originalMimeCandidate =
       isEncrypted && originalMetadata?.originalType
@@ -241,9 +285,8 @@ export async function POST(request) {
         : null;
 
     if (
-      isEncrypted &&
-      originalMetadata?.originalSize &&
-      !Number.isFinite(originalSizeCandidate)
+      hasOriginalSize &&
+      (!Number.isSafeInteger(originalSizeCandidate) || originalSizeCandidate < 0)
     ) {
       return NextResponse.json(
         { error: "암호화된 파일의 원본 크기가 올바르지 않습니다." },
@@ -283,7 +326,7 @@ export async function POST(request) {
     }
 
     const sizeToCheck =
-      isEncrypted && originalSizeCandidate
+      isEncrypted && originalSizeCandidate !== null
         ? originalSizeCandidate
         : numericSize;
 
@@ -295,10 +338,10 @@ export async function POST(request) {
     }
 
     let parentDirectory = null;
-    if (directoryId) {
+    if (normalizedDirectoryId) {
       const directoryResult = await ensureDirectoryWriteAccess(
         payload.userId,
-        directoryId,
+        normalizedDirectoryId,
         shareHash
       );
 
@@ -314,7 +357,12 @@ export async function POST(request) {
 
     const uniqueFilename = generateUniqueFilename(sanitizedFilename);
     const fileHash = generateFileHash();
-    const uploadUrl = await generateUploadUrl(uniqueFilename, normalizedMime);
+    const uploadUrl = await generateUploadUrl(
+      uniqueFilename,
+      normalizedMime,
+      3600,
+      numericSize,
+    );
     const parentDirectoryId = parentDirectory
       ? toObjectId(parentDirectory)
       : null;
@@ -331,7 +379,9 @@ export async function POST(request) {
       uploaded: false,
       isEncrypted: Boolean(isEncrypted),
       originalSize:
-        isEncrypted && originalSizeCandidate ? originalSizeCandidate : null,
+        isEncrypted && originalSizeCandidate !== null
+          ? originalSizeCandidate
+          : null,
       originalMimetype:
         isEncrypted && originalMimeCandidate ? originalMimeCandidate : null,
     });
@@ -376,7 +426,7 @@ export async function PATCH(request) {
       );
     }
 
-    const payload = await verifyToken(token);
+    const payload = await verifyAccessToken(token);
     if (!payload?.userId) {
       return NextResponse.json(
         { error: "유효하지 않은 토큰입니다." },
@@ -394,7 +444,7 @@ export async function PATCH(request) {
 
     const { fileId } = body;
 
-    if (!fileId || !mongoose.Types.ObjectId.isValid(fileId)) {
+    if (!isObjectIdString(fileId)) {
       return NextResponse.json(
         { error: "유효하지 않은 파일 ID입니다." },
         { status: 400 }
@@ -462,7 +512,11 @@ export async function PATCH(request) {
     await file.save();
 
     const sizeToIncrement =
-      file.isEncrypted && file.originalSize ? file.originalSize : file.size;
+      file.isEncrypted &&
+      file.originalSize !== null &&
+      file.originalSize !== undefined
+        ? file.originalSize
+        : file.size;
 
     await User.findByIdAndUpdate(file.owner, {
       $inc: { storageUsed: sizeToIncrement },

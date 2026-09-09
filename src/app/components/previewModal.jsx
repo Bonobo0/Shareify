@@ -2,6 +2,7 @@
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import PdfPreview from "./pdfPreview";
 
 export default function PreviewModal({
   isOpen,
@@ -14,6 +15,7 @@ export default function PreviewModal({
   if (!isOpen) return null;
 
   const type = mimeType?.split("/")[0]; // image, video, audio 등
+  const isPdf = mimeType?.toLowerCase().startsWith("application/pdf");
 
   const handleDownload = () => {
     const link = document.createElement("a");
@@ -61,13 +63,26 @@ export default function PreviewModal({
               </audio>
             </div>
           )}
-          {(mimeType === "application/pdf" || type === "application") && (
-            <iframe src={url} className="w-full h-[70vh]" title={file.name}>
-              PDF를 표시할 수 없습니다.
+          {isPdf && (
+            <PdfPreview url={url} fileName={file.name} />
+          )}
+          {type === "application" && !isPdf && (
+            <iframe
+              src={url}
+              className="w-full h-[70vh]"
+              title={file.name}
+              sandbox=""
+            >
+              파일을 표시할 수 없습니다.
             </iframe>
           )}
           {type === "text" && (
-            <iframe src={url} className="w-full h-[70vh]" title={file.name}>
+            <iframe
+              src={url}
+              className="w-full h-[70vh]"
+              title={file.name}
+              sandbox=""
+            >
               텍스트를 표시할 수 없습니다.
             </iframe>
           )}

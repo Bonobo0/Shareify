@@ -1,7 +1,41 @@
+import {
+  WEBGL_BOOTSTRAP_HTML,
+  WEBGL_FRAME_MESSAGE_SOURCE,
+  WEBGL_PARENT_MESSAGE_SOURCE,
+  WEBGL_SANDBOX,
+} from "./sandbox.mjs";
+
 /**
  * Unity WebGL 플레이어 유틸리티
- * WebGL 빌드를 브라우저에서 로드하고 실행하는 기능 제공
+ *
+ * WebGL 빌드는 업로드한 사용자가 만든 JavaScript를 포함하므로, 로더를
+ * Shareify 문서에 직접 삽입하지 않는다. ZIP의 바이트와 Blob URL은
+ * opaque-origin sandbox iframe 안에서만 만들어지고 사용된다.
  */
+
+const LOAD_TIMEOUT_MS = 120_000;
+const QUIT_TIMEOUT_MS = 5_000;
+
+const getBaseName = (fileName) => {
+  const parts = String(fileName || "").split(/[\\/]+/).filter(Boolean);
+  return parts[parts.length - 1] || String(fileName || "");
+};
+
+const getMimeType = (fileName) => {
+  const lowerName = String(fileName || "").toLowerCase();
+
+  if (lowerName.endsWith(".loader.js") || lowerName.endsWith(".framework.js")) {
+    return "text/javascript";
+  }
+  if (lowerName.endsWith(".wasm")) return "application/wasm";
+  if (lowerName.endsWith(".data")) return "application/octet-stream";
+  return "application/octet-stream";
+};
+
+const hasSuffix = (fileName, suffix) => {
+  const lowerName = String(fileName || "").toLowerCase();
+  return lowerName.endsWith(suffix) || getBaseName(lowerName).endsWith(suffix);
+};
 
 /**
  * WebGL 빌드 로드 및 실행
@@ -9,160 +43,280 @@
  * @param {string} buildName - 빌드 이름
  * @param {string} containerElementId - 게임을 렌더링할 컨테이너 요소 ID
  * @param {Function} onProgress - 진행률 콜백 (0-100)
- * @returns {Promise<Object>} Unity 인스턴스 객체
+ * @returns {Promise<Object>} sandbox 컨트롤러
  */
-export async function loadWebGLBuild(zipBlob, buildName, containerElementId, onProgress) {
+export async function loadWebGLBuild(
+  zipBlob,
+  buildName,
+  containerElementId,
+  onProgress,
+  options = {},
+) {
+  const { signal } = options;
+  let iframe = null;
+  let messageHandler = null;
+  let loadTimeoutId = null;
+  let abortHandler = null;
+
+  const createAbortError = () => {
+    const error = new Error("WebGL 빌드 로드가 취소되었습니다.");
+    error.name = "AbortError";
+    return error;
+  };
+
+  const throwIfAborted = () => {
+    if (signal?.aborted) throw createAbortError();
+  };
+
+  const removeFrame = () => {
+    if (iframe?.parentNode) iframe.parentNode.removeChild(iframe);
+    iframe = null;
+  };
+
+  const removeMessageHandler = () => {
+    if (messageHandler) {
+      window.removeEventListener("message", messageHandler);
+      messageHandler = null;
+    }
+  };
+
+  const removeAbortHandler = () => {
+    if (abortHandler) {
+      signal?.removeEventListener("abort", abortHandler);
+      abortHandler = null;
+    }
+  };
+
+  const clearLoadTimeout = () => {
+    if (loadTimeoutId !== null) {
+      window.clearTimeout(loadTimeoutId);
+      loadTimeoutId = null;
+    }
+  };
+
   try {
+    throwIfAborted();
     onProgress?.(5);
     console.log("빌드 압축 해제:", buildName);
-    
-    // ZIP 압축 해제
+
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
     const contents = await zip.loadAsync(zipBlob);
-    
+    throwIfAborted();
+    const zipEntries = Object.entries(contents.files);
+
     onProgress?.(15);
-    
-    // 필요한 파일 추출
-    const buildFiles = {};
-    const files = Object.keys(contents.files);
-    
-    for (let i = 0; i < files.length; i++) {
-      const fileName = files[i];
-      const fileEntry = contents.files[fileName];
-      
-      // 디렉토리는 건너뛰기
-      if (fileEntry.dir) {
-        console.log("디렉토리 건너뛰기:", fileName);
-        continue;
-      }
-      
-      // 파일 데이터 추출
-      const fileData = await fileEntry.async("blob");
-      
-      // 파일명 정규화: 경로 포함 시 마지막 파일명만 추출
-      // 예: "Build/game.loader.js" -> "game.loader.js"
-      // filter(Boolean)로 빈 문자열 제거 (trailing slash 처리)
-      const normalizedFileName = fileName.includes('/') 
-        ? fileName.split('/').filter(Boolean).pop() || fileName
-        : fileName;
-      
-      buildFiles[normalizedFileName] = {
-        blob: fileData,
-        url: URL.createObjectURL(fileData),
-        originalPath: fileName, // 원본 경로 보존
+
+    // Transferable ArrayBuffer만 부모에서 iframe으로 전달한다. URL을
+    // 부모에서 만들면 sandbox 밖의 origin으로 생성될 수 있으므로, 실제
+    // Blob/URL 생성은 bootstrap 문서가 담당한다.
+    const buildFiles = [];
+    for (let i = 0; i < zipEntries.length; i += 1) {
+      throwIfAborted();
+      const [fileName, fileEntry] = zipEntries[i];
+
+      if (fileEntry.dir) continue;
+
+      const data = await fileEntry.async("arraybuffer");
+      throwIfAborted();
+      const file = {
+        name: fileName,
+        type: getMimeType(fileName),
+        data,
       };
-      
-      onProgress?.(15 + (i / files.length) * 25);
-    }
-    
-    onProgress?.(40);
-    
-    // Unity 로더 스크립트 찾기 (경로 및 파일명 모두 확인)
-    const loaderFile = Object.keys(buildFiles).find(
-      (name) => {
-        const originalPath = buildFiles[name].originalPath;
-        return name.endsWith(".loader.js") || 
-               originalPath.endsWith(".loader.js") ||
-               name.match(/\.loader\.js$/) || 
-               originalPath.match(/Build\/.*\.loader\.js$/);
+
+      if (hasSuffix(fileName, ".loader.js")) {
+        file.scriptText = new TextDecoder().decode(data);
       }
-    );
-    
-    if (!loaderFile) {
-      console.error("사용 가능한 파일:", Object.keys(buildFiles));
-      throw new Error("Unity 로더 파일을 찾을 수 없습니다.");
+
+      buildFiles.push(file);
+      onProgress?.(15 + ((i + 1) / Math.max(zipEntries.length, 1)) * 25);
     }
-    
-    // 필요한 파일들의 URL 매핑 (경로 및 파일명 모두 확인)
-    const dataFile = Object.keys(buildFiles).find((name) => {
-      const originalPath = buildFiles[name].originalPath;
-      return name.endsWith(".data") || originalPath.endsWith(".data");
-    });
-    const frameworkFile = Object.keys(buildFiles).find((name) => {
-      const originalPath = buildFiles[name].originalPath;
-      return name.endsWith(".framework.js") || 
-             originalPath.endsWith(".framework.js") ||
-             originalPath.match(/Build\/.*\.framework\.js$/);
-    });
-    const wasmFile = Object.keys(buildFiles).find((name) => {
-      const originalPath = buildFiles[name].originalPath;
-      return name.endsWith(".wasm") || originalPath.endsWith(".wasm");
-    });
-    
-    if (!dataFile || !frameworkFile || !wasmFile) {
-      console.error("사용 가능한 파일:", Object.keys(buildFiles));
-      console.error("찾은 파일:", { dataFile, frameworkFile, wasmFile, loaderFile });
+
+    onProgress?.(40);
+
+    const loaderFile = buildFiles.find((file) => hasSuffix(file.name, ".loader.js"));
+    const dataFile = buildFiles.find((file) => hasSuffix(file.name, ".data"));
+    const frameworkFile = buildFiles.find((file) =>
+      hasSuffix(file.name, ".framework.js"),
+    );
+    const wasmFile = buildFiles.find((file) => hasSuffix(file.name, ".wasm"));
+
+    if (!loaderFile || !dataFile || !frameworkFile || !wasmFile) {
+      console.error("사용 가능한 파일:", buildFiles.map((file) => file.name));
       throw new Error("필수 WebGL 파일이 누락되었습니다.");
     }
-    
-    onProgress?.(50);
-    
-    // Unity 인스턴스 생성 설정
-    const buildUrl = {
-      dataUrl: buildFiles[dataFile].url,
-      frameworkUrl: buildFiles[frameworkFile].url,
-      codeUrl: buildFiles[wasmFile].url,
-      loaderUrl: buildFiles[loaderFile].url,
-    };
-    
-    // 로더 스크립트 동적 로드
-    const loaderScriptBlob = buildFiles[loaderFile].blob;
-    const loaderScriptText = await loaderScriptBlob.text();
-    
-    onProgress?.(60);
-    
-    // 로더 스크립트를 전역에 추가
-    const scriptElement = document.createElement("script");
-    scriptElement.textContent = loaderScriptText;
-    document.head.appendChild(scriptElement);
-    
-    onProgress?.(70);
-    
-    // Unity 인스턴스 생성
+
     const container = document.getElementById(containerElementId);
+    throwIfAborted();
     if (!container) {
       throw new Error(`컨테이너 요소를 찾을 수 없습니다: ${containerElementId}`);
     }
-    
-    // 캔버스 생성
-    const canvas = document.createElement("canvas");
-    canvas.id = "unity-canvas";
-    canvas.style.width = "100%";
-    canvas.style.height = "100%";
-    container.innerHTML = "";
-    container.appendChild(canvas);
-    
-    onProgress?.(80);
-    
-    // Unity 로더를 통해 게임 시작
-    // createUnityInstance는 로더 스크립트에서 전역으로 정의됨
-    if (typeof window.createUnityInstance === "function") {
-      const config = {
-        dataUrl: buildUrl.dataUrl,
-        frameworkUrl: buildUrl.frameworkUrl,
-        codeUrl: buildUrl.codeUrl,
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: buildName,
-        productVersion: "1.0",
+
+    iframe = document.createElement("iframe");
+    iframe.setAttribute("sandbox", WEBGL_SANDBOX);
+    iframe.setAttribute("allowfullscreen", "true");
+    iframe.setAttribute("allow", "fullscreen; autoplay; gamepad");
+    iframe.setAttribute("title", `${buildName || "WebGL"} 플레이어`);
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.display = "block";
+    iframe.style.border = "0";
+    container.replaceChildren(iframe);
+
+    onProgress?.(50);
+
+    const controller = await new Promise((resolve, reject) => {
+      let isReady = false;
+      let isClosed = false;
+      let quitPromise = null;
+      let resolveQuit = null;
+
+      const closeController = () => {
+        if (isClosed) return;
+        isClosed = true;
+        removeMessageHandler();
+        removeAbortHandler();
+        clearLoadTimeout();
+        removeFrame();
       };
-      
-      onProgress?.(90);
-      
-      const unityInstance = await window.createUnityInstance(canvas, config, (progress) => {
-        onProgress?.(90 + progress * 10);
-      });
-      
-      onProgress?.(100);
-      console.log("WebGL 빌드 로드 완료");
-      
-      // Unity 인스턴스 반환
-      return unityInstance;
-    } else {
-      throw new Error("Unity 로더를 찾을 수 없습니다.");
-    }
+
+      const rejectLoad = (error) => {
+        if (isReady || isClosed) return;
+        closeController();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+
+      const sendToFrame = (message, transferables = []) => {
+        if (!iframe?.contentWindow || isClosed) return false;
+        const payload = { source: WEBGL_PARENT_MESSAGE_SOURCE, ...message };
+        if (transferables.length > 0) {
+          iframe.contentWindow.postMessage(payload, "*", transferables);
+        } else {
+          iframe.contentWindow.postMessage(payload, "*");
+        }
+        return true;
+      };
+
+      const finishQuit = () => {
+        if (resolveQuit) resolveQuit();
+        resolveQuit = null;
+        quitPromise = null;
+        closeController();
+      };
+
+      const quit = () => {
+        if (isClosed) return Promise.resolve();
+        if (quitPromise) return quitPromise;
+
+        quitPromise = new Promise((resolve) => {
+          resolveQuit = resolve;
+          const quitTimeoutId = window.setTimeout(finishQuit, QUIT_TIMEOUT_MS);
+          const previousResolveQuit = resolveQuit;
+          resolveQuit = () => {
+            window.clearTimeout(quitTimeoutId);
+            previousResolveQuit();
+          };
+
+          if (!sendToFrame({ type: "quit" })) finishQuit();
+        });
+
+        return quitPromise;
+      };
+
+      let didSendBuild = false;
+      messageHandler = (event) => {
+        if (!iframe || event.source !== iframe.contentWindow) return;
+
+        const message = event.data;
+        if (!message || message.source !== WEBGL_FRAME_MESSAGE_SOURCE) return;
+
+        if (message.type === "bootstrap-ready") {
+          if (didSendBuild) return;
+          didSendBuild = true;
+          const transferables = buildFiles.map((file) => file.data);
+          try {
+            sendToFrame(
+              {
+                type: "load",
+                buildName: String(buildName || "WebGL Build"),
+                files: buildFiles,
+              },
+              transferables,
+            );
+          } catch (error) {
+            rejectLoad(error);
+          }
+          return;
+        }
+
+        if (message.type === "progress") {
+          onProgress?.(Math.max(0, Math.min(100, Number(message.progress) || 0)));
+          return;
+        }
+
+        if (message.type === "error") {
+          const error = new Error(
+            message.message || "WebGL 빌드를 로드할 수 없습니다.",
+          );
+          if (isReady) {
+            console.error("WebGL 샌드박스 오류:", error);
+          } else {
+            rejectLoad(error);
+          }
+          return;
+        }
+
+        if (message.type === "ready") {
+          if (signal?.aborted) {
+            rejectLoad(createAbortError());
+            return;
+          }
+          isReady = true;
+          clearLoadTimeout();
+          onProgress?.(100);
+          console.log("WebGL 빌드 로드 완료");
+          resolve({
+            iframe,
+            quit,
+            cleanup: closeController,
+          });
+          return;
+        }
+
+        if (message.type === "quit-complete" && quitPromise) finishQuit();
+      };
+
+      window.addEventListener("message", messageHandler);
+      abortHandler = () => {
+        if (isReady) {
+          closeController();
+        } else {
+          rejectLoad(createAbortError());
+        }
+      };
+      signal?.addEventListener("abort", abortHandler, { once: true });
+
+      if (signal?.aborted) {
+        abortHandler();
+        return;
+      }
+
+      loadTimeoutId = window.setTimeout(() => {
+        rejectLoad(new Error("WebGL 빌드 로드 시간이 초과되었습니다."));
+      }, LOAD_TIMEOUT_MS);
+
+      // srcdoc is assigned only after the listener is installed so that the
+      // bootstrap-ready message cannot race with listener registration.
+      iframe.srcdoc = WEBGL_BOOTSTRAP_HTML;
+    });
+
+    return controller;
   } catch (error) {
+    removeMessageHandler();
+    removeAbortHandler();
+    clearLoadTimeout();
+    removeFrame();
     console.error("WebGL 빌드 로드 오류:", error);
     throw error;
   }
@@ -170,19 +324,26 @@ export async function loadWebGLBuild(zipBlob, buildName, containerElementId, onP
 
 /**
  * Unity 인스턴스 정리 및 종료
- * @param {Object} unityInstance - Unity 인스턴스 객체
+ * @param {Object} unityInstance - sandbox 컨트롤러 또는 기존 Unity 인스턴스
  */
 export function unloadWebGLBuild(unityInstance) {
   try {
+    if (unityInstance && typeof unityInstance.quit === "function") {
+      console.log("WebGL 샌드박스 종료 중...");
+      Promise.resolve(unityInstance.quit()).catch((error) => {
+        console.error("WebGL 샌드박스 종료 오류:", error);
+      });
+      return;
+    }
+
+    // 기존 호출자와의 호환성을 위해 직접 Unity 인스턴스도 정리한다.
     if (unityInstance && typeof unityInstance.Quit === "function") {
       console.log("Unity 인스턴스 종료 중...");
-      unityInstance.Quit().then(() => {
-        console.log("Unity 인스턴스 종료 완료");
-      }).catch((error) => {
+      Promise.resolve(unityInstance.Quit()).catch((error) => {
         console.error("Unity 인스턴스 종료 오류:", error);
       });
     }
   } catch (error) {
-    console.error("Unity 인스턴스 정리 오류:", error);
+    console.error("WebGL 인스턴스 정리 오류:", error);
   }
 }

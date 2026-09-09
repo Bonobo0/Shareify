@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import PdfPreview from "../pdfPreview";
 
 // LiveEditor uses @editorjs/* packages that reference browser-only 'Element' API
 // at module evaluation time, so it must be dynamically imported with ssr: false
@@ -158,13 +159,10 @@ export default function FileListModals({
                 previewModal.file.originalMimetype?.startsWith(
                   "application/pdf",
                 ) ? (
-                <iframe
-                  src={previewModal.url}
-                  className="w-full h-[70vh]"
-                  title={previewModal.file.originalName}
-                >
-                  PDF를 표시할 수 없습니다.
-                </iframe>
+                <PdfPreview
+                  url={previewModal.url}
+                  fileName={previewModal.file.originalName}
+                />
               ) : previewModal.file.originalName.endsWith(".ejtxt") ? (
                 <LiveEditor
                   file={previewModal.file}
@@ -184,6 +182,7 @@ export default function FileListModals({
                   src={previewModal.url}
                   className="w-full h-[70vh]"
                   title={previewModal.file.originalName}
+                  sandbox=""
                 >
                   텍스트를 표시할 수 없습니다.
                 </iframe>

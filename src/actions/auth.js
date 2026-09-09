@@ -22,6 +22,7 @@ import {
 import { verify2FAToken, verifyBackupCode } from "@/lib/auth/twoFactor";
 import { checkActionRateLimit } from "@/lib/actionRateLimit";
 import { validatePassword, validateEmail } from "@/lib/validation";
+import { isHexToken } from "@/lib/security/tokens.mjs";
 
 // Cookie configuration
 const ACCESS_TOKEN_MAX_AGE = 15 * 60; // 15분
@@ -652,9 +653,10 @@ export async function requestPasswordReset({ email }) {
 }
 
 // 비밀번호 재설정 토큰 확인
-export async function verifyPasswordResetToken({ token }) {
+export async function verifyPasswordResetToken(input = {}) {
   try {
-    if (!token) {
+    const token = input?.token;
+    if (!isHexToken(token)) {
       return { error: "재설정 토큰이 필요합니다." };
     }
 
@@ -683,14 +685,16 @@ export async function verifyPasswordResetToken({ token }) {
 }
 
 // 비밀번호 재설정 실행
-export async function resetPassword({
-  token,
-  newPassword,
-  confirmPassword,
-  twoFactorCode,
-  isBackupCode = false,
-}) {
+export async function resetPassword(input = {}) {
   try {
+    const {
+      token,
+      newPassword,
+      confirmPassword,
+      twoFactorCode,
+      isBackupCode = false,
+    } = input || {};
+
     // Rate limiting 체크
     const rateLimitResult = await checkActionRateLimit("reset-password");
     if (!rateLimitResult.allowed) {
@@ -699,7 +703,7 @@ export async function resetPassword({
       };
     }
 
-    if (!token) {
+    if (!isHexToken(token)) {
       return { error: "재설정 토큰이 필요합니다." };
     }
 

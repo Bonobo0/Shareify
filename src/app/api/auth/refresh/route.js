@@ -1,16 +1,6 @@
 import { NextResponse } from "next/server";
 import { rotateRefreshToken, setTokenCookies } from "@/lib/auth/jwt";
-
-/**
- * Validate that a callback URL is a safe internal path (not an open redirect).
- * Only allows relative paths starting with '/'.
- */
-function getSafeCallbackUrl(callbackUrl) {
-  if (!callbackUrl || typeof callbackUrl !== "string") return "/dashboard";
-  // Only allow relative paths (prevent open redirect)
-  if (!callbackUrl.startsWith("/") || callbackUrl.startsWith("//")) return "/dashboard";
-  return callbackUrl;
-}
+import { getSafeCallbackUrl } from "@/lib/auth/safeCallbackUrl";
 
 /**
  * Token refresh API endpoint

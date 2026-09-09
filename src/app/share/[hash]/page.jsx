@@ -9,6 +9,7 @@ import { getSharedFileInfo, downloadSharedFile } from "@/actions/share";
 import { downloadAndDecrypt, decryptFile } from "@/lib/crypto/encryption";
 import { createPreviewUrl } from "@/lib/downloadUtils";
 import PreviewModal from "@/app/components/previewModal";
+import PdfPreview from "@/app/components/pdfPreview";
 import WebGLPlayer from "@/app/components/webGLPlayer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -787,13 +788,10 @@ export default function SharePage() {
                 </div>
               )}
               {previewModal.file.mimetype === "application/pdf" && (
-                <iframe
-                  src={previewModal.url}
-                  className="w-full h-[70vh]"
-                  title={previewModal.file.originalName}
-                >
-                  PDF를 표시할 수 없습니다.
-                </iframe>
+                <PdfPreview
+                  url={previewModal.url}
+                  fileName={previewModal.file.originalName}
+                />
               )}
             </div>
 

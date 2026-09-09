@@ -13,6 +13,7 @@ import { aiDeleteFile, aiUploadComplete } from "@/app/actions/ai";
 import { encryptFile } from "@/lib/crypto/encryption";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import DOMPurify from "dompurify";
 
 // Editor.js 플러그인
 import Header from "@editorjs/header";
@@ -108,10 +109,13 @@ function createEditorTools(parentFileId, readOnly = false) {
 
                 if (completeResult.error) throw new Error(completeResult.error);
 
+                const safeUrl = sanitizeMediaUrl(completeResult.url);
+                if (!safeUrl) throw new Error("안전하지 않은 이미지 URL입니다.");
+
                 return {
                   success: 1,
                   file: {
-                    url: completeResult.url,
+                    url: safeUrl,
                     hash: result.file.hash,
                     name: fileObj.name,
                   },
@@ -122,10 +126,12 @@ function createEditorTools(parentFileId, readOnly = false) {
               }
             },
             async uploadByUrl(url) {
-              // URL 이미지는 그대로 사용
+              const safeUrl = sanitizeMediaUrl(url);
+              if (!safeUrl) return { success: 0 };
+
               return {
                 success: 1,
-                file: { url },
+                file: { url: safeUrl },
               };
             },
           },
@@ -167,59 +173,270 @@ function getExportStyles() {
   `;
 }
 
+const RICH_TEXT_SANITIZE_OPTIONS = {
+  ALLOWED_TAGS: [
+    "a",
+    "b",
+    "br",
+    "code",
+    "del",
+    "em",
+    "i",
+    "kbd",
+    "mark",
+    "s",
+    "small",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "u",
+  ],
+  ALLOWED_ATTR: ["class", "href", "rel", "target", "title"],
+  ALLOW_DATA_ATTR: false,
+  FORBID_TAGS: [
+    "embed",
+    "form",
+    "iframe",
+    "input",
+    "link",
+    "math",
+    "meta",
+    "object",
+    "script",
+    "style",
+    "svg",
+    "textarea",
+  ],
+};
+
+function sanitizeRichText(value) {
+  if (typeof value !== "string") return value ?? "";
+  return DOMPurify.sanitize(value, RICH_TEXT_SANITIZE_OPTIONS);
+}
+
+// Only allow URLs that can be used as images without executing a script.
+// Raster data URLs are supported for locally-created images; SVG data URLs
+// are deliberately excluded because SVG can contain active content.
+function sanitizeMediaUrl(value) {
+  if (typeof value !== "string") return "";
+
+  const url = value.trim();
+  if (!url || url.startsWith("//")) return "";
+
+  if (
+    /^data:image\/(?:gif|jpe?g|png|webp);base64,[a-z\d+/]+=*$/i.test(url)
+  ) {
+    return url;
+  }
+
+  try {
+    const baseUrl =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "http://localhost";
+    const parsed = new URL(url, baseUrl);
+    const protocol = parsed.protocol.toLowerCase();
+
+    if (protocol === "blob:" && !/^blob:(?:https?:\/\/|null\/)/i.test(url)) {
+      return "";
+    }
+
+    return ["http:", "https:", "blob:"].includes(protocol) ? url : "";
+  } catch {
+    return "";
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function sanitizeZipName(value, fallback = "file") {
+  const sanitized = String(value ?? "")
+    .replace(/[\\/]+/g, "_")
+    .replace(/[\u0000-\u001f\u007f]/g, "_")
+    .trim();
+  if (!sanitized || sanitized === "." || sanitized === "..") return fallback;
+  return sanitized;
+}
+
+function sanitizeListItems(items) {
+  if (!Array.isArray(items)) return items;
+
+  return items.map((item) => {
+    if (typeof item === "string") return sanitizeRichText(item);
+    if (!item || typeof item !== "object") return item;
+
+    const sanitizedItem = { ...item };
+    for (const field of ["content", "text"]) {
+      if (typeof sanitizedItem[field] === "string") {
+        sanitizedItem[field] = sanitizeRichText(sanitizedItem[field]);
+      }
+    }
+    if (Array.isArray(sanitizedItem.items)) {
+      sanitizedItem.items = sanitizeListItems(sanitizedItem.items);
+    }
+    return sanitizedItem;
+  });
+}
+
+function sanitizeTableContent(content) {
+  if (!Array.isArray(content)) return content;
+
+  return content.map((row) =>
+    Array.isArray(row)
+      ? row.map((cell) => sanitizeRichText(cell))
+      : row,
+  );
+}
+
+function sanitizeEditorBlock(block) {
+  if (!block || typeof block !== "object") return block;
+
+  const data =
+    block.data && typeof block.data === "object"
+      ? { ...block.data }
+      : block.data;
+  if (!data || typeof data !== "object") return block;
+
+  switch (block.type) {
+    case "header":
+    case "paragraph":
+      if (typeof data.text === "string") data.text = sanitizeRichText(data.text);
+      break;
+    case "list":
+      data.items = sanitizeListItems(data.items);
+      break;
+    case "checklist":
+      if (Array.isArray(data.items)) {
+        data.items = data.items.map((item) => {
+          if (!item || typeof item !== "object") return item;
+          return {
+            ...item,
+            text:
+              typeof item.text === "string"
+                ? sanitizeRichText(item.text)
+                : item.text,
+          };
+        });
+      }
+      break;
+    case "quote":
+      for (const field of ["text", "caption"]) {
+        if (typeof data[field] === "string") {
+          data[field] = sanitizeRichText(data[field]);
+        }
+      }
+      break;
+    case "image":
+      if (typeof data.caption === "string") {
+        data.caption = sanitizeRichText(data.caption);
+      }
+      if (data.file && typeof data.file === "object") {
+        data.file = {
+          ...data.file,
+          url: sanitizeMediaUrl(data.file.url),
+        };
+      }
+      break;
+    case "table":
+      data.content = sanitizeTableContent(data.content);
+      break;
+    case "code":
+      // Code is intentionally untouched. It is escaped only at HTML export
+      // time so that the editor and Markdown/text exports preserve its exact
+      // source contents.
+      break;
+    default:
+      break;
+  }
+
+  return { ...block, data };
+}
+
+function sanitizeEditorData(editorData) {
+  if (!editorData || typeof editorData !== "object") return editorData;
+
+  return {
+    ...editorData,
+    blocks: Array.isArray(editorData.blocks)
+      ? editorData.blocks.map(sanitizeEditorBlock)
+      : editorData.blocks,
+  };
+}
+
 // 에디터 블록 → HTML 변환
-function blocksToHtml(blocks) {
+function blocksToHtml(blocks = []) {
   return blocks
     .map((block) => {
       switch (block.type) {
-        case "header":
-          return `<h${block.data.level}>${block.data.text}</h${block.data.level}>`;
+        case "header": {
+          const parsedLevel = Number.parseInt(block.data?.level, 10);
+          const level = Math.min(6, Math.max(1, parsedLevel || 2));
+          return `<h${level}>${sanitizeRichText(block.data?.text)}</h${level}>`;
+        }
         case "paragraph":
-          return `<p>${block.data.text}</p>`;
+          return `<p>${sanitizeRichText(block.data?.text)}</p>`;
         case "list": {
-          const tag = block.data.style === "ordered" ? "ol" : "ul";
-          const items = block.data.items
-            .map(
-              (item) =>
-                `<li>${typeof item === "string" ? item : item.content || item.text || ""}</li>`,
-            )
-            .join("");
+          const tag = block.data?.style === "ordered" ? "ol" : "ul";
+          const renderItems = (items) =>
+            (Array.isArray(items) ? items : [])
+              .map((item) => {
+                const text =
+                  typeof item === "string"
+                    ? item
+                    : item?.content || item?.text || "";
+                const nestedItems =
+                  Array.isArray(item?.items) && item.items.length > 0
+                    ? `<ul>${renderItems(item.items)}</ul>`
+                    : "";
+                return `<li>${sanitizeRichText(text)}${nestedItems}</li>`;
+              })
+              .join("");
+          const items = renderItems(block.data?.items);
           return `<${tag}>${items}</${tag}>`;
         }
         case "checklist":
-          return `<div class="checklist">${block.data.items
+          return `<div class="checklist">${(block.data?.items || [])
             .map(
               (item) =>
-                `<div class="checklist-item"><input type="checkbox" ${item.checked ? "checked" : ""} disabled /><span>${item.text}</span></div>`,
+                `<div class="checklist-item"><input type="checkbox" ${item.checked ? "checked" : ""} disabled /><span>${sanitizeRichText(item.text)}</span></div>`,
             )
             .join("")}</div>`;
         case "quote":
-          return `<blockquote><p>${block.data.text}</p>${block.data.caption ? `<cite>— ${block.data.caption}</cite>` : ""}</blockquote>`;
+          return `<blockquote><p>${sanitizeRichText(block.data?.text)}</p>${block.data?.caption ? `<cite>— ${sanitizeRichText(block.data.caption)}</cite>` : ""}</blockquote>`;
         case "code":
-          return `<pre><code>${block.data.code}</code></pre>`;
+          return `<pre><code>${escapeHtml(block.data?.code)}</code></pre>`;
         case "image": {
           const classes = ["image-block"];
-          if (block.data.stretched) classes.push("stretched");
-          if (block.data.withBorder) classes.push("with-border");
-          if (block.data.withBackground) classes.push("with-background");
+          if (block.data?.stretched) classes.push("stretched");
+          if (block.data?.withBorder) classes.push("with-border");
+          if (block.data?.withBackground) classes.push("with-background");
+          const caption = block.data?.caption || "";
+          const safeUrl = sanitizeMediaUrl(block.data?.file?.url);
           let imgHtml = `<figure class="${classes.join(" ")}">`;
-          imgHtml += `<img src="${block.data.file?.url || ""}" alt="${block.data.caption || ""}" />`;
-          if (block.data.caption)
-            imgHtml += `<figcaption>${block.data.caption}</figcaption>`;
+          imgHtml += `<img${safeUrl ? ` src="${escapeHtml(safeUrl)}"` : ""} alt="${escapeHtml(stripHtml(caption))}" />`;
+          if (caption) imgHtml += `<figcaption>${sanitizeRichText(caption)}</figcaption>`;
           imgHtml += `</figure>`;
           return imgHtml;
         }
         case "delimiter":
           return "<hr />";
         case "table": {
-          if (!block.data.content || block.data.content.length === 0) return "";
-          const withHeadings = block.data.withHeadings !== false;
+          if (!block.data?.content || block.data.content.length === 0) return "";
+          const withHeadings = block.data?.withHeadings !== false;
           let html = "<table>";
           if (withHeadings && block.data.content.length > 0) {
-            html += `<thead><tr>${block.data.content[0].map((cell) => `<th>${cell}</th>`).join("")}</tr></thead>`;
+            html += `<thead><tr>${block.data.content[0].map((cell) => `<th>${sanitizeRichText(cell)}</th>`).join("")}</tr></thead>`;
             html += "<tbody>";
             for (let i = 1; i < block.data.content.length; i++) {
-              html += `<tr>${block.data.content[i].map((cell) => `<td>${cell}</td>`).join("")}</tr>`;
+              html += `<tr>${block.data.content[i].map((cell) => `<td>${sanitizeRichText(cell)}</td>`).join("")}</tr>`;
             }
             html += "</tbody>";
           } else {
@@ -227,7 +444,7 @@ function blocksToHtml(blocks) {
             html += block.data.content
               .map(
                 (row) =>
-                  `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`,
+                  `<tr>${row.map((cell) => `<td>${sanitizeRichText(cell)}</td>`).join("")}</tr>`,
               )
               .join("");
             html += "</tbody>";
@@ -236,7 +453,7 @@ function blocksToHtml(blocks) {
           return html;
         }
         default:
-          return `<p>${JSON.stringify(block.data)}</p>`;
+          return `<p>${escapeHtml(JSON.stringify(block.data))}</p>`;
       }
     })
     .join("\n");
@@ -374,6 +591,13 @@ export default function LiveEditor({
 }) {
   const editorCore = useRef(null);
   const autoSaveTimer = useRef(null);
+  const statusResetTimer = useRef(null);
+  const saveInFlightRef = useRef(false);
+  const saveStatusRef = useRef("loaded");
+  const changeVersionRef = useRef(0);
+  const dirtyRef = useRef(false);
+  const mountedRef = useRef(false);
+  const handleSaveRef = useRef(null);
   const [saveStatus, setSaveStatus] = useState("loaded"); // loaded, unsaved, saving, saved, error
   const [saveMessage, setSaveMessage] = useState("");
   const [editorData, setEditorData] = useState(null);
@@ -392,10 +616,54 @@ export default function LiveEditor({
     editorCore.current = instance;
   }, []);
 
+  // 저장 상태는 비동기 저장 중에도 최신 값과 변경 여부를 추적해야 한다.
+  // 상태만 검사하면 저장 중 발생한 변경을 완료된 저장으로 잘못 표시할 수 있다.
+  const updateSaveState = useCallback((status, message = "") => {
+    saveStatusRef.current = status;
+    if (!mountedRef.current) return;
+    setSaveStatus(status);
+    setSaveMessage(message);
+  }, []);
+
+  const clearStatusResetTimer = useCallback(() => {
+    if (statusResetTimer.current) {
+      clearTimeout(statusResetTimer.current);
+      statusResetTimer.current = null;
+    }
+  }, []);
+
+  const scheduleAutoSave = useCallback((delay = 30000) => {
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+    }
+
+    autoSaveTimer.current = setTimeout(() => {
+      autoSaveTimer.current = null;
+      handleSaveRef.current?.();
+    }, delay);
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      if (autoSaveTimer.current) {
+        clearTimeout(autoSaveTimer.current);
+        autoSaveTimer.current = null;
+      }
+      if (statusResetTimer.current) {
+        clearTimeout(statusResetTimer.current);
+        statusResetTimer.current = null;
+      }
+    };
+  }, []);
+
   // 파일 URL에서 에디터 데이터 로드
   useEffect(() => {
     if (!fileUrl) return;
 
+    let cancelled = false;
     const loadContent = async () => {
       setLoading(true);
       setLoadError(null);
@@ -428,20 +696,24 @@ export default function LiveEditor({
           };
         }
 
+        const sanitizedData = sanitizeEditorData(parsed);
+
         // 이미지 블록의 presigned URL 갱신
         const refreshedBlocks = await Promise.all(
-          parsed.blocks.map(async (block) => {
+          sanitizedData.blocks.map(async (block) => {
             if (block.type === "image" && block.data?.file?.hash) {
               try {
                 const result = await getEditorMediaUrl({
                   fileHash: block.data.file.hash,
+                  parentFileId: file?.id,
                 });
-                if (result.success && result.url) {
+                const safeUrl = sanitizeMediaUrl(result.url);
+                if (result.success && safeUrl) {
                   return {
                     ...block,
                     data: {
                       ...block.data,
-                      file: { ...block.data.file, url: result.url },
+                      file: { ...block.data.file, url: safeUrl },
                     },
                   };
                 }
@@ -453,18 +725,23 @@ export default function LiveEditor({
           }),
         );
 
-        parsed.blocks = refreshedBlocks;
-        setEditorData(parsed);
+        if (cancelled) return;
+        sanitizedData.blocks = refreshedBlocks;
+        setEditorData(sanitizedData);
       } catch (err) {
+        if (cancelled) return;
         console.error("에디터 데이터 로드 오류:", err);
         setLoadError(err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     loadContent();
-  }, [fileUrl]);
+    return () => {
+      cancelled = true;
+    };
+  }, [file?.id, fileUrl]);
 
   // 에디터 데이터 가져오기
   const getEditorData = useCallback(async () => {
@@ -479,11 +756,24 @@ export default function LiveEditor({
 
   // 저장 함수
   const handleSave = useCallback(async () => {
-    if (!file?.id) return;
-    if (saveStatus === "saving") return;
+    if (readOnly || !file?.id || saveInFlightRef.current) return;
 
-    setSaveStatus("saving");
-    setSaveMessage("저장 중...");
+    const hasEncryptionPassword =
+      typeof encryptionPassword === "string" && encryptionPassword.trim();
+    if (file.isEncrypted && !hasEncryptionPassword) {
+      updateSaveState(
+        "error",
+        "암호화된 문서는 복호화 비밀번호가 필요합니다. 문서를 다시 열어주세요.",
+      );
+      return;
+    }
+
+    saveInFlightRef.current = true;
+    const saveVersion = changeVersionRef.current;
+    let saveSucceeded = false;
+    clearStatusResetTimer();
+
+    updateSaveState("saving", "저장 중...");
 
     try {
       // 에디터 데이터 직렬화
@@ -502,7 +792,7 @@ export default function LiveEditor({
       let originalSize;
       let contentType;
 
-      if (file.isEncrypted && encryptionPassword) {
+      if (file.isEncrypted) {
         // 암호화된 파일: 재암호화 후 업로드
         const fileObj = new File([jsonBlob], file.originalName, {
           type: "application/json",
@@ -546,6 +836,7 @@ export default function LiveEditor({
       });
 
       if (completeResult.error) throw new Error(completeResult.error);
+      saveSucceeded = true;
 
       // AI 인덱스 갱신: 기존 인덱스 삭제 후 재인덱싱 (암호화된 파일은 제외)
       if (!file.isEncrypted) {
@@ -557,52 +848,88 @@ export default function LiveEditor({
         }
       }
 
-      setSaveStatus("saved");
-      setSaveMessage("저장 완료");
+      // 저장 요청 이후 수정이 발생했다면 서버에는 이전 스냅샷만 저장된
+      // 상태이므로 저장 완료로 표시하면 안 된다. 다음 자동 저장이 최신
+      // 내용을 저장할 수 있도록 수정 상태를 유지한다.
+      if (changeVersionRef.current !== saveVersion) {
+        dirtyRef.current = true;
+        updateSaveState("unsaved");
+      } else {
+        dirtyRef.current = false;
+        updateSaveState("saved", "저장 완료");
 
-      if (onSaved) onSaved();
+        clearStatusResetTimer();
+        statusResetTimer.current = setTimeout(() => {
+          statusResetTimer.current = null;
+          if (saveStatusRef.current === "saved") {
+            updateSaveState("loaded");
+          }
+        }, 3000);
+      }
 
-      // 3초 후 상태 리셋
-      setTimeout(() => {
-        setSaveStatus((prev) => (prev === "saved" ? "loaded" : prev));
-        setSaveMessage("");
-      }, 3000);
+      if (onSaved && mountedRef.current) onSaved();
     } catch (err) {
       console.error("파일 저장 오류:", err);
-      setSaveStatus("error");
-      setSaveMessage(err.message || "저장 실패");
+      updateSaveState("error", err.message || "저장 실패");
+    } finally {
+      saveInFlightRef.current = false;
+
+      // 자동 저장 타이머가 저장 중 만료되면 handleSave가 잠금에 의해
+      // 건너뛰어진다. 최신 변경이 남아 있고 타이머가 없다면 다시 예약한다.
+      if (
+        saveSucceeded &&
+        dirtyRef.current &&
+        changeVersionRef.current !== saveVersion &&
+        !autoSaveTimer.current &&
+        mountedRef.current
+      ) {
+        scheduleAutoSave();
+      }
     }
-  }, [file, encryptionPassword, getEditorData, saveStatus, onSaved]);
+  }, [
+    file,
+    encryptionPassword,
+    getEditorData,
+    onSaved,
+    readOnly,
+    clearStatusResetTimer,
+    scheduleAutoSave,
+    updateSaveState,
+  ]);
+
+  // 자동 저장과 키보드 단축키가 오래된 handleSave를 호출하지 않도록 최신
+  // 함수를 ref로 보관한다. 이로써 저장 상태 변경이 자동 저장 타이머를
+  // 취소하지 않는다.
+  handleSaveRef.current = handleSave;
 
   // 에디터 내용 변경 시 자동 저장 (30초 디바운스)
   const handleChange = useCallback(async () => {
-    setSaveStatus("unsaved");
-    setSaveMessage("");
+    if (readOnly) return;
 
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current);
-    }
+    changeVersionRef.current += 1;
+    dirtyRef.current = true;
+    clearStatusResetTimer();
+    updateSaveState("unsaved");
 
-    autoSaveTimer.current = setTimeout(() => {
-      handleSave();
-    }, 30000);
-  }, [handleSave]);
+    scheduleAutoSave();
+  }, [readOnly, clearStatusResetTimer, scheduleAutoSave, updateSaveState]);
 
   // Ctrl+S 키보드 단축키
   useEffect(() => {
+    if (readOnly) return;
+
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        handleSave();
+        handleSaveRef.current?.();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [handleSave]);
+  }, [readOnly]);
 
   // 내보내기: 파일로 다운로드 (이미지 포함 시 zip으로 내보내기)
   const handleExport = useCallback(
@@ -624,19 +951,29 @@ export default function LiveEditor({
         let imgIdx = 0;
         await Promise.all(
           imageBlocks.map(async (block) => {
-            const url = block.data.file.url;
+            const url = sanitizeMediaUrl(block.data.file.url);
+            if (!url) {
+              failedCount++;
+              return;
+            }
             if (imageMap.has(url)) return;
             try {
               const resp = await fetch(url);
               if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
               const blob = await resp.blob();
-              const origName = block.data.file.name || block.data.caption || "";
-              const ext =
+              const origName = sanitizeZipName(
+                block.data.file.name || block.data.caption,
+                `image_${imgIdx}`,
+              );
+              const rawExt =
                 origName.split(".").pop()?.toLowerCase() ||
                 blob.type.split("/").pop() ||
                 "png";
+              const ext = sanitizeZipName(rawExt.replace(/[^a-z\d]/gi, ""), "png").slice(0, 12);
               // 원본 파일명 유지, 충돌 시 번호 부여
-              let baseName = origName.replace(/\.[^.]+$/, "") || `image_${imgIdx}`;
+              let baseName =
+                sanitizeZipName(origName.replace(/\.[^.]+$/, ""), "") ||
+                `image_${imgIdx}`;
               let filename = `images/${baseName}.${ext}`;
               while (usedNames.has(filename)) {
                 imgIdx++;
@@ -655,7 +992,7 @@ export default function LiveEditor({
       // 블록 내 이미지 URL을 로컬 경로로 치환한 복사본 생성
       const localBlocks = data.blocks.map((block) => {
         if (block.type === "image" && block.data?.file?.url) {
-          const mapped = imageMap.get(block.data.file.url);
+          const mapped = imageMap.get(sanitizeMediaUrl(block.data.file.url));
           if (mapped) {
             return {
               ...block,
@@ -675,7 +1012,7 @@ export default function LiveEditor({
         case "html": {
           const htmlBody = blocksToHtml(localBlocks);
           const styles = getExportStyles();
-          content = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>${file?.originalName || "document"}</title>${styles}</head>\n<body>\n${htmlBody}\n</body>\n</html>`;
+          content = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>${escapeHtml(file?.originalName || "document")}</title>${styles}</head>\n<body>\n${htmlBody}\n</body>\n</html>`;
           mimeType = "text/html";
           extension = "html";
           break;
@@ -703,8 +1040,10 @@ export default function LiveEditor({
           return;
       }
 
-      const baseName =
-        file?.originalName?.replace(/\.ejtxt$/, "") || "document";
+      const baseName = sanitizeZipName(
+        file?.originalName?.replace(/\.ejtxt$/, ""),
+        "document",
+      );
 
       // 이미지가 있으면 zip으로 내보내기
       if (imageMap.size > 0) {
@@ -716,8 +1055,11 @@ export default function LiveEditor({
         const zipBlob = await zip.generateAsync({ type: "blob" });
         saveAs(zipBlob, `${baseName}.zip`);
         if (failedCount > 0) {
-          setSaveMessage(`내보내기 완료 (이미지 ${failedCount}개 다운로드 실패)`);
-          setSaveStatus("error");
+          clearStatusResetTimer();
+          updateSaveState(
+            "error",
+            `내보내기 완료 (이미지 ${failedCount}개 다운로드 실패)`,
+          );
         }
       } else {
         const blob = new Blob([content], { type: mimeType });
@@ -731,7 +1073,7 @@ export default function LiveEditor({
         URL.revokeObjectURL(url);
       }
     },
-    [getEditorData, file],
+    [getEditorData, file, clearStatusResetTimer, updateSaveState],
   );
 
   // 저장 상태 뱃지 색상
@@ -873,3 +1215,7 @@ export default function LiveEditor({
     </div>
   );
 }
+
+// Kept as named exports for focused regression tests. The default export is
+// the only runtime component API.
+export { blocksToHtml, sanitizeEditorData, sanitizeMediaUrl };

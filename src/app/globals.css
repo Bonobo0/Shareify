@@ -730,6 +730,36 @@
   }
 }
 
+/* Restore heading typography reset by Tailwind Preflight inside Editor.js. */
+.codex-editor .ce-header {
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.codex-editor h1.ce-header {
+  font-size: 2.25em;
+}
+
+.codex-editor h2.ce-header {
+  font-size: 1.875em;
+}
+
+.codex-editor h3.ce-header {
+  font-size: 1.5em;
+}
+
+.codex-editor h4.ce-header {
+  font-size: 1.25em;
+}
+
+.codex-editor h5.ce-header {
+  font-size: 1.125em;
+}
+
+.codex-editor h6.ce-header {
+  font-size: 1em;
+}
+
 /* ── Editor.js touch fix ── */
 .codex-editor,
 .codex-editor * {

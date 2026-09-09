@@ -9,6 +9,7 @@ import User from "@/models/User";
 import mongoose from "mongoose";
 import crypto from "crypto";
 import { deleteObject as deleteFileFromR2 } from "@/lib/r2/r2Client";
+import { isDirectoryHash, isShareLinkHash } from "@/lib/security/identifiers.mjs";
 import { dir } from "console";
 
 function generateDirectoryHash() {
@@ -25,6 +26,14 @@ export async function getDirectoryList({
   shareLinkHash = null,
 }) {
   try {
+    if (
+      shareLinkHash !== null &&
+      shareLinkHash !== undefined &&
+      !isShareLinkHash(shareLinkHash)
+    ) {
+      return { error: "유효하지 않은 공유 링크입니다." };
+    }
+
     const userId = await requireAuthenticatedUser();
 
     if (!userId) {
@@ -716,6 +725,10 @@ export async function getDirectoryDetails({ directoryId }) {
 
 export async function getDirectoryByHash({ hash }) {
   try {
+    if (!isDirectoryHash(hash)) {
+      return { error: "유효하지 않은 디렉토리 해시입니다." };
+    }
+
     const userId = await requireAuthenticatedUser();
 
     if (!userId) {
@@ -967,7 +980,9 @@ export async function deleteDirectoryRecursive(directoryId) {
         // 소유자의 저장소 사용량 업데이트
         if (file.owner.toString() === userId) {
           const sizeToDecrement =
-            file.isEncrypted && file.originalSize
+            file.isEncrypted &&
+            file.originalSize !== null &&
+            file.originalSize !== undefined
               ? file.originalSize
               : file.size;
           await User.findByIdAndUpdate(userId, {
@@ -1119,6 +1134,10 @@ export async function getDirectoryShareLinks({ directoryId }) {
 // 디렉토리 공유 링크 삭제
 export async function deleteDirectoryShareLink({ directoryId, shareHash }) {
   try {
+    if (!isShareLinkHash(shareHash)) {
+      return { error: "유효하지 않은 공유 링크입니다." };
+    }
+
     const userId = await requireAuthenticatedUser();
 
     if (!userId) {
@@ -1172,10 +1191,14 @@ export async function deleteDirectoryShareLink({ directoryId, shareHash }) {
 // 공유 링크로 디렉토리 접근
 export async function getSharedDirectory({ shareHash }) {
   try {
+    if (!isShareLinkHash(shareHash)) {
+      return { error: "유효하지 않은 공유 링크입니다." };
+    }
+
     await connectToDatabase();
 
     const directory = await Directory.findOne({
-      "shareLinks.hash": shareHash,
+      shareLinks: { $elemMatch: { hash: shareHash } },
       deleted: { $ne: true },
     }).lean();
 
@@ -1207,6 +1230,7 @@ export async function getSharedDirectory({ shareHash }) {
     const fileCount = await File.countDocuments({
       parentDirectory: directory._id,
       deleted: { $ne: true },
+      uploaded: true,
     });
 
     return {
@@ -1239,10 +1263,14 @@ export async function getSharedDirectoryFiles({
   limit = 50,
 }) {
   try {
+    if (!isShareLinkHash(shareHash)) {
+      return { error: "유효하지 않은 공유 링크입니다." };
+    }
+
     await connectToDatabase();
 
     const directory = await Directory.findOne({
-      "shareLinks.hash": shareHash,
+      shareLinks: { $elemMatch: { hash: shareHash } },
       deleted: { $ne: true },
     }).lean();
 
@@ -1269,6 +1297,7 @@ export async function getSharedDirectoryFiles({
     const files = await File.find({
       parentDirectory: directory._id,
       deleted: { $ne: true },
+      uploaded: true,
     })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -1278,6 +1307,7 @@ export async function getSharedDirectoryFiles({
     const totalFiles = await File.countDocuments({
       parentDirectory: directory._id,
       deleted: { $ne: true },
+      uploaded: true,
     });
 
     const totalPages = Math.ceil(totalFiles / limit);

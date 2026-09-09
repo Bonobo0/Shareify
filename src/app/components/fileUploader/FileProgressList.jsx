@@ -29,11 +29,11 @@ export default function FileProgressList({ files, progress }) {
             </span>
           </div>
 
-          {progress[file.name] && (
+          {progress[String(index)] && (
             <div className="mt-2">
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5">
-                  {progress[file.name].status === "validating" && (
+                  {progress[String(index)].status === "validating" && (
                     <>
                       <FontAwesomeIcon
                         icon={faMagnifyingGlass}
@@ -42,7 +42,7 @@ export default function FileProgressList({ files, progress }) {
                       <span className="text-info">WebGL 검증 중...</span>
                     </>
                   )}
-                  {progress[file.name].status === "encrypting" && (
+                  {progress[String(index)].status === "encrypting" && (
                     <>
                       <FontAwesomeIcon
                         icon={faLock}
@@ -51,7 +51,7 @@ export default function FileProgressList({ files, progress }) {
                       <span className="text-warning">암호화 중...</span>
                     </>
                   )}
-                  {progress[file.name].status === "uploading" && (
+                  {progress[String(index)].status === "uploading" && (
                     <>
                       <FontAwesomeIcon
                         icon={faUpload}
@@ -60,7 +60,7 @@ export default function FileProgressList({ files, progress }) {
                       <span className="text-brand-400">업로드 중...</span>
                     </>
                   )}
-                  {progress[file.name].status === "success" && (
+                  {progress[String(index)].status === "success" && (
                     <>
                       <FontAwesomeIcon
                         icon={faCircleCheck}
@@ -69,34 +69,34 @@ export default function FileProgressList({ files, progress }) {
                       <span className="text-success">완료</span>
                     </>
                   )}
-                  {progress[file.name].status === "error" && (
+                  {progress[String(index)].status === "error" && (
                     <>
                       <FontAwesomeIcon
                         icon={faCircleXmark}
                         className="text-error"
                       />
                       <span className="text-error">
-                        {progress[file.name].error || "오류"}
+                        {progress[String(index)].error || "오류"}
                       </span>
                     </>
                   )}
                 </span>
                 <span className="tabular-nums text-base-content/40">
-                  {progress[file.name].percent}%
+                  {progress[String(index)].percent}%
                 </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-surface-300">
                 <div
                   className={`h-full rounded-full transition-all duration-300 ${
-                    progress[file.name].status === "success"
+                    progress[String(index)].status === "success"
                       ? "bg-success"
-                      : progress[file.name].status === "error"
+                      : progress[String(index)].status === "error"
                         ? "bg-error"
-                        : progress[file.name].status === "encrypting"
+                        : progress[String(index)].status === "encrypting"
                           ? "bg-warning"
                           : "bg-brand-500"
                   }`}
-                  style={{ width: `${progress[file.name].percent}%` }}
+                  style={{ width: `${progress[String(index)].percent}%` }}
                 />
               </div>
             </div>

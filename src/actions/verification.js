@@ -15,6 +15,7 @@ import {
   generateBackupCodes,
   verifyBackupCode,
 } from "@/lib/auth/twoFactor";
+import { isHexToken } from "@/lib/security/tokens.mjs";
 
 
 // 이메일 인증 토큰 전송
@@ -64,8 +65,13 @@ export async function sendEmailVerification() {
 }
 
 // 이메일 인증 확인
-export async function verifyEmail({ token }) {
+export async function verifyEmail(input = {}) {
   try {
+    const token = input?.token;
+    if (!isHexToken(token)) {
+      return { error: "유효하지 않거나 만료된 인증 토큰입니다." };
+    }
+
     await connectToDatabase();
 
     const user = await User.findOne({
@@ -153,6 +159,10 @@ export async function enable2FA({ token, secret }) {
 
     if (!user) {
       return { error: "사용자를 찾을 수 없습니다." };
+    }
+
+    if (user.twoFactorEnabled) {
+      return { error: "이미 2단계 인증이 활성화되어 있습니다." };
     }
 
     // 백업 코드 생성

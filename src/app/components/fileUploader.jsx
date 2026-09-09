@@ -9,6 +9,12 @@ import {
 import { validateWebGLBuildFile } from "@/lib/webgl/validation";
 import FileProgressList from "./fileUploader/FileProgressList";
 import UploadOptions from "./fileUploader/UploadOptions";
+import {
+  createEmptyUploadQueueState,
+  getFilesToUpload,
+  getUploadQueueStateForSelection,
+  getUploadFileKey,
+} from "./fileUploader/uploadQueue.mjs";
 import { aiUploadComplete } from "@/app/actions/ai";
 import useSearchStore from "@/app/stores/searchStore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -34,20 +40,48 @@ export default function FileUploader({
   const [uploadResults, setUploadResults] = useState({});
   const [retryMode, setRetryMode] = useState(false);
   const fileInputRef = useRef(null);
+  const uploadingRef = useRef(false);
   const [dragActive, setDragActive] = useState(false);
   const [isWebGLBuild, setIsWebGLBuild] = useState(false);
+
+  const resetUploadQueueState = () => {
+    const emptyQueue = createEmptyUploadQueueState();
+    setProgress(emptyQueue.progress);
+    setUploadResults(emptyQueue.uploadResults);
+    setRetryMode(emptyQueue.retryMode);
+  };
+
+  const replaceUploadQueue = (selectedFiles) => {
+    const nextQueue = getUploadQueueStateForSelection(
+      selectedFiles,
+      uploadingRef.current,
+    );
+    if (!nextQueue) return false;
+
+    setFiles(nextQueue.files);
+    setProgress(nextQueue.progress);
+    setUploadResults(nextQueue.uploadResults);
+    setRetryMode(nextQueue.retryMode);
+    return true;
+  };
 
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
-      setFiles(selectedFiles);
-      setError("");
+      // A new selection starts a new queue. Status must not leak into files
+      // with the same name from a previous selection.
+      if (replaceUploadQueue(selectedFiles)) setError("");
     }
   };
 
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (uploadingRef.current) {
+      setDragActive(false);
+      return;
+    }
+
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
@@ -59,10 +93,12 @@ export default function FileUploader({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+
     if (e.dataTransfer.files.length > 0) {
       const selectedFiles = Array.from(e.dataTransfer.files);
-      setFiles(selectedFiles);
-      setError("");
+      // A new selection starts a new queue. Status must not leak into files
+      // with the same name from a previous selection.
+      if (replaceUploadQueue(selectedFiles)) setError("");
     }
   };
 
@@ -85,6 +121,10 @@ export default function FileUploader({
   };
 
   const handleUpload = async (isRetry = false) => {
+    // React state updates are asynchronous, so the disabled button alone does
+    // not prevent two rapid clicks from starting duplicate uploads.
+    if (uploadingRef.current) return;
+
     if (files.length === 0) {
       setError("업로드할 파일을 선택해주세요.");
       return;
@@ -100,19 +140,17 @@ export default function FileUploader({
       return;
     }
 
+    uploadingRef.current = true;
     setUploading(true);
     setError("");
 
-    const filesToUpload = isRetry
-      ? files.filter(
-          (file) =>
-            !uploadResults[file.name] ||
-            uploadResults[file.name].status === "error"
-        )
-      : files;
+    // A filename is not a unique identifier. Keep each file's original index
+    // so duplicate names get independent progress and retry state.
+    const filesToUpload = getFilesToUpload(files, uploadResults, isRetry);
 
     if (filesToUpload.length === 0 && isRetry) {
       setError("재시도할 파일이 없습니다. 모든 파일이 이미 업로드되었습니다.");
+      uploadingRef.current = false;
       setUploading(false);
       return;
     }
@@ -120,21 +158,23 @@ export default function FileUploader({
     let hasErrors = false;
 
     try {
-      for (const file of filesToUpload) {
-        if (uploadResults[file.name]?.status === "success") {
+      for (const { file, index: fileIndex } of filesToUpload) {
+        const fileKey = getUploadFileKey(fileIndex);
+
+        if (uploadResults[fileKey]?.status === "success") {
           continue;
         }
 
         try {
           setProgress((prev) => ({
             ...prev,
-            [file.name]: { percent: 0, status: "uploading" },
+            [fileKey]: { percent: 0, status: "uploading" },
           }));
 
           if (isWebGLBuild) {
             setProgress((prev) => ({
               ...prev,
-              [file.name]: { percent: 2, status: "validating" },
+              [fileKey]: { percent: 2, status: "validating" },
             }));
             const validationResult = await validateWebGLBuildFile(file);
             if (!validationResult.isValid) {
@@ -150,7 +190,7 @@ export default function FileUploader({
           if (enableE2EE) {
             setProgress((prev) => ({
               ...prev,
-              [file.name]: { percent: 5, status: "encrypting" },
+              [fileKey]: { percent: 5, status: "encrypting" },
             }));
             const encryptResult = await encryptFile(file, encryptionPassword);
             if (!encryptResult.success) {
@@ -160,7 +200,7 @@ export default function FileUploader({
             originalMetadata = encryptResult.metadata;
             setProgress((prev) => ({
               ...prev,
-              [file.name]: { percent: 15, status: "uploading" },
+              [fileKey]: { percent: 15, status: "uploading" },
             }));
           }
 
@@ -186,7 +226,7 @@ export default function FileUploader({
 
           setProgress((prev) => ({
             ...prev,
-            [file.name]: {
+            [fileKey]: {
               percent: enableE2EE ? 25 : 10,
               status: "uploading",
             },
@@ -204,7 +244,7 @@ export default function FileUploader({
                   );
                 setProgress((prev) => ({
                   ...prev,
-                  [file.name]: {
+                  [fileKey]: {
                     percent: progressPercent,
                     status: "uploading",
                     loaded: event.loaded,
@@ -241,7 +281,7 @@ export default function FileUploader({
 
           setProgress((prev) => ({
             ...prev,
-            [file.name]: { percent: 90, status: "uploading" },
+            [fileKey]: { percent: 90, status: "uploading" },
           }));
 
           const completeResult = await completeFileUpload({ fileId });
@@ -250,34 +290,43 @@ export default function FileUploader({
           }
 
           if (!enableE2EE) {
-            const aiResult = await aiUploadComplete(
-              fileId,
-              file.name,
-              file.type || "application/octet-stream"
-            );
-            if (aiResult.success) {
-              addIndexingFile({
-                fileId: aiResult.fileId,
-                filename: file.name,
-                status: aiResult.status,
-              });
+            // AI indexing is a post-upload enhancement. A transient AI
+            // failure must not turn an already completed upload into a retry,
+            // which would create a duplicate object on the next attempt.
+            try {
+              const aiResult = await aiUploadComplete(
+                fileId,
+                file.name,
+                file.type || "application/octet-stream"
+              );
+              if (aiResult?.success) {
+                addIndexingFile({
+                  fileId: aiResult.fileId,
+                  filename: file.name,
+                  status: aiResult.status,
+                });
+              } else if (aiResult?.error) {
+                console.warn("AI 인덱싱 요청 실패 (업로드는 완료됨):", aiResult.error);
+              }
+            } catch (aiError) {
+              console.warn("AI 인덱싱 요청 오류 (업로드는 완료됨):", aiError);
             }
           }
 
           setProgress((prev) => ({
             ...prev,
-            [file.name]: { percent: 100, status: "success" },
+            [fileKey]: { percent: 100, status: "success" },
           }));
           setUploadResults((prev) => ({
             ...prev,
-            [file.name]: { status: "success", fileId },
+            [fileKey]: { status: "success", fileId },
           }));
         } catch (fileError) {
           console.error(`파일 ${file.name} 업로드 실패:`, fileError);
           hasErrors = true;
           setProgress((prev) => ({
             ...prev,
-            [file.name]: {
+            [fileKey]: {
               percent: 0,
               status: "error",
               error: fileError.message,
@@ -285,7 +334,7 @@ export default function FileUploader({
           }));
           setUploadResults((prev) => ({
             ...prev,
-            [file.name]: { status: "error", error: fileError.message },
+            [fileKey]: { status: "error", error: fileError.message },
           }));
           continue;
         }
@@ -294,8 +343,7 @@ export default function FileUploader({
       if (!hasErrors) {
         onUploadComplete();
         setFiles([]);
-        setUploadResults({});
-        setRetryMode(false);
+        resetUploadQueueState();
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
@@ -310,6 +358,7 @@ export default function FileUploader({
       setError(error.message);
       hasErrors = true;
     } finally {
+      uploadingRef.current = false;
       setUploading(false);
     }
   };
@@ -319,9 +368,10 @@ export default function FileUploader({
   };
 
   const cancelUpload = () => {
+    if (uploadingRef.current) return;
+
     setFiles([]);
-    setUploadResults({});
-    setRetryMode(false);
+    resetUploadQueueState();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }

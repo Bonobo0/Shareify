@@ -1,7 +1,10 @@
 "use server";
 
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { requireAuthenticatedUser } from "@/lib/auth/serverAuth";
+import {
+  getAuthenticatedUser,
+  requireAuthenticatedUser,
+} from "@/lib/auth/serverAuth";
 import File from "@/models/File";
 import Directory from "@/models/Directory";
 import User from "@/models/User";
@@ -14,6 +17,11 @@ import {
   generateDownloadUrl,
   deleteObject as deleteFileFromR2,
 } from "@/lib/r2/r2Client";
+import {
+  isFileHash,
+  isObjectIdString,
+  isShareLinkHash,
+} from "@/lib/security/identifiers.mjs";
 
 
 export async function getFileList({
@@ -22,9 +30,24 @@ export async function getFileList({
   limit = 50,
   sortBy = "createdAt",
   sortOrder = "desc",
-  shareLinkHash = "null",
+  shareLinkHash = null,
 }) {
   try {
+    if (
+      directoryId !== null &&
+      directoryId !== undefined &&
+      !isObjectIdString(directoryId)
+    ) {
+      return { error: "유효하지 않은 디렉토리 ID입니다." };
+    }
+    if (
+      shareLinkHash !== null &&
+      shareLinkHash !== undefined &&
+      !isShareLinkHash(shareLinkHash)
+    ) {
+      return { error: "유효하지 않은 공유 링크입니다." };
+    }
+
     const userId = await requireAuthenticatedUser();
 
     if (!userId) {
@@ -450,6 +473,42 @@ export async function uploadFile({
       return { error: "필수 파일 정보가 누락되었습니다." };
     }
 
+    const numericSize = Number(size);
+    if (!Number.isSafeInteger(numericSize) || numericSize <= 0) {
+      return { error: "파일 크기가 올바르지 않습니다." };
+    }
+
+    const hasOriginalSize =
+      Boolean(isEncrypted) &&
+      originalMetadata !== null &&
+      typeof originalMetadata === "object" &&
+      originalMetadata.originalSize !== undefined &&
+      originalMetadata.originalSize !== null;
+    const numericOriginalSize = hasOriginalSize
+      ? Number(originalMetadata.originalSize)
+      : null;
+    if (
+      hasOriginalSize &&
+      (!Number.isSafeInteger(numericOriginalSize) || numericOriginalSize < 0)
+    ) {
+      return { error: "원본 파일 크기가 올바르지 않습니다." };
+    }
+
+    if (
+      directoryId !== null &&
+      directoryId !== undefined &&
+      !isObjectIdString(directoryId)
+    ) {
+      return { error: "유효하지 않은 디렉토리 ID입니다." };
+    }
+    if (
+      shareHash !== null &&
+      shareHash !== undefined &&
+      !isShareLinkHash(shareHash)
+    ) {
+      return { error: "유효하지 않은 공유 링크입니다." };
+    }
+
     await connectToDatabase();
 
     // 사용자 조회 및 저장소 용량 확인
@@ -467,7 +526,9 @@ export async function uploadFile({
 
     // 저장소 용량 확인 (암호화된 경우 원본 크기 기준)
     const sizeToCheck =
-      isEncrypted && originalMetadata ? originalMetadata.originalSize : size;
+      isEncrypted && numericOriginalSize !== null
+        ? numericOriginalSize
+        : numericSize;
     if (user.storageUsed + sizeToCheck > user.storageLimit) {
       return { error: "저장소 용량이 부족합니다." };
     }
@@ -568,7 +629,12 @@ export async function uploadFile({
     const fileHash = generateFileHash();
 
     // R2 업로드 URL 생성
-    const uploadUrl = await generateUploadUrl(uniqueFilename, mimetype, 3600, size);
+    const uploadUrl = await generateUploadUrl(
+      uniqueFilename,
+      mimetype,
+      3600,
+      numericSize,
+    );
 
     // 파일 메타데이터 저장
     const fileData = {
@@ -577,7 +643,7 @@ export async function uploadFile({
           ? originalMetadata.originalName
           : filename,
       fileName: uniqueFilename,
-      size,
+      size: numericSize,
       mimetype,
       hash: fileHash,
       path: uniqueFilename, // R2에서 파일 경로는 fileName과 동일
@@ -588,7 +654,9 @@ export async function uploadFile({
       uploaded: false, // 업로드 완료 여부
       isEncrypted: isEncrypted || false,
       originalSize:
-        isEncrypted && originalMetadata ? originalMetadata.originalSize : null,
+        isEncrypted && numericOriginalSize !== null
+          ? numericOriginalSize
+          : null,
       originalMimetype:
         isEncrypted && originalMetadata ? originalMetadata.originalType : null,
       isWebGLBuild: isWebGLBuild || false,
@@ -614,7 +682,7 @@ export async function uploadFile({
     if (isEncrypted) {
       file.isEncrypted = true;
       if (originalMetadata) {
-        file.originalSize = originalMetadata.originalSize;
+        file.originalSize = numericOriginalSize;
         file.originalMimetype = originalMetadata.originalType;
       }
     } else {
@@ -671,7 +739,11 @@ export async function completeFileUpload({ fileId }) {
 
     // 사용자 저장소 사용량 업데이트 (암호화된 파일의 경우 원본 크기 사용)
     const sizeToIncrement =
-      file.isEncrypted && file.originalSize ? file.originalSize : file.size;
+      file.isEncrypted &&
+      file.originalSize !== null &&
+      file.originalSize !== undefined
+        ? file.originalSize
+        : file.size;
     await User.findByIdAndUpdate(userId, {
       $inc: { storageUsed: sizeToIncrement },
     });
@@ -807,7 +879,11 @@ export async function deleteFile({ fileId }) {
     // 소유자의 저장소 사용량 업데이트 (암호화된 파일의 경우 원본 크기 사용)
     if (file.owner.toString() === userId) {
       const sizeToDecrement =
-        file.isEncrypted && file.originalSize ? file.originalSize : file.size;
+        file.isEncrypted &&
+        file.originalSize !== null &&
+        file.originalSize !== undefined
+          ? file.originalSize
+          : file.size;
       await User.findByIdAndUpdate(userId, {
         $inc: { storageUsed: -(sizeToDecrement + mediaSize) },
       });
@@ -829,6 +905,10 @@ export async function getFileDownloadUrl({
   asPreview = false,
 }) {
   try {
+    if (!isObjectIdString(fileId)) {
+      return { error: "유효하지 않은 파일 ID입니다." };
+    }
+
     const userId = await requireAuthenticatedUser();
 
     if (!userId) {
@@ -1054,6 +1134,13 @@ export async function shareFile({ fileId, email, permission = "read" }) {
 
 export async function getFileDetails({ hash, fileId }) {
   try {
+    if (hash !== null && hash !== undefined && !isFileHash(hash)) {
+      return { error: "유효하지 않은 파일 해시입니다." };
+    }
+    if (fileId !== null && fileId !== undefined && !isObjectIdString(fileId)) {
+      return { error: "유효하지 않은 파일 ID입니다." };
+    }
+
     const userId = await requireAuthenticatedUser();
 
     if (!userId) {
@@ -1184,11 +1271,20 @@ export async function getFileDetails({ hash, fileId }) {
 // 공유 링크로 파일 다운로드 URL 생성
 export async function getSharedFileDownloadUrl({ fileId, shareHash }) {
   try {
+    if (!isObjectIdString(fileId) || !isShareLinkHash(shareHash)) {
+      return { error: "유효하지 않은 공유 파일 요청입니다." };
+    }
+
     await connectToDatabase();
 
     // 공유 디렉토리 확인
     const directory = await Directory.findOne({
-      "shareLinks.hash": shareHash,
+      shareLinks: {
+        $elemMatch: {
+          hash: shareHash,
+          expiresAt: { $gte: new Date() },
+        },
+      },
       deleted: { $ne: true },
     }).lean();
 
@@ -1215,17 +1311,13 @@ export async function getSharedFileDownloadUrl({ fileId, shareHash }) {
       _id: fileId,
       parentDirectory: directory._id,
       deleted: { $ne: true },
+      uploaded: true,
     });
 
     if (!file) {
       return {
         error: "파일을 찾을 수 없거나 해당 디렉토리에 속하지 않습니다.",
       };
-    }
-
-    // 파일이 업로드 완료되었는지 확인
-    if (!file.uploaded) {
-      return { error: "파일 업로드가 아직 완료되지 않았습니다." };
     }
 
     // R2에서 사용할 키 결정
@@ -1646,7 +1738,7 @@ export async function prepareFileUpdate({ fileId }) {
       return { error: "로그인이 필요합니다." };
     }
 
-    if (!fileId) {
+    if (!isObjectIdString(fileId)) {
       return { error: "필수 매개변수가 누락되었습니다." };
     }
 
@@ -1673,12 +1765,18 @@ export async function prepareFileUpdate({ fileId }) {
     // 상위 디렉토리 쓰기 권한 확인
     let hasParentWriteAccess = false;
     if (!isOwner && !hasWriteAccess) {
-      let currentDirectory = await Directory.findById(
-        file.parentDirectory,
-      ).lean();
+      let currentDirectory = await Directory.findOne({
+        _id: file.parentDirectory,
+        deleted: { $ne: true },
+      }).lean();
+      const visitedDirectoryIds = new Set();
       while (currentDirectory && !hasParentWriteAccess) {
+        const directoryId = currentDirectory._id.toString();
+        if (visitedDirectoryIds.has(directoryId)) break;
+        visitedDirectoryIds.add(directoryId);
+
         const parentDir = await Directory.findOne({
-          _id: currentDirectory._id,
+          _id: directoryId,
           $or: [
             { owner: new mongoose.Types.ObjectId(userId) },
             {
@@ -1697,7 +1795,10 @@ export async function prepareFileUpdate({ fileId }) {
           hasParentWriteAccess = true;
         } else {
           currentDirectory = currentDirectory.parent
-            ? await Directory.findById(currentDirectory.parent).lean()
+            ? await Directory.findOne({
+                _id: currentDirectory.parent,
+                deleted: { $ne: true },
+              }).lean()
             : null;
         }
       }
@@ -1720,7 +1821,7 @@ export async function prepareFileUpdate({ fileId }) {
       fileId: file._id.toString(),
       currentSize: file.size,
       isEncrypted: file.isEncrypted || false,
-      originalSize: file.originalSize || file.size,
+      originalSize: file.originalSize ?? file.size,
     };
   } catch (error) {
     console.error("파일 업데이트 준비 오류:", error);
@@ -1743,15 +1844,24 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
       return { error: rateLimitResult.error };
     }
 
-    if (!fileId || newSize === undefined) {
+    if (!isObjectIdString(fileId) || newSize === undefined) {
       return { error: "필수 매개변수가 누락되었습니다." };
     }
 
     // newSize 검증
-    if (typeof newSize !== "number" || newSize <= 0 || newSize > 100 * 1024 * 1024 * 1024) {
+    if (
+      !Number.isSafeInteger(newSize) ||
+      newSize <= 0 ||
+      newSize > 100 * 1024 * 1024 * 1024
+    ) {
       return { error: "유효하지 않은 파일 크기입니다." };
     }
-    if (originalSize !== undefined && (typeof originalSize !== "number" || originalSize < 0 || originalSize > 100 * 1024 * 1024 * 1024)) {
+    if (
+      originalSize !== undefined &&
+      (!Number.isSafeInteger(originalSize) ||
+        originalSize < 0 ||
+        originalSize > 100 * 1024 * 1024 * 1024)
+    ) {
       return { error: "유효하지 않은 원본 파일 크기입니다." };
     }
 
@@ -1774,7 +1884,51 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
         ["write", "admin"].includes(share.permission),
     );
 
+    // prepareFileUpdate also accepts write/admin access inherited from a
+    // parent directory. Re-check the same relationship at completion so a
+    // valid shared-directory editor save does not fail after the upload.
+    let hasParentWriteAccess = false;
     if (!isOwner && !hasWriteAccess) {
+      let currentDirectory = await Directory.findOne({
+        _id: file.parentDirectory,
+        deleted: { $ne: true },
+      }).lean();
+      const visitedDirectoryIds = new Set();
+      while (currentDirectory && !hasParentWriteAccess) {
+        const directoryId = currentDirectory._id.toString();
+        if (visitedDirectoryIds.has(directoryId)) break;
+        visitedDirectoryIds.add(directoryId);
+
+        const parentDir = await Directory.findOne({
+          _id: directoryId,
+          $or: [
+            { owner: new mongoose.Types.ObjectId(userId) },
+            {
+              shared: {
+                $elemMatch: {
+                  userId: new mongoose.Types.ObjectId(userId),
+                  permission: { $in: ["write", "admin"] },
+                },
+              },
+            },
+          ],
+          deleted: { $ne: true },
+        });
+
+        if (parentDir) {
+          hasParentWriteAccess = true;
+        } else {
+          currentDirectory = currentDirectory.parent
+            ? await Directory.findOne({
+                _id: currentDirectory.parent,
+                deleted: { $ne: true },
+              }).lean()
+            : null;
+        }
+      }
+    }
+
+    if (!isOwner && !hasWriteAccess && !hasParentWriteAccess) {
       return { error: "파일을 수정할 권한이 없습니다." };
     }
 
@@ -2459,12 +2613,106 @@ export async function completeEditorMediaUpload({ fileId }) {
 }
 
 // 에디터 미디어 URL 가져오기 (에디터 로드 시 이미지 URL 갱신)
-export async function getEditorMediaUrl({ fileHash }) {
+export async function getEditorMediaUrl({ fileHash, parentFileId }) {
   try {
+    if (!isFileHash(fileHash) || !isObjectIdString(parentFileId)) {
+      return { error: "유효하지 않은 미디어 요청입니다." };
+    }
+
     await connectToDatabase();
 
-    const file = await File.findOne({ hash: fileHash, deleted: { $ne: true } });
+    // 해시만으로 조회하면 일반 private 파일도 presigned URL을 발급할 수
+    // 있으므로, 미디어와 부모 에디터 문서의 연결을 함께 확인한다.
+    const file = await File.findOne({
+      hash: fileHash,
+      parentFile: parentFileId,
+      deleted: { $ne: true },
+      uploaded: true,
+    });
     if (!file) return { error: "파일을 찾을 수 없습니다." };
+
+    const parentFile = await File.findOne({
+      _id: parentFileId,
+      deleted: { $ne: true },
+      uploaded: true,
+    })
+      .select("owner shared parentDirectory isPublic")
+      .lean();
+    if (!parentFile) return { error: "문서를 찾을 수 없습니다." };
+
+    let hasAccess = Boolean(parentFile.isPublic);
+
+    // 공개 에디터뿐 아니라 공개 디렉터리 공유 안의 에디터도 기존처럼
+    // 비로그인으로 이미지가 표시되어야 한다.
+    let currentDirectoryId = parentFile.parentDirectory;
+    const visitedPublicDirectoryIds = new Set();
+    while (currentDirectoryId && !hasAccess) {
+      const directoryId = currentDirectoryId.toString();
+      if (visitedPublicDirectoryIds.has(directoryId)) break;
+      visitedPublicDirectoryIds.add(directoryId);
+
+      const directory = await Directory.findOne({
+        _id: currentDirectoryId,
+        deleted: { $ne: true },
+      })
+        .select("owner shared shareLinks parent")
+        .lean();
+
+      if (!directory) break;
+
+      const hasActiveShareLink = directory.shareLinks?.some(
+        (link) => link.expiresAt && new Date() <= new Date(link.expiresAt),
+      );
+      if (hasActiveShareLink) {
+        hasAccess = true;
+        break;
+      }
+
+      currentDirectoryId = directory.parent;
+    }
+
+    if (!hasAccess) {
+      const userId = await getAuthenticatedUser();
+      if (userId) {
+        const isOwner = parentFile.owner?.toString() === userId;
+        const hasDirectReadAccess = parentFile.shared?.some(
+          (share) => share.userId?.toString() === userId,
+        );
+        hasAccess = isOwner || hasDirectReadAccess;
+
+        currentDirectoryId = parentFile.parentDirectory;
+        const visitedUserDirectoryIds = new Set();
+        while (currentDirectoryId && !hasAccess) {
+          const directoryId = currentDirectoryId.toString();
+          if (visitedUserDirectoryIds.has(directoryId)) break;
+          visitedUserDirectoryIds.add(directoryId);
+
+          const directory = await Directory.findOne({
+            _id: currentDirectoryId,
+            deleted: { $ne: true },
+          })
+            .select("owner shared parent")
+            .lean();
+
+          if (!directory) break;
+
+          const isDirectoryOwner = directory.owner?.toString() === userId;
+          const hasDirectoryAccess = directory.shared?.some(
+            (share) => share.userId?.toString() === userId,
+          );
+          if (isDirectoryOwner || hasDirectoryAccess) {
+            hasAccess = true;
+            break;
+          }
+
+          currentDirectoryId = directory.parent;
+        }
+      }
+    }
+
+    if (!hasAccess) {
+      return { error: "미디어에 접근할 권한이 없습니다." };
+    }
 
     const downloadUrl = await generateDownloadUrl(file.path || file.fileName);
     return { success: true, url: downloadUrl };

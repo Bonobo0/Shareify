@@ -52,8 +52,33 @@ export default function WebGLPlayer({
   
   // Unity 인스턴스 참조
   const unityInstanceRef = useRef(null);
+  const loadAbortControllerRef = useRef(null);
+  const loadAttemptRef = useRef(0);
+  const hasAttemptedRef = useRef(false);
+  const fileBlobRef = useRef(fileBlob);
+
+  const stopGame = useCallback(() => {
+    loadAttemptRef.current += 1;
+    loadAbortControllerRef.current?.abort();
+    loadAbortControllerRef.current = null;
+
+    if (unityInstanceRef.current) {
+      unloadWebGLBuild(unityInstanceRef.current);
+      unityInstanceRef.current = null;
+    }
+  }, []);
 
   const startGame = useCallback(async () => {
+    if (!fileBlob || !file) return;
+
+    const attempt = loadAttemptRef.current + 1;
+    loadAttemptRef.current = attempt;
+    hasAttemptedRef.current = true;
+
+    loadAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    loadAbortControllerRef.current = abortController;
+
     setGameLoading(true);
     setLoadProgress(0);
     setError("");
@@ -66,48 +91,92 @@ export default function WebGLPlayer({
         containerIdRef,
         (progress) => {
           setLoadProgress(progress);
-        }
+        },
+        { signal: abortController.signal },
       );
-      
+
+      // 닫기 또는 새 시도가 먼저 시작된 경우, 늦게 완료된 iframe도 즉시
+      // 정리해 게임 인스턴스가 백그라운드에서 남지 않도록 한다.
+      if (abortController.signal.aborted || loadAttemptRef.current !== attempt) {
+        unloadWebGLBuild(unityInstance);
+        return;
+      }
+
       // Unity 인스턴스 참조 저장
       unityInstanceRef.current = unityInstance;
+      loadAbortControllerRef.current = null;
 
       setGameReady(true);
     } catch (err) {
-      console.error("게임 로드 오류:", err);
-      setError(err.message || "게임을 로드하는 중 오류가 발생했습니다.");
+      if (!abortController.signal.aborted && loadAttemptRef.current === attempt) {
+        console.error("게임 로드 오류:", err);
+        setError(err.message || "게임을 로드하는 중 오류가 발생했습니다.");
+      }
     } finally {
-      setGameLoading(false);
+      if (loadAttemptRef.current === attempt) {
+        loadAbortControllerRef.current = null;
+        setGameLoading(false);
+      }
     }
   }, [fileBlob, file, containerIdRef]);
 
   useEffect(() => {
-    if (isOpen && fileBlob && !gameReady && !gameLoading) {
-      startGame();
-    }
-  }, [isOpen, fileBlob, gameReady, gameLoading, startGame]);
-  
-  // 컴포넌트 언마운트 시 Unity 인스턴스 정리
-  useEffect(() => {
-    return () => {
-      if (unityInstanceRef.current) {
-        console.log("컴포넌트 언마운트 - Unity 인스턴스 정리");
-        unloadWebGLBuild(unityInstanceRef.current);
-        unityInstanceRef.current = null;
-      }
-    };
-  }, []);
+    if (isOpen) return;
 
-  const handleClose = () => {
-    // Unity 인스턴스 정리
-    if (unityInstanceRef.current) {
-      unloadWebGLBuild(unityInstanceRef.current);
-      unityInstanceRef.current = null;
-    }
-    
+    stopGame();
+    hasAttemptedRef.current = false;
+    setGameLoading(false);
     setGameReady(false);
     setLoadProgress(0);
     setError("");
+  }, [isOpen, stopGame]);
+
+  useEffect(() => {
+    if (fileBlob === fileBlobRef.current) return;
+
+    fileBlobRef.current = fileBlob;
+    stopGame();
+    hasAttemptedRef.current = false;
+    setGameLoading(false);
+    setGameReady(false);
+    setLoadProgress(0);
+    setError("");
+  }, [fileBlob, stopGame]);
+
+  useEffect(() => {
+    if (
+      isOpen &&
+      fileBlob &&
+      !gameReady &&
+      !gameLoading &&
+      !hasAttemptedRef.current
+    ) {
+      startGame();
+    }
+  }, [isOpen, fileBlob, gameReady, gameLoading, startGame]);
+
+  // 컴포넌트 언마운트 시 Unity 인스턴스 정리
+  useEffect(() => {
+    return () => {
+      console.log("컴포넌트 언마운트 - WebGL 인스턴스 정리");
+      stopGame();
+    };
+  }, [stopGame]);
+
+  const handleRetry = () => {
+    if (gameLoading) return;
+    hasAttemptedRef.current = false;
+    startGame();
+  };
+
+  const handleClose = () => {
+    stopGame();
+
+    setGameLoading(false);
+    setGameReady(false);
+    setLoadProgress(0);
+    setError("");
+    hasAttemptedRef.current = false;
     onClose();
   };
 
@@ -213,8 +282,11 @@ export default function WebGLPlayer({
                 <div className="alert alert-error mb-4">
                   <span>{error}</span>
                 </div>
-                <div className="text-center">
-                  <button className="btn btn-primary" onClick={handleClose}>
+                <div className="flex justify-center gap-2">
+                  <button className="btn btn-primary" onClick={handleRetry}>
+                    다시 시도
+                  </button>
+                  <button className="btn btn-ghost" onClick={handleClose}>
                     닫기
                   </button>
                 </div>
