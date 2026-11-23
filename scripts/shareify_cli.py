@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover - optional dependency
 CHUNK_SIZE = 5 * 1024 * 1024
 AES_CTR_MODE = 2
 UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
+SUB_CHUNK_SIZE = 64 * 1024
 AUTH_TAG_SIZE = 32
 AUTH_TAG_CONTEXT = b"shareify-e2ee-v1"
 
@@ -169,11 +170,26 @@ def _notify_discord(webhook_url: str, file_info: Dict[str, object], base_url: st
         _print_error(f"디스코드 웹훅 전송 중 오류: {exc}")
 
 
-def _counter_for_chunk(initial_counter: bytes, chunk_index: int) -> bytes:
+def _counter_for_sub_chunk(initial_counter: bytes, sub_chunk_index: int) -> bytes:
     prefix = initial_counter[:8]
     suffix_value = int.from_bytes(initial_counter[8:], "big")
-    new_suffix = ((suffix_value + chunk_index) % (1 << 64)).to_bytes(8, "big")
+    new_suffix = ((suffix_value + sub_chunk_index) % (1 << 64)).to_bytes(8, "big")
     return prefix + new_suffix
+
+
+def _encrypt_chunk(key: bytes, initial_counter: bytes, chunk: bytes) -> bytes:
+    # Mirrors aesCtrEncrypt in src/lib/crypto/encryption.js: every chunk restarts
+    # at the initial counter, and each 64KB sub-chunk uses counter + its index.
+    encrypted = bytearray()
+    for sub_chunk_index, offset in enumerate(range(0, len(chunk), SUB_CHUNK_SIZE)):
+        encryptor = Cipher(
+            algorithms.AES(key),
+            modes.CTR(_counter_for_sub_chunk(initial_counter, sub_chunk_index)),
+            backend=default_backend(),
+        ).encryptor()
+        encrypted += encryptor.update(chunk[offset:offset + SUB_CHUNK_SIZE])
+        encrypted += encryptor.finalize()
+    return bytes(encrypted)
 
 
 def authenticate(
@@ -429,20 +445,11 @@ def build_encryption_plan(
                 return
 
             with open(file_path, "rb") as source:
-                for chunk_index in range(total_chunks):
+                for _ in range(total_chunks):
                     chunk = source.read(CHUNK_SIZE)
                     if not chunk:
                         break
-                    chunk_counter = _counter_for_chunk(counter, chunk_index)
-                    cipher = Cipher(
-                        algorithms.AES(key),
-                        modes.CTR(chunk_counter),
-                        backend=default_backend(),
-                    )
-                    encryptor = cipher.encryptor()
-                    encrypted_chunk = encryptor.update(
-                        chunk) + encryptor.finalize()
-                    yield encrypted_chunk
+                    yield _encrypt_chunk(key, counter, chunk)
 
         return generator()
 
