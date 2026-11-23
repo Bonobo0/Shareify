@@ -1610,6 +1610,7 @@ export async function getAllFilesForDownload({ directoryId }) {
             downloadUrl,
             path: path ? `${path}/${file.originalName}` : file.originalName,
             isEncrypted: file.isEncrypted || false,
+            encryptionVersion: file.encryptionVersion ?? null,
           });
         }
       }
@@ -1726,6 +1727,7 @@ export async function getSelectedFilesForDownload({ fileIds }) {
           downloadUrl,
           path: file.originalName, // 선택 다운로드는 플랫 구조
           isEncrypted: file.isEncrypted || false,
+          encryptionVersion: file.encryptionVersion ?? null,
         });
       }
     }

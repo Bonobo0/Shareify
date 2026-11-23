@@ -150,6 +150,7 @@ export default function FilePage() {
         originalName: file.originalName,
         originalType: file.originalMimetype,
         originalSize: file.originalSize,
+        encryptionVersion: file.encryptionVersion,
       };
 
       const downloadResult = await downloadAndDecrypt(
