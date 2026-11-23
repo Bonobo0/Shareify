@@ -426,15 +426,9 @@ def build_encryption_plan(
         dklen=32,
     )
 
-    # Same as generateHMAC in encryption.js: HMAC-SHA256(PBKDF2(password, salt), salt)
-    hmac_key = hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        salt,
-        100000,
-        dklen=32,
-    )
-    header_hmac = hmac.new(hmac_key, salt, hashlib.sha256).digest()
+    # Same as generateHMAC in encryption.js: HMAC-SHA256(PBKDF2(password, salt), salt).
+    # Its PBKDF2 output is identical to `key`, so reuse it instead of deriving twice.
+    header_hmac = hmac.new(key, salt, hashlib.sha256).digest()
 
     total_chunks = math.ceil(
         original_size / CHUNK_SIZE) if original_size else 0
