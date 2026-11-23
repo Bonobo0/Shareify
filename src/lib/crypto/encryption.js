@@ -301,6 +301,27 @@ export async function encryptFile(file, password, options = {}) {
 
 // ---- 파일 복호화 ----
 
+// ===== V1 AES-GCM 포맷: [salt: 16B][iv: 12B][encrypted data...] =====
+async function decryptLegacyGcm(data, password, originalMetadata) {
+  const salt = data.slice(0, 16);
+  const iv = data.slice(16, 28);
+  const encData = data.slice(28);
+
+  const km = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
+  );
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    km, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+  );
+
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encData);
+  return {
+    success: true,
+    decryptedFile: new File([pt], originalMetadata.originalName, { type: originalMetadata.originalType }),
+  };
+}
+
 export async function decryptFile(encryptedArrayBuffer, password, originalMetadata) {
   try {
     const data = new Uint8Array(encryptedArrayBuffer);
@@ -311,19 +332,21 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
 
     if (firstByte === V3_MAGIC) {
       // ===== V3 포맷 (전역 고유 카운터) =====
-      isV3 = true;
       let off = 1;
-      if (data[off++] !== ENCRYPTION_MODE.AES_CTR) throw new Error("지원되지 않는 암호화 모드");
-
+      const mode = data[off++];
       salt = data.slice(off, off + 16); off += 16;
       counter = data.slice(off, off + 16); off += 16;
 
       const hmac = data.slice(off, off + HMAC_SIZE); off += HMAC_SIZE;
       const expectedHMAC = await generateHMAC(salt, password);
-      if (hmac.length !== expectedHMAC.length) throw new Error("무결성 검증 실패");
-      for (let i = 0; i < hmac.length; i++) {
-        if (hmac[i] !== expectedHMAC[i]) throw new Error("비밀번호가 올바르지 않습니다");
+      const headerValid = mode === ENCRYPTION_MODE.AES_CTR
+        && hmac.length === expectedHMAC.length
+        && hmac.every((b, i) => b === expectedHMAC[i]);
+      if (!headerValid) {
+        // 레거시 AES-GCM 파일은 매직 바이트 없이 랜덤 salt로 시작하므로 0xFD로 시작할 수 있다
+        return await decryptLegacyGcm(data, password, originalMetadata);
       }
+      isV3 = true;
 
       totalChunks = new Uint32Array(data.slice(off, off + 4).buffer)[0];
       off += 4;
@@ -376,24 +399,7 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
       key = await deriveKey(password, salt, "AES-CTR");
 
     } else {
-      // ===== V1 AES-GCM 포맷 =====
-      salt = data.slice(0, 16);
-      const iv = data.slice(16, 28);
-      const encData = data.slice(28);
-
-      const km = await crypto.subtle.importKey(
-        "raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
-      );
-      key = await crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-        km, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
-      );
-
-      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encData);
-      return {
-        success: true,
-        decryptedFile: new File([pt], originalMetadata.originalName, { type: originalMetadata.originalType }),
-      };
+      return await decryptLegacyGcm(data, password, originalMetadata);
     }
 
     // ===== V1/V2 공통: 스트리밍 복호화 =====
