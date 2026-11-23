@@ -235,6 +235,7 @@ export default function FilePage() {
         metadata: {
           originalName: file.originalName,
           originalMimetype: file.originalMimetype,
+          encryptionVersion: file.encryptionVersion,
         },
       });
 

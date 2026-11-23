@@ -205,6 +205,7 @@ export async function getFileList({
         isEncrypted: f.isEncrypted,
         originalSize: f.originalSize,
         originalMimetype: f.originalMimetype,
+        encryptionVersion: f.encryptionVersion ?? null,
       })),
     );
 
@@ -225,6 +226,7 @@ export async function getFileList({
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         isWebGLBuild: file.isWebGLBuild || false,
         webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
@@ -659,6 +661,10 @@ export async function uploadFile({
           : null,
       originalMimetype:
         isEncrypted && originalMetadata ? originalMetadata.originalType : null,
+      encryptionVersion:
+        isEncrypted && Number(originalMetadata?.version) >= 3
+          ? Number(originalMetadata.version)
+          : null,
       isWebGLBuild: isWebGLBuild || false,
       webGLValidated: false,
     };
@@ -684,6 +690,7 @@ export async function uploadFile({
       if (originalMetadata) {
         file.originalSize = numericOriginalSize;
         file.originalMimetype = originalMetadata.originalType;
+        file.encryptionVersion = fileData.encryptionVersion;
       }
     } else {
       file.isEncrypted = false;
@@ -698,6 +705,7 @@ export async function uploadFile({
       isEncrypted: file.isEncrypted,
       originalSize: file.originalSize,
       originalMimetype: file.originalMimetype,
+      encryptionVersion: file.encryptionVersion ?? null,
     });
 
     return {
@@ -1238,6 +1246,7 @@ export async function getFileDetails({ hash, fileId }) {
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         isWebGLBuild: file.isWebGLBuild || false,
         webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
@@ -1335,6 +1344,7 @@ export async function getSharedFileDownloadUrl({ fileId, shareHash }) {
       isEncrypted: file.isEncrypted || false,
       originalSize: file.originalSize,
       originalMimetype: file.originalMimetype,
+      encryptionVersion: file.encryptionVersion ?? null,
     };
   } catch (error) {
     console.error("공유 파일 다운로드 URL 생성 오류:", error);
@@ -1409,6 +1419,7 @@ export async function getMyUploadedFiles({
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         isWebGLBuild: file.isWebGLBuild || false,
         webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
@@ -2243,6 +2254,7 @@ export async function getEditorFileById({ fileId }) {
         id: file._id.toString(),
         originalName: file.originalName,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         size: file.size,
         hash: file.hash,
         isEncrypted: file.isEncrypted || false,

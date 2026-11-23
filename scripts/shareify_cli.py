@@ -475,6 +475,7 @@ def build_encryption_plan(
         "originalName": file_name,
         "originalSize": original_size,
         "originalType": original_mime,
+        "version": 3,
     }
 
     return UploadPlan(

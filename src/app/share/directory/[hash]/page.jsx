@@ -320,6 +320,7 @@ export default function SharedDirectoryPage() {
         metadata: {
           originalName: file.name,
           originalMimetype: file.originalMimetype || file.mimeType,
+          encryptionVersion: file.encryptionVersion,
         },
         forceBlob: !file.isEncrypted,
       });
@@ -442,6 +443,7 @@ export default function SharedDirectoryPage() {
           const metadata = {
             originalName: webGLFile.name,
             originalType: webGLFile.originalMimetype || webGLFile.mimeType,
+            encryptionVersion: webGLFile.encryptionVersion,
             originalSize: webGLFile.originalSize || webGLFile.size,
           };
 

@@ -1324,6 +1324,7 @@ export async function getSharedDirectoryFiles({
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
         updatedAt: file.updatedAt ? file.updatedAt.toISOString() : null,
         canDownload: true, // 공유 링크로는 기본적으로 다운로드 가능

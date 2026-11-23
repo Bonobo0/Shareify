@@ -384,6 +384,10 @@ export async function POST(request) {
           : null,
       originalMimetype:
         isEncrypted && originalMimeCandidate ? originalMimeCandidate : null,
+      encryptionVersion:
+        isEncrypted && Number(originalMetadata?.version) >= 3
+          ? Number(originalMetadata.version)
+          : null,
     });
 
     await fileDocument.save();
@@ -403,6 +407,7 @@ export async function POST(request) {
         isEncrypted: fileDocument.isEncrypted,
         originalSize: fileDocument.originalSize,
         originalMimetype: fileDocument.originalMimetype,
+        encryptionVersion: fileDocument.encryptionVersion ?? null,
       },
     });
   } catch (error) {
@@ -503,6 +508,7 @@ export async function PATCH(request) {
           isEncrypted: file.isEncrypted,
           originalSize: file.originalSize,
           originalMimetype: file.originalMimetype,
+          encryptionVersion: file.encryptionVersion ?? null,
         },
       });
     }
@@ -537,6 +543,7 @@ export async function PATCH(request) {
         isEncrypted: file.isEncrypted,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
       },
     });
   } catch (error) {

@@ -132,6 +132,7 @@ export async function getSharedFileInfo({ hash }) {
         isEncrypted: file.isEncrypted,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         isWebGLBuild: file.isWebGLBuild,
         webGLValidated: file.webGLValidated,
       },
@@ -265,6 +266,7 @@ export async function downloadSharedFile({ hash, asPreview = false }) {
       isEncrypted: file.isEncrypted,
       originalSize: file.originalSize,
       originalMimetype: file.originalMimetype,
+      encryptionVersion: file.encryptionVersion ?? null,
     };
   } catch (error) {
     console.error("공유 파일 다운로드 URL 생성 에러:", error);
@@ -513,7 +515,7 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
       deleted: { $ne: true },
       uploaded: true,
     }).select(
-      "originalName size createdAt hash mimetype originalMimetype originalSize isEncrypted isWebGLBuild webGLValidated"
+      "originalName size createdAt hash mimetype originalMimetype encryptionVersion originalSize isEncrypted isWebGLBuild webGLValidated"
     );
 
     // 현재 디렉토리의 하위 디렉토리 목록 조회
@@ -546,6 +548,7 @@ export async function getSharedDirectoryInfo({ shareHash, subPath }) {
         mimeType: file.mimetype,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         isEncrypted: file.isEncrypted || false,
         isWebGLBuild: file.isWebGLBuild || false,
         webGLValidated: file.webGLValidated || false,
@@ -666,6 +669,7 @@ export async function getSharedSelectedFilesForDownload({
           mimetype: file.mimetype,
           mimeType: file.mimetype, // downloadFilesAsZip에서 사용하는 필드명
           originalMimetype: file.originalMimetype, // 암호화된 파일의 원본 MIME 타입
+          encryptionVersion: file.encryptionVersion ?? null,
           originalSize: file.originalSize, // 암호화된 파일의 원본 크기
           isEncrypted: file.isEncrypted || false,
           fileName: file.fileName,
@@ -812,6 +816,7 @@ export async function getSharedAllFilesForDownload({ shareHash, directoryId }) {
             mimetype: file.mimetype,
             mimeType: file.mimetype, // downloadFilesAsZip에서 사용하는 필드명
             originalMimetype: file.originalMimetype, // 암호화된 파일의 원본 MIME 타입
+            encryptionVersion: file.encryptionVersion ?? null,
             originalSize: file.originalSize, // 암호화된 파일의 원본 크기
             isEncrypted: file.isEncrypted || false,
             fileName: file.fileName,

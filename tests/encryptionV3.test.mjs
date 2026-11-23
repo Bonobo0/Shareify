@@ -40,6 +40,18 @@ test("V3 rejects tampered ciphertext and a truncated MAC", async () => {
   assert.equal((await decryptFile(buf.subarray(0, buf.length - 1), "pw-test-1234", enc.metadata)).success, false);
 });
 
+test("files recorded as V3 reject a legacy-format replacement", async () => {
+  const v3 = await encryptFile(new File([randomBytes(1000)], "d.bin"), "pw-test-1234");
+  const meta = { ...v3.metadata, encryptionVersion: 3 };
+  assert.equal((await decryptFile(await v3.encryptedFile.arrayBuffer(), "pw-test-1234", meta)).success, true);
+
+  const legacy = await encryptFile(new File([randomBytes(1000)], "d.bin"), "pw-test-1234", { version: 2 });
+  const swapped = await decryptFile(await legacy.encryptedFile.arrayBuffer(), "pw-test-1234", meta);
+  assert.equal(swapped.success, false);
+  assert.match(swapped.error, /변조/);
+  assert.equal((await decryptFile(await legacy.encryptedFile.arrayBuffer(), "pw-test-1234", legacy.metadata)).success, true);
+});
+
 test("V3 rejects a wrong password", async () => {
   const enc = await encryptFile(new File([randomBytes(1000)], "c.bin"), "pw-test-1234");
   const dec = await decryptFile(await enc.encryptedFile.arrayBuffer(), "wrong-password", enc.metadata);

@@ -117,6 +117,7 @@ export default function SharePage() {
           {
             originalName: file.originalName || file.name,
             originalType: file.originalMimetype || "application/json",
+            encryptionVersion: file.encryptionVersion,
           },
         );
 
@@ -197,6 +198,7 @@ export default function SharePage() {
           originalName: file.name,
           originalMimetype:
             result.originalMimetype || file.originalMimetype || file.mimetype,
+          encryptionVersion: file.encryptionVersion,
         },
       });
 
@@ -275,6 +277,7 @@ export default function SharePage() {
             originalName: result.filename || file.originalName,
             originalType:
               result.originalMimetype || file.originalMimetype || file.mimetype,
+            encryptionVersion: file.encryptionVersion,
             originalSize: result.originalSize || file.originalSize || file.size,
           };
 
@@ -398,6 +401,7 @@ export default function SharePage() {
         originalName: result.filename || file.originalName,
         originalMimetype:
           result.originalMimetype || file.originalMimetype || file.mimetype,
+        encryptionVersion: file.encryptionVersion,
         originalSize: result.originalSize || file.originalSize || file.size,
       });
 
