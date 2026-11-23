@@ -72,5 +72,13 @@ test("legacy AES-GCM file whose salt starts with 0xFD is not mistaken for V3", a
   const blob = Buffer.concat([salt, iv, ct]);
   const dec = await decryptFile(blob, "pw-test-1234", { originalName: "g.bin", originalType: "application/octet-stream" });
   assert.equal(dec.success, true);
+
+  const pinned = await decryptFile(blob, "pw-test-1234", {
+    originalName: "g.bin",
+    originalType: "application/octet-stream",
+    encryptionVersion: 3,
+  });
+  assert.equal(pinned.success, false, "a file recorded as V3 must not fall back to AES-GCM");
+  assert.match(pinned.error, /변조/);
   assert.equal(Buffer.from(await dec.decryptedFile.arrayBuffer()).equals(plain), true);
 });
