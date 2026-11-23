@@ -5,6 +5,11 @@
  * V1 AES-GCM: [mode: 1B=0x01][salt: 16B][iv: 12B][encrypted data...]
  * V1 AES-CTR: [mode: 1B=0x02][salt: 16B][counter: 16B][chunkCount|FLAG: 4B][authTag: 32B][encrypted chunks...]
  * V2 (강화):   [0xFE: 1B][mode: 1B][salt: 16B][counter: 16B][HMAC: 32B][chunkCount: 4B][encrypted chunks...]
+ * V3 (안전):   [0xFD: 1B][mode: 1B][salt: 16B][counter: 16B][verifier: 32B][chunkCount: 4B][encrypted chunks...][MAC: 32B]
+ *   -> 64KB 서브청크마다 파일 전역에서 고유한 카운터를 사용해 키스트림 재사용을 제거
+ *   -> PBKDF2(512bit)를 암호화 키/MAC 키로 분리해 변조 감지
+ *      chunkTag_i = HMAC(macKey, u32le(i) || 암호문 청크 i), MAC = HMAC(macKey, 헤더 || chunkTag_0 || ...)
+ *      (WebCrypto에 스트리밍 HMAC이 없어서, 전체 암호문을 한 버퍼에 올리지 않도록 청크 단위로 계산)
  *
  * 주의: V2 매직 바이트는 V1 모드 값(0x01, 0x02)과 겹치지 않는 0xFE 사용
  * 64KB 서브청크로 쪼개서 암호화 (Node.js crypto.subtle.encrypt 64KB 제한 대응)
@@ -12,12 +17,19 @@
 
 const ENCRYPTION_MODE = { AES_GCM: 1, AES_CTR: 2 };
 const V2_MAGIC = 0xFE;
+const V3_MAGIC = 0xFD;
+const MAC_TAG_SIZE = 32;
+const TAMPERED_ERROR = "파일이 변조되었거나 손상되었습니다.";
+const V3_VERIFIER_CONTEXT = new TextEncoder().encode("shareify-e2ee-v3-verifier");
 const AUTH_TAG_SIZE = 32;
 const HMAC_SIZE = 32;
 const AUTH_TAG_CONTEXT = "shareify-e2ee-v1";
 const AUTH_TAG_FLAG = 0x80000000;
 const CHUNK_SIZE = 5 * 1024 * 1024;
 const SUB_CHUNK_SIZE = 64 * 1024; // Node.js 64KB 제한 대응
+const BLOCK_SIZE = 16;
+const SUB_CHUNK_BLOCKS = SUB_CHUNK_SIZE / BLOCK_SIZE; // 4096
+const CHUNK_BLOCKS = CHUNK_SIZE / BLOCK_SIZE;          // 327680
 
 // ---- 유틸리티 ----
 
@@ -49,7 +61,76 @@ function computeCounter(initialCounter, globalIndex) {
   return counter;
 }
 
+/**
+ * 카운터의 하위 64비트(바이트 8~15, 빅엔디언)에 blockDelta(블록 수)를 더한다.
+ */
+function addCounterBlocks(initialCounter, blockDelta) {
+  const counter = new Uint8Array(initialCounter);
+  let carry = blockDelta;
+  for (let k = 15; k >= 8; k--) {
+    carry += counter[k];
+    counter[k] = carry & 0xff;
+    carry = Math.floor(carry / 256);
+  }
+  return counter;
+}
+
+/**
+ * V3 AES-CTR 변환(암·복호 동일). 각 64KB 서브청크는 파일 전역에서 고유한
+ * 카운터(initialCounter + 절대 블록 오프셋)를 사용하므로 키스트림이 재사용되지 않는다.
+ * @param {Uint8Array} data
+ * @param {CryptoKey} key
+ * @param {Uint8Array} initialCounter
+ * @param {number} startBlock - 이 청크 첫 바이트의 파일 전역 블록 오프셋
+ */
+async function aesCtrTransformV3(data, key, initialCounter, startBlock) {
+  const totalLen = data.length;
+  const result = new Uint8Array(totalLen);
+  let done = 0, sub = 0;
+  while (done < totalLen) {
+    const subEnd = Math.min(done + SUB_CHUNK_SIZE, totalLen);
+    const seg = data.slice(done, subEnd);
+    const ctr = addCounterBlocks(initialCounter, startBlock + sub * SUB_CHUNK_BLOCKS);
+    const out = await crypto.subtle.encrypt(
+      { name: "AES-CTR", counter: ctr, length: 64 }, key, seg
+    );
+    result.set(new Uint8Array(out), done);
+    done = subEnd;
+    sub++;
+  }
+  return result;
+}
+
 // ---- 키 유도 & 인증 ----
+
+/**
+ * V3: PBKDF2-SHA256으로 512비트를 유도해 앞 32바이트는 AES-CTR 키, 뒤 32바이트는 HMAC 키로 사용
+ */
+async function v3ChunkTag(macKey, index, ciphertext) {
+  const buf = new Uint8Array(4 + ciphertext.length);
+  new DataView(buf.buffer).setUint32(0, index, true);
+  buf.set(ciphertext, 4);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", macKey, buf));
+}
+
+function v3MacInput(header, chunkTags) {
+  const buf = new Uint8Array(header.length + chunkTags.length * MAC_TAG_SIZE);
+  buf.set(header, 0);
+  chunkTags.forEach((t, i) => buf.set(t, header.length + i * MAC_TAG_SIZE));
+  return buf;
+}
+
+async function deriveV3Keys(password, salt) {
+  const km = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveBits"]
+  );
+  const bits = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, km, 512
+  ));
+  const encKey = await crypto.subtle.importKey("raw", bits.slice(0, 32), { name: "AES-CTR" }, false, ["encrypt", "decrypt"]);
+  const macKey = await crypto.subtle.importKey("raw", bits.slice(32), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  return { encKey, macKey };
+}
 
 async function deriveAuthTag(password, salt) {
   const encoder = new TextEncoder();
@@ -162,17 +243,29 @@ export async function encryptFile(file, password, options = {}) {
     }
 
     const useScrypt = options.useScrypt || false;
-    const version = options.version || 2;
+    const version = options.version || 3;
     const isV2 = (version === 2);
+    const isV3 = (version === 3);
 
     const salt = generateSalt();
     const counter = generateCounter();
-    const key = await deriveKey(password, salt, "AES-CTR", useScrypt);
+    const v3Keys = isV3 ? await deriveV3Keys(password, salt) : null;
+    const key = isV3 ? v3Keys.encKey : await deriveKey(password, salt, "AES-CTR", useScrypt);
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
     // ---- 헤더 생성 ----
     let header;
-    if (isV2) {
+    if (isV3) {
+      const verifier = new Uint8Array(await crypto.subtle.sign("HMAC", v3Keys.macKey, V3_VERIFIER_CONTEXT));
+      // [0xFD][mode][salt][counter][verifier][chunkCount] = 70 bytes, 끝에 MAC 32 bytes
+      header = new Uint8Array(70);
+      header[0] = V3_MAGIC;
+      header[1] = ENCRYPTION_MODE.AES_CTR;
+      header.set(salt, 2);
+      header.set(counter, 18);
+      header.set(verifier, 34);
+      header.set(new Uint8Array(new Uint32Array([totalChunks]).buffer), 66);
+    } else if (isV2) {
       const hmac = await generateHMAC(salt, password);
       // [0xFE][mode][salt][counter][HMAC][chunkCount] = 70 bytes
       header = new Uint8Array(70);
@@ -194,6 +287,7 @@ export async function encryptFile(file, password, options = {}) {
     }
 
     // ---- 청크 암호화 ----
+    const chunkTags = [];
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -205,7 +299,10 @@ export async function encryptFile(file, password, options = {}) {
             const chunkData = new Uint8Array(await file.slice(start, end).arrayBuffer());
 
             // 핵심: 서브청크 단위 AES-CTR 암호화
-            const encryptedChunk = await aesCtrEncrypt(chunkData, key, counter);
+            const encryptedChunk = isV3
+              ? await aesCtrTransformV3(chunkData, key, counter, i * CHUNK_BLOCKS)
+              : await aesCtrEncrypt(chunkData, key, counter);
+            if (isV3) chunkTags.push(await v3ChunkTag(v3Keys.macKey, i, encryptedChunk));
             controller.enqueue(encryptedChunk);
           }
           controller.close();
@@ -215,8 +312,14 @@ export async function encryptFile(file, password, options = {}) {
       },
     });
 
+    let encryptedBlob = await new Response(stream).blob();
+    if (isV3) {
+      const tag = await crypto.subtle.sign("HMAC", v3Keys.macKey, v3MacInput(header, chunkTags));
+      encryptedBlob = new Blob([encryptedBlob, new Uint8Array(tag)]);
+    }
+
     const encryptedFile = new File(
-      [await new Response(stream).blob()],
+      [encryptedBlob],
       file.name + ".encrypted",
       { type: "application/octet-stream" }
     );
@@ -242,14 +345,76 @@ export async function encryptFile(file, password, options = {}) {
 
 // ---- 파일 복호화 ----
 
+// ===== V1 AES-GCM 포맷: [salt: 16B][iv: 12B][encrypted data...] =====
+async function decryptLegacyGcm(data, password, originalMetadata) {
+  const salt = data.slice(0, 16);
+  const iv = data.slice(16, 28);
+  const encData = data.slice(28);
+
+  const km = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
+  );
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    km, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+  );
+
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encData);
+  return {
+    success: true,
+    decryptedFile: new File([pt], originalMetadata.originalName, { type: originalMetadata.originalType }),
+  };
+}
+
 export async function decryptFile(encryptedArrayBuffer, password, originalMetadata) {
   try {
     const data = new Uint8Array(encryptedArrayBuffer);
     const firstByte = data[0];
 
     let salt, counter, key, totalChunks, headerSize;
+    let isV3 = false;
+    let dataEnd = data.length;
 
-    if (firstByte === V2_MAGIC) {
+    if (firstByte === V3_MAGIC) {
+      // ===== V3 포맷 (전역 고유 카운터 + MAC) =====
+      let off = 1;
+      const mode = data[off++];
+      salt = data.slice(off, off + 16); off += 16;
+      counter = data.slice(off, off + 16); off += 16;
+      const verifier = data.slice(off, off + HMAC_SIZE); off += HMAC_SIZE;
+
+      const encodedChunks = data.length >= off + 4 ? new Uint32Array(data.slice(off, off + 4).buffer)[0] : -1;
+      const ciphertextLength = data.length - (off + 4) - MAC_TAG_SIZE;
+      // 레거시 AES-GCM 파일은 매직 바이트 없이 랜덤 salt로 시작하므로 0xFD로 시작할 수 있다.
+      // 헤더 구조가 V3와 맞지 않을 때만 AES-GCM으로 처리한다.
+      const looksLikeV3 = mode === ENCRYPTION_MODE.AES_CTR
+        && ciphertextLength >= 0
+        && encodedChunks === Math.ceil(ciphertextLength / CHUNK_SIZE);
+      if (!looksLikeV3) {
+        return await decryptLegacyGcm(data, password, originalMetadata);
+      }
+
+      const v3Keys = await deriveV3Keys(password, salt);
+      const expected = new Uint8Array(await crypto.subtle.sign("HMAC", v3Keys.macKey, V3_VERIFIER_CONTEXT));
+      if (!verifier.every((b, i) => b === expected[i])) throw new Error("비밀번호가 올바르지 않습니다");
+
+      totalChunks = new Uint32Array(data.slice(off, off + 4).buffer)[0];
+      off += 4;
+      headerSize = off;
+      dataEnd = data.length - MAC_TAG_SIZE;
+
+      const chunkTags = [];
+      for (let i = 0, pos = headerSize; i < totalChunks; i++, pos += CHUNK_SIZE) {
+        chunkTags.push(await v3ChunkTag(v3Keys.macKey, i, data.subarray(pos, Math.min(pos + CHUNK_SIZE, dataEnd))));
+      }
+      const macValid = await crypto.subtle.verify(
+        "HMAC", v3Keys.macKey, data.subarray(dataEnd), v3MacInput(data.subarray(0, headerSize), chunkTags)
+      );
+      if (!macValid) throw new Error(TAMPERED_ERROR);
+      key = v3Keys.encKey;
+      isV3 = true;
+
+    } else if (firstByte === V2_MAGIC) {
       // ===== V2 포맷 =====
       let off = 1;
       if (data[off++] !== ENCRYPTION_MODE.AES_CTR) throw new Error("지원되지 않는 암호화 모드");
@@ -295,24 +460,7 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
       key = await deriveKey(password, salt, "AES-CTR");
 
     } else {
-      // ===== V1 AES-GCM 포맷 =====
-      salt = data.slice(0, 16);
-      const iv = data.slice(16, 28);
-      const encData = data.slice(28);
-
-      const km = await crypto.subtle.importKey(
-        "raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
-      );
-      key = await crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-        km, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
-      );
-
-      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encData);
-      return {
-        success: true,
-        decryptedFile: new File([pt], originalMetadata.originalName, { type: originalMetadata.originalType }),
-      };
+      return await decryptLegacyGcm(data, password, originalMetadata);
     }
 
     // ===== V1/V2 공통: 스트리밍 복호화 =====
@@ -321,9 +469,11 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
         try {
           let pos = headerSize;
           for (let i = 0; i < totalChunks; i++) {
-            const end = Math.min(pos + CHUNK_SIZE, data.length);
+            const end = Math.min(pos + CHUNK_SIZE, dataEnd);
             const encChunk = data.slice(pos, end);
-            const decChunk = await aesCtrDecrypt(encChunk, key, counter);
+            const decChunk = isV3
+              ? await aesCtrTransformV3(encChunk, key, counter, i * CHUNK_BLOCKS)
+              : await aesCtrDecrypt(encChunk, key, counter);
             controller.enqueue(decChunk);
             pos = end;
           }
@@ -341,6 +491,7 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
     };
   } catch (error) {
     console.error("파일 복호화 오류:", error);
+    if (error.message === TAMPERED_ERROR) return { success: false, error: TAMPERED_ERROR };
     return { success: false, error: "복호화에 실패했습니다. 비밀번호를 확인해주세요." };
   }
 }

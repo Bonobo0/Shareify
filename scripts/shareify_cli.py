@@ -3,6 +3,7 @@
 import argparse
 import getpass
 import hashlib
+import hmac
 import json
 import math
 import mimetypes
@@ -30,8 +31,12 @@ CHUNK_SIZE = 5 * 1024 * 1024
 AES_CTR_MODE = 2
 UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 SUB_CHUNK_SIZE = 64 * 1024
-AUTH_TAG_SIZE = 32
-AUTH_TAG_CONTEXT = b"shareify-e2ee-v1"
+BLOCK_SIZE = 16
+SUB_CHUNK_BLOCKS = SUB_CHUNK_SIZE // BLOCK_SIZE
+CHUNK_BLOCKS = CHUNK_SIZE // BLOCK_SIZE
+V3_MAGIC = 0xFD
+MAC_TAG_SIZE = 32
+V3_VERIFIER_CONTEXT = b"shareify-e2ee-v3-verifier"
 
 
 @dataclass
@@ -170,21 +175,23 @@ def _notify_discord(webhook_url: str, file_info: Dict[str, object], base_url: st
         _print_error(f"디스코드 웹훅 전송 중 오류: {exc}")
 
 
-def _counter_for_sub_chunk(initial_counter: bytes, sub_chunk_index: int) -> bytes:
+def _counter_for_block(initial_counter: bytes, block_offset: int) -> bytes:
     prefix = initial_counter[:8]
     suffix_value = int.from_bytes(initial_counter[8:], "big")
-    new_suffix = ((suffix_value + sub_chunk_index) % (1 << 64)).to_bytes(8, "big")
+    new_suffix = ((suffix_value + block_offset) % (1 << 64)).to_bytes(8, "big")
     return prefix + new_suffix
 
 
-def _encrypt_chunk(key: bytes, initial_counter: bytes, chunk: bytes) -> bytes:
-    # Mirrors aesCtrEncrypt in src/lib/crypto/encryption.js: every chunk restarts
-    # at the initial counter, and each 64KB sub-chunk uses counter + its index.
+def _encrypt_chunk(key: bytes, initial_counter: bytes, chunk: bytes, start_block: int) -> bytes:
+    # V3, mirrors aesCtrTransformV3 in src/lib/crypto/encryption.js: each 64KB
+    # sub-chunk starts at initial counter + its absolute block offset in the file,
+    # so no counter value (keystream block) is ever reused.
     encrypted = bytearray()
     for sub_chunk_index, offset in enumerate(range(0, len(chunk), SUB_CHUNK_SIZE)):
+        block_offset = start_block + sub_chunk_index * SUB_CHUNK_BLOCKS
         encryptor = Cipher(
             algorithms.AES(key),
-            modes.CTR(_counter_for_sub_chunk(initial_counter, sub_chunk_index)),
+            modes.CTR(_counter_for_block(initial_counter, block_offset)),
             backend=default_backend(),
         ).encryptor()
         encrypted += encryptor.update(chunk[offset:offset + SUB_CHUNK_SIZE])
@@ -413,43 +420,54 @@ def build_encryption_plan(
 
     salt = os.urandom(16)
     counter = os.urandom(16)
-    key = hashlib.pbkdf2_hmac(
+    # Same as deriveV3Keys in encryption.js: 512-bit PBKDF2 split into AES and HMAC keys.
+    derived = hashlib.pbkdf2_hmac(
         "sha256",
         password.encode("utf-8"),
         salt,
         100000,
-        dklen=32,
+        dklen=64,
     )
-
-    auth_tag_input = salt + password.encode("utf-8") + AUTH_TAG_CONTEXT
-    auth_tag = hashlib.sha256(auth_tag_input).digest()
+    key, mac_key = derived[:32], derived[32:]
+    header_verifier = hmac.new(
+        mac_key, V3_VERIFIER_CONTEXT, hashlib.sha256).digest()
 
     total_chunks = math.ceil(
         original_size / CHUNK_SIZE) if original_size else 0
     header = bytearray()
+    header.append(V3_MAGIC)
     header.append(AES_CTR_MODE)
     header.extend(salt)
     header.extend(counter)
-    header.extend((total_chunks | 0x80000000).to_bytes(4, "little"))
-    header.extend(auth_tag)
+    header.extend(header_verifier)
+    header.extend(total_chunks.to_bytes(4, "little"))
     header_bytes = bytes(header)
 
-    encrypted_size = len(header_bytes) + original_size
+    encrypted_size = len(header_bytes) + original_size + MAC_TAG_SIZE
     upload_filename = f"{file_name}.encrypted"
     mime_type = forced_mime or "application/octet-stream"
 
     def stream_factory() -> Iterable[bytes]:
         def generator() -> Iterable[bytes]:
+            # Same as v3ChunkTag / v3MacInput in encryption.js.
+            chunk_tags = []
             yield header_bytes
-            if total_chunks == 0:
-                return
 
             with open(file_path, "rb") as source:
-                for _ in range(total_chunks):
+                for chunk_index in range(total_chunks):
                     chunk = source.read(CHUNK_SIZE)
                     if not chunk:
                         break
-                    yield _encrypt_chunk(key, counter, chunk)
+                    encrypted_chunk = _encrypt_chunk(
+                        key, counter, chunk, chunk_index * CHUNK_BLOCKS)
+                    chunk_tags.append(hmac.new(
+                        mac_key,
+                        chunk_index.to_bytes(4, "little") + encrypted_chunk,
+                        hashlib.sha256,
+                    ).digest())
+                    yield encrypted_chunk
+            yield hmac.new(
+                mac_key, header_bytes + b"".join(chunk_tags), hashlib.sha256).digest()
 
         return generator()
 
