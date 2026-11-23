@@ -49,6 +49,11 @@ test("shareify_cli.py writes V3 without keystream reuse and web decryptFile rest
     assert.equal(decrypted.success, true);
     const bytes = Buffer.from(await decrypted.decryptedFile.arrayBuffer());
     assert.equal(bytes.equals(original), true);
+
+    const tampered = Buffer.from(blob);
+    tampered[70 + chunk + 123] ^= 0x01;
+    const rejected = await decryptFile(tampered, "pw-test", { originalName: "source.bin" });
+    assert.equal(rejected.success, false, "tampered ciphertext must be rejected");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

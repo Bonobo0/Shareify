@@ -35,6 +35,8 @@ BLOCK_SIZE = 16
 SUB_CHUNK_BLOCKS = SUB_CHUNK_SIZE // BLOCK_SIZE
 CHUNK_BLOCKS = CHUNK_SIZE // BLOCK_SIZE
 V3_MAGIC = 0xFD
+MAC_TAG_SIZE = 32
+V3_VERIFIER_CONTEXT = b"shareify-e2ee-v3-verifier"
 
 
 @dataclass
@@ -418,17 +420,17 @@ def build_encryption_plan(
 
     salt = os.urandom(16)
     counter = os.urandom(16)
-    key = hashlib.pbkdf2_hmac(
+    # Same as deriveV3Keys in encryption.js: 512-bit PBKDF2 split into AES and HMAC keys.
+    derived = hashlib.pbkdf2_hmac(
         "sha256",
         password.encode("utf-8"),
         salt,
         100000,
-        dklen=32,
+        dklen=64,
     )
-
-    # Same as generateHMAC in encryption.js: HMAC-SHA256(PBKDF2(password, salt), salt).
-    # Its PBKDF2 output is identical to `key`, so reuse it instead of deriving twice.
-    header_hmac = hmac.new(key, salt, hashlib.sha256).digest()
+    key, mac_key = derived[:32], derived[32:]
+    header_verifier = hmac.new(
+        mac_key, V3_VERIFIER_CONTEXT, hashlib.sha256).digest()
 
     total_chunks = math.ceil(
         original_size / CHUNK_SIZE) if original_size else 0
@@ -437,27 +439,29 @@ def build_encryption_plan(
     header.append(AES_CTR_MODE)
     header.extend(salt)
     header.extend(counter)
-    header.extend(header_hmac)
+    header.extend(header_verifier)
     header.extend(total_chunks.to_bytes(4, "little"))
     header_bytes = bytes(header)
 
-    encrypted_size = len(header_bytes) + original_size
+    encrypted_size = len(header_bytes) + original_size + MAC_TAG_SIZE
     upload_filename = f"{file_name}.encrypted"
     mime_type = forced_mime or "application/octet-stream"
 
     def stream_factory() -> Iterable[bytes]:
         def generator() -> Iterable[bytes]:
+            mac = hmac.new(mac_key, header_bytes, hashlib.sha256)
             yield header_bytes
-            if total_chunks == 0:
-                return
 
             with open(file_path, "rb") as source:
                 for chunk_index in range(total_chunks):
                     chunk = source.read(CHUNK_SIZE)
                     if not chunk:
                         break
-                    yield _encrypt_chunk(
+                    encrypted_chunk = _encrypt_chunk(
                         key, counter, chunk, chunk_index * CHUNK_BLOCKS)
+                    mac.update(encrypted_chunk)
+                    yield encrypted_chunk
+            yield mac.digest()
 
         return generator()
 
