@@ -403,6 +403,20 @@ def build_plain_upload_plan(
     )
 
 
+def detect_encryption_version(file_path: str) -> Optional[int]:
+    """Return 3 when the file has a structurally valid V3 header, else None."""
+    size = os.path.getsize(file_path)
+    with open(file_path, "rb") as source:
+        head = source.read(70)
+    if len(head) < 70 or head[0] != V3_MAGIC or head[1] != AES_CTR_MODE:
+        return None
+    ciphertext_length = size - len(head) - MAC_TAG_SIZE
+    chunk_count = int.from_bytes(head[66:70], "little")
+    if ciphertext_length < 0 or chunk_count != math.ceil(ciphertext_length / CHUNK_SIZE):
+        return None
+    return 3
+
+
 def build_encryption_plan(
     file_path: str,
     password: str,
@@ -556,6 +570,9 @@ def handle_upload(args: argparse.Namespace) -> None:
                 "originalSize": args.original_size,
                 "originalType": args.original_mime,
             }
+            encryption_version = detect_encryption_version(args.file_path)
+            if encryption_version:
+                original_metadata["version"] = encryption_version
 
         plan = build_plain_upload_plan(
             args.file_path,
