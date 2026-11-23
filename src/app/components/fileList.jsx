@@ -735,7 +735,7 @@ export default function FileList({
       const metadata = {
         originalName: file.originalName,
         originalType: file.originalMimetype,
-        encryptionVersion: file.encryptionVersion,
+        encryptionVersion: result.encryptionVersion ?? file.encryptionVersion,
         originalSize: file.originalSize,
       };
 
@@ -828,7 +828,7 @@ export default function FileList({
         metadata: {
           originalName: file.originalName,
           originalMimetype: file.originalMimetype,
-          encryptionVersion: file.encryptionVersion,
+          encryptionVersion: result.encryptionVersion ?? file.encryptionVersion,
         },
       });
 

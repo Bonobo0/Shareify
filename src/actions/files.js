@@ -1025,6 +1025,7 @@ export async function getFileDownloadUrl({
       filename: file.originalName,
       size: file.size,
       mimetype: file.mimetype,
+      encryptionVersion: file.encryptionVersion ?? null,
     };
   } catch (error) {
     console.error("파일 다운로드 URL 생성 오류:", error);

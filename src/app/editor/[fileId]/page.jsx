@@ -131,7 +131,7 @@ export default function EditorFilePage() {
         {
           originalName: file.originalName,
           originalType: file.originalMimetype || "application/json",
-          encryptionVersion: file.encryptionVersion,
+          encryptionVersion: result.encryptionVersion ?? file.encryptionVersion,
         },
       );
 
