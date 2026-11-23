@@ -1843,7 +1843,19 @@ export async function prepareFileUpdate({ fileId }) {
 }
 
 // 파일 내용 업데이트 완료 (클라이언트가 presigned URL로 업로드 후 호출)
-export async function completeFileUpdate({ fileId, newSize, originalSize }) {
+// E2EE 포맷 버전은 올리기만 한다 (3 미만 요청이나 하향 요청은 무시)
+function nextEncryptionVersion(current, requested) {
+  const version = Number(requested);
+  if (!Number.isSafeInteger(version) || version < 3) return current ?? null;
+  return Math.max(version, current ?? 0);
+}
+
+export async function completeFileUpdate({
+  fileId,
+  newSize,
+  originalSize,
+  encryptionVersion,
+}) {
   try {
     const userId = await requireAuthenticatedUser();
 
@@ -1950,6 +1962,12 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
     file.size = newSize;
     if (originalSize !== undefined) {
       file.originalSize = originalSize;
+    }
+    if (file.isEncrypted) {
+      file.encryptionVersion = nextEncryptionVersion(
+        file.encryptionVersion,
+        encryptionVersion,
+      );
     }
     file.updatedAt = new Date();
     await file.save();
@@ -2372,7 +2390,10 @@ export async function createEditorFile({
 }
 
 // 새 에디터 파일 업로드 완료
-export async function completeEditorFileCreation({ fileId }) {
+export async function completeEditorFileCreation({
+  fileId,
+  encryptionVersion,
+}) {
   try {
     const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
@@ -2384,6 +2405,12 @@ export async function completeEditorFileCreation({ fileId }) {
     if (file.owner.toString() !== userId) return { error: "권한이 없습니다." };
 
     file.uploaded = true;
+    if (file.isEncrypted) {
+      file.encryptionVersion = nextEncryptionVersion(
+        file.encryptionVersion,
+        encryptionVersion,
+      );
+    }
     await file.save();
 
     // 저장소 사용량 업데이트

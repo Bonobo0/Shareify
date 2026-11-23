@@ -132,6 +132,7 @@ export default function EditorListPage() {
 
       let uploadBody = result.initialData;
       let contentType = "application/json";
+      let encryptionVersion;
 
       // 암호화 처리
       if (newFileEncrypted) {
@@ -151,6 +152,7 @@ export default function EditorListPage() {
         }
         uploadBody = encryptResult.encryptedFile;
         contentType = "application/octet-stream";
+        encryptionVersion = encryptResult.metadata.version;
       }
 
       // 초기 데이터 업로드
@@ -168,6 +170,7 @@ export default function EditorListPage() {
       // 업로드 완료 처리
       const completeResult = await completeEditorFileCreation({
         fileId: result.file.id,
+        encryptionVersion,
       });
       if (completeResult.error) {
         setAlertModal({ show: true, message: completeResult.error });
