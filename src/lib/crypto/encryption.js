@@ -364,15 +364,20 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
       counter = data.slice(off, off + 16); off += 16;
       const verifier = data.slice(off, off + HMAC_SIZE); off += HMAC_SIZE;
 
-      const v3Keys = await deriveV3Keys(password, salt);
-      const expected = new Uint8Array(await crypto.subtle.sign("HMAC", v3Keys.macKey, V3_VERIFIER_CONTEXT));
-      const headerValid = mode === ENCRYPTION_MODE.AES_CTR
-        && data.length >= off + 4 + MAC_TAG_SIZE
-        && verifier.every((b, i) => b === expected[i]);
-      if (!headerValid) {
-        // 레거시 AES-GCM 파일은 매직 바이트 없이 랜덤 salt로 시작하므로 0xFD로 시작할 수 있다
+      const encodedChunks = data.length >= off + 4 ? new Uint32Array(data.slice(off, off + 4).buffer)[0] : -1;
+      const ciphertextLength = data.length - (off + 4) - MAC_TAG_SIZE;
+      // 레거시 AES-GCM 파일은 매직 바이트 없이 랜덤 salt로 시작하므로 0xFD로 시작할 수 있다.
+      // 헤더 구조가 V3와 맞지 않을 때만 AES-GCM으로 처리한다.
+      const looksLikeV3 = mode === ENCRYPTION_MODE.AES_CTR
+        && ciphertextLength >= 0
+        && encodedChunks === Math.ceil(ciphertextLength / CHUNK_SIZE);
+      if (!looksLikeV3) {
         return await decryptLegacyGcm(data, password, originalMetadata);
       }
+
+      const v3Keys = await deriveV3Keys(password, salt);
+      const expected = new Uint8Array(await crypto.subtle.sign("HMAC", v3Keys.macKey, V3_VERIFIER_CONTEXT));
+      if (!verifier.every((b, i) => b === expected[i])) throw new Error("비밀번호가 올바르지 않습니다");
 
       totalChunks = new Uint32Array(data.slice(off, off + 4).buffer)[0];
       off += 4;
