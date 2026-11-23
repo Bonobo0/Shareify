@@ -152,7 +152,7 @@ export default function EditorListPage() {
         }
         uploadBody = encryptResult.encryptedFile;
         contentType = "application/octet-stream";
-        encryptionVersion = encryptResult.metadata.version;
+        encryptionVersion = encryptResult.metadata?.version;
       }
 
       // 초기 데이터 업로드

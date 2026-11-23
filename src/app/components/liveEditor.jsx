@@ -808,7 +808,7 @@ export default function LiveEditor({
         uploadSize = encryptResult.encryptedFile.size;
         originalSize = jsonBlob.size;
         contentType = "application/octet-stream";
-        encryptionVersion = encryptResult.metadata.version;
+        encryptionVersion = encryptResult.metadata?.version;
       } else {
         // 일반 파일: JSON 직접 업로드
         uploadBody = jsonBlob;
