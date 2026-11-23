@@ -5,6 +5,8 @@
  * V1 AES-GCM: [mode: 1B=0x01][salt: 16B][iv: 12B][encrypted data...]
  * V1 AES-CTR: [mode: 1B=0x02][salt: 16B][counter: 16B][chunkCount|FLAG: 4B][authTag: 32B][encrypted chunks...]
  * V2 (강화):   [0xFE: 1B][mode: 1B][salt: 16B][counter: 16B][HMAC: 32B][chunkCount: 4B][encrypted chunks...]
+ * V3 (안전):   [0xFD: 1B][mode: 1B][salt: 16B][counter: 16B][HMAC: 32B][chunkCount: 4B][encrypted chunks...]
+ *   -> V3는 64KB 서브청크마다 파일 전역에서 고유한 카운터를 사용해 키스트림 재사용을 제거
  *
  * 주의: V2 매직 바이트는 V1 모드 값(0x01, 0x02)과 겹치지 않는 0xFE 사용
  * 64KB 서브청크로 쪼개서 암호화 (Node.js crypto.subtle.encrypt 64KB 제한 대응)
@@ -12,12 +14,16 @@
 
 const ENCRYPTION_MODE = { AES_GCM: 1, AES_CTR: 2 };
 const V2_MAGIC = 0xFE;
+const V3_MAGIC = 0xFD;
 const AUTH_TAG_SIZE = 32;
 const HMAC_SIZE = 32;
 const AUTH_TAG_CONTEXT = "shareify-e2ee-v1";
 const AUTH_TAG_FLAG = 0x80000000;
 const CHUNK_SIZE = 5 * 1024 * 1024;
 const SUB_CHUNK_SIZE = 64 * 1024; // Node.js 64KB 제한 대응
+const BLOCK_SIZE = 16;
+const SUB_CHUNK_BLOCKS = SUB_CHUNK_SIZE / BLOCK_SIZE; // 4096
+const CHUNK_BLOCKS = CHUNK_SIZE / BLOCK_SIZE;          // 327680
 
 // ---- 유틸리티 ----
 
@@ -47,6 +53,46 @@ function computeCounter(initialCounter, globalIndex) {
     }
   }
   return counter;
+}
+
+/**
+ * 카운터의 하위 64비트(바이트 8~15, 빅엔디언)에 blockDelta(블록 수)를 더한다.
+ */
+function addCounterBlocks(initialCounter, blockDelta) {
+  const counter = new Uint8Array(initialCounter);
+  let carry = blockDelta;
+  for (let k = 15; k >= 8; k--) {
+    carry += counter[k];
+    counter[k] = carry & 0xff;
+    carry = Math.floor(carry / 256);
+  }
+  return counter;
+}
+
+/**
+ * V3 AES-CTR 변환(암·복호 동일). 각 64KB 서브청크는 파일 전역에서 고유한
+ * 카운터(initialCounter + 절대 블록 오프셋)를 사용하므로 키스트림이 재사용되지 않는다.
+ * @param {Uint8Array} data
+ * @param {CryptoKey} key
+ * @param {Uint8Array} initialCounter
+ * @param {number} startBlock - 이 청크 첫 바이트의 파일 전역 블록 오프셋
+ */
+async function aesCtrTransformV3(data, key, initialCounter, startBlock) {
+  const totalLen = data.length;
+  const result = new Uint8Array(totalLen);
+  let done = 0, sub = 0;
+  while (done < totalLen) {
+    const subEnd = Math.min(done + SUB_CHUNK_SIZE, totalLen);
+    const seg = data.slice(done, subEnd);
+    const ctr = addCounterBlocks(initialCounter, startBlock + sub * SUB_CHUNK_BLOCKS);
+    const out = await crypto.subtle.encrypt(
+      { name: "AES-CTR", counter: ctr, length: 64 }, key, seg
+    );
+    result.set(new Uint8Array(out), done);
+    done = subEnd;
+    sub++;
+  }
+  return result;
 }
 
 // ---- 키 유도 & 인증 ----
@@ -162,8 +208,9 @@ export async function encryptFile(file, password, options = {}) {
     }
 
     const useScrypt = options.useScrypt || false;
-    const version = options.version || 2;
+    const version = options.version || 3;
     const isV2 = (version === 2);
+    const isV3 = (version === 3);
 
     const salt = generateSalt();
     const counter = generateCounter();
@@ -172,7 +219,17 @@ export async function encryptFile(file, password, options = {}) {
 
     // ---- 헤더 생성 ----
     let header;
-    if (isV2) {
+    if (isV3) {
+      const hmac = await generateHMAC(salt, password);
+      // [0xFD][mode][salt][counter][HMAC][chunkCount] = 70 bytes
+      header = new Uint8Array(70);
+      header[0] = V3_MAGIC;
+      header[1] = ENCRYPTION_MODE.AES_CTR;
+      header.set(salt, 2);
+      header.set(counter, 18);
+      header.set(hmac, 34);
+      header.set(new Uint8Array(new Uint32Array([totalChunks]).buffer), 66);
+    } else if (isV2) {
       const hmac = await generateHMAC(salt, password);
       // [0xFE][mode][salt][counter][HMAC][chunkCount] = 70 bytes
       header = new Uint8Array(70);
@@ -205,7 +262,9 @@ export async function encryptFile(file, password, options = {}) {
             const chunkData = new Uint8Array(await file.slice(start, end).arrayBuffer());
 
             // 핵심: 서브청크 단위 AES-CTR 암호화
-            const encryptedChunk = await aesCtrEncrypt(chunkData, key, counter);
+            const encryptedChunk = isV3
+              ? await aesCtrTransformV3(chunkData, key, counter, i * CHUNK_BLOCKS)
+              : await aesCtrEncrypt(chunkData, key, counter);
             controller.enqueue(encryptedChunk);
           }
           controller.close();
@@ -248,8 +307,30 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
     const firstByte = data[0];
 
     let salt, counter, key, totalChunks, headerSize;
+    let isV3 = false;
 
-    if (firstByte === V2_MAGIC) {
+    if (firstByte === V3_MAGIC) {
+      // ===== V3 포맷 (전역 고유 카운터) =====
+      isV3 = true;
+      let off = 1;
+      if (data[off++] !== ENCRYPTION_MODE.AES_CTR) throw new Error("지원되지 않는 암호화 모드");
+
+      salt = data.slice(off, off + 16); off += 16;
+      counter = data.slice(off, off + 16); off += 16;
+
+      const hmac = data.slice(off, off + HMAC_SIZE); off += HMAC_SIZE;
+      const expectedHMAC = await generateHMAC(salt, password);
+      if (hmac.length !== expectedHMAC.length) throw new Error("무결성 검증 실패");
+      for (let i = 0; i < hmac.length; i++) {
+        if (hmac[i] !== expectedHMAC[i]) throw new Error("비밀번호가 올바르지 않습니다");
+      }
+
+      totalChunks = new Uint32Array(data.slice(off, off + 4).buffer)[0];
+      off += 4;
+      headerSize = off;
+      key = await deriveKey(password, salt, "AES-CTR");
+
+    } else if (firstByte === V2_MAGIC) {
       // ===== V2 포맷 =====
       let off = 1;
       if (data[off++] !== ENCRYPTION_MODE.AES_CTR) throw new Error("지원되지 않는 암호화 모드");
@@ -323,7 +404,9 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
           for (let i = 0; i < totalChunks; i++) {
             const end = Math.min(pos + CHUNK_SIZE, data.length);
             const encChunk = data.slice(pos, end);
-            const decChunk = await aesCtrDecrypt(encChunk, key, counter);
+            const decChunk = isV3
+              ? await aesCtrTransformV3(encChunk, key, counter, i * CHUNK_BLOCKS)
+              : await aesCtrDecrypt(encChunk, key, counter);
             controller.enqueue(decChunk);
             pos = end;
           }
