@@ -34,7 +34,9 @@ test("V3 rejects tampered ciphertext and a truncated MAC", async () => {
   const buf = Buffer.from(await enc.encryptedFile.arrayBuffer());
   const flipped = Buffer.from(buf);
   flipped[70 + 50_000] ^= 0x80;
-  assert.equal((await decryptFile(flipped, "pw-test-1234", enc.metadata)).success, false);
+  const tampered = await decryptFile(flipped, "pw-test-1234", enc.metadata);
+  assert.equal(tampered.success, false);
+  assert.match(tampered.error, /변조/);
   assert.equal((await decryptFile(buf.subarray(0, buf.length - 1), "pw-test-1234", enc.metadata)).success, false);
 });
 

@@ -19,6 +19,7 @@ const ENCRYPTION_MODE = { AES_GCM: 1, AES_CTR: 2 };
 const V2_MAGIC = 0xFE;
 const V3_MAGIC = 0xFD;
 const MAC_TAG_SIZE = 32;
+const TAMPERED_ERROR = "파일이 변조되었거나 손상되었습니다.";
 const V3_VERIFIER_CONTEXT = new TextEncoder().encode("shareify-e2ee-v3-verifier");
 const AUTH_TAG_SIZE = 32;
 const HMAC_SIZE = 32;
@@ -409,7 +410,7 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
       const macValid = await crypto.subtle.verify(
         "HMAC", v3Keys.macKey, data.subarray(dataEnd), v3MacInput(data.subarray(0, headerSize), chunkTags)
       );
-      if (!macValid) throw new Error("파일이 변조되었거나 손상되었습니다");
+      if (!macValid) throw new Error(TAMPERED_ERROR);
       key = v3Keys.encKey;
       isV3 = true;
 
@@ -490,6 +491,7 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
     };
   } catch (error) {
     console.error("파일 복호화 오류:", error);
+    if (error.message === TAMPERED_ERROR) return { success: false, error: TAMPERED_ERROR };
     return { success: false, error: "복호화에 실패했습니다. 비밀번호를 확인해주세요." };
   }
 }
