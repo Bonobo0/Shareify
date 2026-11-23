@@ -56,6 +56,11 @@ const FileSchema = new mongoose.Schema(
       required: false,
       default: null,
     },
+    encryptionVersion: {
+      type: Number, // E2EE 포맷 버전(3 이상이면 다운로드 시 해당 포맷만 허용해 다운그레이드 차단)
+      required: false,
+      default: null,
+    },
     shared: [
       {
         userId: {

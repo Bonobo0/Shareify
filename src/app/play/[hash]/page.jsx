@@ -137,6 +137,7 @@ export default function PlayPage() {
           originalName: file.originalName,
           originalType: file.originalMimetype,
           originalSize: file.originalSize,
+          encryptionVersion: file.encryptionVersion,
         };
 
         // 파일 다운로드 및 진행률 추적

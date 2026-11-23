@@ -791,6 +791,7 @@ export default function LiveEditor({
       let uploadSize;
       let originalSize;
       let contentType;
+      let encryptionVersion;
 
       if (file.isEncrypted) {
         // 암호화된 파일: 재암호화 후 업로드
@@ -807,6 +808,7 @@ export default function LiveEditor({
         uploadSize = encryptResult.encryptedFile.size;
         originalSize = jsonBlob.size;
         contentType = "application/octet-stream";
+        encryptionVersion = encryptResult.metadata?.version;
       } else {
         // 일반 파일: JSON 직접 업로드
         uploadBody = jsonBlob;
@@ -833,6 +835,7 @@ export default function LiveEditor({
         fileId: file.id,
         newSize: uploadSize,
         originalSize,
+        encryptionVersion,
       });
 
       if (completeResult.error) throw new Error(completeResult.error);

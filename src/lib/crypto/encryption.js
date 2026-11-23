@@ -370,6 +370,9 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
   try {
     const data = new Uint8Array(encryptedArrayBuffer);
     const firstByte = data[0];
+    // 서버 메타데이터가 V3라고 기록한 파일은 V3로만 연다 (저장소에서 옛 포맷으로 바꿔치기하는 다운그레이드 차단)
+    const requiresV3 = Number(originalMetadata?.encryptionVersion) >= 3;
+    if (requiresV3 && firstByte !== V3_MAGIC) throw new Error(TAMPERED_ERROR);
 
     let salt, counter, key, totalChunks, headerSize;
     let isV3 = false;
@@ -391,6 +394,7 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
         && ciphertextLength >= 0
         && encodedChunks === Math.ceil(ciphertextLength / CHUNK_SIZE);
       if (!looksLikeV3) {
+        if (requiresV3) throw new Error(TAMPERED_ERROR);
         return await decryptLegacyGcm(data, password, originalMetadata);
       }
 
@@ -508,6 +512,7 @@ export async function decryptForPreview(encryptedArrayBuffer, password, metadata
     const result = await decryptFile(encryptedArrayBuffer, password, {
       originalName: metadata.originalName || "preview",
       originalType: metadata.originalMimetype || "application/octet-stream",
+      encryptionVersion: metadata.encryptionVersion,
     });
     return result.success ? { success: true, blob: result.decryptedFile } : { success: false, error: result.error };
   } catch (error) {

@@ -205,6 +205,7 @@ export async function getFileList({
         isEncrypted: f.isEncrypted,
         originalSize: f.originalSize,
         originalMimetype: f.originalMimetype,
+        encryptionVersion: f.encryptionVersion ?? null,
       })),
     );
 
@@ -225,6 +226,7 @@ export async function getFileList({
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         isWebGLBuild: file.isWebGLBuild || false,
         webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
@@ -659,6 +661,10 @@ export async function uploadFile({
           : null,
       originalMimetype:
         isEncrypted && originalMetadata ? originalMetadata.originalType : null,
+      encryptionVersion:
+        isEncrypted && Number(originalMetadata?.version) >= 3
+          ? Number(originalMetadata.version)
+          : null,
       isWebGLBuild: isWebGLBuild || false,
       webGLValidated: false,
     };
@@ -684,6 +690,7 @@ export async function uploadFile({
       if (originalMetadata) {
         file.originalSize = numericOriginalSize;
         file.originalMimetype = originalMetadata.originalType;
+        file.encryptionVersion = fileData.encryptionVersion;
       }
     } else {
       file.isEncrypted = false;
@@ -698,6 +705,7 @@ export async function uploadFile({
       isEncrypted: file.isEncrypted,
       originalSize: file.originalSize,
       originalMimetype: file.originalMimetype,
+      encryptionVersion: file.encryptionVersion ?? null,
     });
 
     return {
@@ -1017,6 +1025,7 @@ export async function getFileDownloadUrl({
       filename: file.originalName,
       size: file.size,
       mimetype: file.mimetype,
+      encryptionVersion: file.encryptionVersion ?? null,
     };
   } catch (error) {
     console.error("파일 다운로드 URL 생성 오류:", error);
@@ -1238,6 +1247,7 @@ export async function getFileDetails({ hash, fileId }) {
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         isWebGLBuild: file.isWebGLBuild || false,
         webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
@@ -1335,6 +1345,7 @@ export async function getSharedFileDownloadUrl({ fileId, shareHash }) {
       isEncrypted: file.isEncrypted || false,
       originalSize: file.originalSize,
       originalMimetype: file.originalMimetype,
+      encryptionVersion: file.encryptionVersion ?? null,
     };
   } catch (error) {
     console.error("공유 파일 다운로드 URL 생성 오류:", error);
@@ -1409,6 +1420,7 @@ export async function getMyUploadedFiles({
         isEncrypted: file.isEncrypted || false,
         originalSize: file.originalSize,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         isWebGLBuild: file.isWebGLBuild || false,
         webGLValidated: file.webGLValidated || false,
         createdAt: file.createdAt ? file.createdAt.toISOString() : null,
@@ -1599,6 +1611,7 @@ export async function getAllFilesForDownload({ directoryId }) {
             downloadUrl,
             path: path ? `${path}/${file.originalName}` : file.originalName,
             isEncrypted: file.isEncrypted || false,
+            encryptionVersion: file.encryptionVersion ?? null,
           });
         }
       }
@@ -1715,6 +1728,7 @@ export async function getSelectedFilesForDownload({ fileIds }) {
           downloadUrl,
           path: file.originalName, // 선택 다운로드는 플랫 구조
           isEncrypted: file.isEncrypted || false,
+          encryptionVersion: file.encryptionVersion ?? null,
         });
       }
     }
@@ -1830,7 +1844,19 @@ export async function prepareFileUpdate({ fileId }) {
 }
 
 // 파일 내용 업데이트 완료 (클라이언트가 presigned URL로 업로드 후 호출)
-export async function completeFileUpdate({ fileId, newSize, originalSize }) {
+// E2EE 포맷 버전은 올리기만 한다 (3 미만 요청이나 하향 요청은 무시)
+function nextEncryptionVersion(current, requested) {
+  const version = Number(requested);
+  if (!Number.isSafeInteger(version) || version < 3) return current ?? null;
+  return Math.max(version, current ?? 0);
+}
+
+export async function completeFileUpdate({
+  fileId,
+  newSize,
+  originalSize,
+  encryptionVersion,
+}) {
   try {
     const userId = await requireAuthenticatedUser();
 
@@ -1937,6 +1963,12 @@ export async function completeFileUpdate({ fileId, newSize, originalSize }) {
     file.size = newSize;
     if (originalSize !== undefined) {
       file.originalSize = originalSize;
+    }
+    if (file.isEncrypted) {
+      file.encryptionVersion = nextEncryptionVersion(
+        file.encryptionVersion,
+        encryptionVersion,
+      );
     }
     file.updatedAt = new Date();
     await file.save();
@@ -2243,6 +2275,7 @@ export async function getEditorFileById({ fileId }) {
         id: file._id.toString(),
         originalName: file.originalName,
         originalMimetype: file.originalMimetype,
+        encryptionVersion: file.encryptionVersion ?? null,
         size: file.size,
         hash: file.hash,
         isEncrypted: file.isEncrypted || false,
@@ -2358,7 +2391,10 @@ export async function createEditorFile({
 }
 
 // 새 에디터 파일 업로드 완료
-export async function completeEditorFileCreation({ fileId }) {
+export async function completeEditorFileCreation({
+  fileId,
+  encryptionVersion,
+}) {
   try {
     const userId = await requireAuthenticatedUser();
     if (!userId) return { error: "로그인이 필요합니다." };
@@ -2370,6 +2406,12 @@ export async function completeEditorFileCreation({ fileId }) {
     if (file.owner.toString() !== userId) return { error: "권한이 없습니다." };
 
     file.uploaded = true;
+    if (file.isEncrypted) {
+      file.encryptionVersion = nextEncryptionVersion(
+        file.encryptionVersion,
+        encryptionVersion,
+      );
+    }
     await file.save();
 
     // 저장소 사용량 업데이트

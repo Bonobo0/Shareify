@@ -131,6 +131,7 @@ export async function downloadFilesAsZip(
               console.log(`복호화 시작: ${file.originalName}`);
               const originalMetadata = {
                 originalName: file.originalName || file.name,
+                encryptionVersion: file.encryptionVersion,
                 originalType:
                   file.originalMimetype ||
                   file.mimeType ||
