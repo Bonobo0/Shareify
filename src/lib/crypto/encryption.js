@@ -7,7 +7,9 @@
  * V2 (강화):   [0xFE: 1B][mode: 1B][salt: 16B][counter: 16B][HMAC: 32B][chunkCount: 4B][encrypted chunks...]
  * V3 (안전):   [0xFD: 1B][mode: 1B][salt: 16B][counter: 16B][verifier: 32B][chunkCount: 4B][encrypted chunks...][MAC: 32B]
  *   -> 64KB 서브청크마다 파일 전역에서 고유한 카운터를 사용해 키스트림 재사용을 제거
- *   -> PBKDF2(512bit)를 암호화 키/MAC 키로 분리, MAC = HMAC-SHA256(macKey, 헤더 + 암호문)으로 변조 감지
+ *   -> PBKDF2(512bit)를 암호화 키/MAC 키로 분리해 변조 감지
+ *      chunkTag_i = HMAC(macKey, u32le(i) || 암호문 청크 i), MAC = HMAC(macKey, 헤더 || chunkTag_0 || ...)
+ *      (WebCrypto에 스트리밍 HMAC이 없어서, 전체 암호문을 한 버퍼에 올리지 않도록 청크 단위로 계산)
  *
  * 주의: V2 매직 바이트는 V1 모드 값(0x01, 0x02)과 겹치지 않는 0xFE 사용
  * 64KB 서브청크로 쪼개서 암호화 (Node.js crypto.subtle.encrypt 64KB 제한 대응)
@@ -103,6 +105,20 @@ async function aesCtrTransformV3(data, key, initialCounter, startBlock) {
 /**
  * V3: PBKDF2-SHA256으로 512비트를 유도해 앞 32바이트는 AES-CTR 키, 뒤 32바이트는 HMAC 키로 사용
  */
+async function v3ChunkTag(macKey, index, ciphertext) {
+  const buf = new Uint8Array(4 + ciphertext.length);
+  new DataView(buf.buffer).setUint32(0, index, true);
+  buf.set(ciphertext, 4);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", macKey, buf));
+}
+
+function v3MacInput(header, chunkTags) {
+  const buf = new Uint8Array(header.length + chunkTags.length * MAC_TAG_SIZE);
+  buf.set(header, 0);
+  chunkTags.forEach((t, i) => buf.set(t, header.length + i * MAC_TAG_SIZE));
+  return buf;
+}
+
 async function deriveV3Keys(password, salt) {
   const km = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveBits"]
@@ -270,6 +286,7 @@ export async function encryptFile(file, password, options = {}) {
     }
 
     // ---- 청크 암호화 ----
+    const chunkTags = [];
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -284,6 +301,7 @@ export async function encryptFile(file, password, options = {}) {
             const encryptedChunk = isV3
               ? await aesCtrTransformV3(chunkData, key, counter, i * CHUNK_BLOCKS)
               : await aesCtrEncrypt(chunkData, key, counter);
+            if (isV3) chunkTags.push(await v3ChunkTag(v3Keys.macKey, i, encryptedChunk));
             controller.enqueue(encryptedChunk);
           }
           controller.close();
@@ -295,7 +313,7 @@ export async function encryptFile(file, password, options = {}) {
 
     let encryptedBlob = await new Response(stream).blob();
     if (isV3) {
-      const tag = await crypto.subtle.sign("HMAC", v3Keys.macKey, await encryptedBlob.arrayBuffer());
+      const tag = await crypto.subtle.sign("HMAC", v3Keys.macKey, v3MacInput(header, chunkTags));
       encryptedBlob = new Blob([encryptedBlob, new Uint8Array(tag)]);
     }
 
@@ -384,8 +402,12 @@ export async function decryptFile(encryptedArrayBuffer, password, originalMetada
       headerSize = off;
       dataEnd = data.length - MAC_TAG_SIZE;
 
+      const chunkTags = [];
+      for (let i = 0, pos = headerSize; i < totalChunks; i++, pos += CHUNK_SIZE) {
+        chunkTags.push(await v3ChunkTag(v3Keys.macKey, i, data.subarray(pos, Math.min(pos + CHUNK_SIZE, dataEnd))));
+      }
       const macValid = await crypto.subtle.verify(
-        "HMAC", v3Keys.macKey, data.subarray(dataEnd), data.subarray(0, dataEnd)
+        "HMAC", v3Keys.macKey, data.subarray(dataEnd), v3MacInput(data.subarray(0, headerSize), chunkTags)
       );
       if (!macValid) throw new Error("파일이 변조되었거나 손상되었습니다");
       key = v3Keys.encKey;

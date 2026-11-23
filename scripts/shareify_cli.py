@@ -449,7 +449,8 @@ def build_encryption_plan(
 
     def stream_factory() -> Iterable[bytes]:
         def generator() -> Iterable[bytes]:
-            mac = hmac.new(mac_key, header_bytes, hashlib.sha256)
+            # Same as v3ChunkTag / v3MacInput in encryption.js.
+            chunk_tags = []
             yield header_bytes
 
             with open(file_path, "rb") as source:
@@ -459,9 +460,14 @@ def build_encryption_plan(
                         break
                     encrypted_chunk = _encrypt_chunk(
                         key, counter, chunk, chunk_index * CHUNK_BLOCKS)
-                    mac.update(encrypted_chunk)
+                    chunk_tags.append(hmac.new(
+                        mac_key,
+                        chunk_index.to_bytes(4, "little") + encrypted_chunk,
+                        hashlib.sha256,
+                    ).digest())
                     yield encrypted_chunk
-            yield mac.digest()
+            yield hmac.new(
+                mac_key, header_bytes + b"".join(chunk_tags), hashlib.sha256).digest()
 
         return generator()
 
